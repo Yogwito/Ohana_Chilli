@@ -2,95 +2,100 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base colors */
+    --background: 0 0% 98%;
+    --foreground: 220 20% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 20% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 20% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Ohana Brand - Fresh, Healthy, Calm */
+    --ohana: 160 84% 39%;
+    --ohana-light: 158 64% 92%;
+    --ohana-foreground: 0 0% 100%;
+    --ohana-muted: 158 30% 85%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Chilli Brand - Bold, Energetic, Fast */
+    --chilli: 45 93% 47%;
+    --chilli-dark: 0 84% 60%;
+    --chilli-foreground: 220 20% 10%;
+    --chilli-muted: 45 100% 94%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Primary uses Ohana green as default */
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 10%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --accent: 45 93% 47%;
+    --accent-foreground: 220 20% 10%;
 
-    --radius: 0.5rem;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --sidebar-background: 0 0% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 160 84% 39%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --radius: 0.75rem;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
+    /* Sidebar (for cart drawer) */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 20% 10%;
+    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 220 20% 10%;
     --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 160 84% 39%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 220 20% 10%;
+    --foreground: 220 14% 96%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 20% 14%;
+    --card-foreground: 220 14% 96%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 20% 14%;
+    --popover-foreground: 220 14% 96%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 160 84% 45%;
+    --primary-foreground: 220 20% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 14% 20%;
+    --secondary-foreground: 220 14% 96%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 14% 20%;
+    --muted-foreground: 220 9% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 45 93% 50%;
+    --accent-foreground: 220 20% 10%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 220 14% 20%;
+    --input: 220 14% 20%;
+    --ring: 160 84% 45%;
+
+    --sidebar-background: 220 20% 12%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-primary: 160 84% 45%;
+    --sidebar-primary-foreground: 220 20% 10%;
+    --sidebar-accent: 220 14% 20%;
+    --sidebar-accent-foreground: 220 14% 96%;
+    --sidebar-border: 220 14% 20%;
+    --sidebar-ring: 160 84% 45%;
   }
 }
 
@@ -100,6 +105,174 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Typography Scale */
+  h1 {
+    @apply text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+  }
+
+  h3 {
+    @apply text-xl sm:text-2xl font-semibold;
+  }
+
+  h4 {
+    @apply text-lg font-semibold;
+  }
+}
+
+@layer components {
+  /* Brand-specific button styles */
+  .btn-ohana {
+    @apply bg-ohana text-ohana-foreground hover:bg-ohana/90 rounded-full px-6 py-3 font-semibold transition-all duration-200 shadow-lg shadow-ohana/25 hover:shadow-xl hover:shadow-ohana/30 hover:-translate-y-0.5;
+  }
+
+  .btn-chilli {
+    @apply bg-chilli text-chilli-foreground hover:bg-chilli/90 rounded-lg px-6 py-3 font-bold uppercase tracking-wide transition-all duration-200 shadow-lg shadow-chilli/25 hover:shadow-xl hover:shadow-chilli/30;
+  }
+
+  /* Brand cards */
+  .card-ohana {
+    @apply bg-card rounded-2xl shadow-lg border border-ohana-muted/50 hover:shadow-xl hover:border-ohana/30 transition-all duration-300;
+  }
+
+  .card-chilli {
+    @apply bg-card rounded-xl shadow-lg border-2 border-chilli/20 hover:shadow-xl hover:border-chilli/40 transition-all duration-200;
+  }
+
+  /* Brand backgrounds */
+  .bg-ohana-gradient {
+    background: linear-gradient(135deg, hsl(var(--ohana-light)) 0%, hsl(0 0% 100%) 100%);
+  }
+
+  .bg-chilli-gradient {
+    background: linear-gradient(135deg, hsl(var(--chilli-muted)) 0%, hsl(0 0% 100%) 100%);
+  }
+
+  /* Product card hover effects */
+  .product-card {
+    @apply bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1;
+  }
+
+  /* Badge styles */
+  .badge-ohana {
+    @apply bg-ohana/10 text-ohana border border-ohana/20 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .badge-chilli {
+    @apply bg-chilli/10 text-chilli-dark border border-chilli/30 rounded-md px-2 py-0.5 text-xs font-bold uppercase;
+  }
+
+  /* Step indicator */
+  .step-active {
+    @apply bg-ohana text-ohana-foreground;
+  }
+
+  .step-completed {
+    @apply bg-ohana/20 text-ohana;
+  }
+
+  .step-inactive {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  /* Ingredient chip */
+  .ingredient-chip {
+    @apply px-3 py-2 rounded-full border-2 transition-all duration-200 cursor-pointer select-none;
+  }
+
+  .ingredient-chip-selected {
+    @apply bg-ohana/10 border-ohana text-ohana font-medium;
+  }
+
+  .ingredient-chip-unselected {
+    @apply bg-card border-border hover:border-ohana/50;
+  }
+
+  .ingredient-chip-disabled {
+    @apply bg-muted border-muted text-muted-foreground cursor-not-allowed opacity-50;
+  }
+
+  /* Counter badge */
+  .counter-badge {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .counter-badge-ok {
+    @apply bg-ohana/10 text-ohana;
+  }
+
+  .counter-badge-full {
+    @apply bg-ohana text-ohana-foreground;
+  }
+
+  .counter-badge-warning {
+    @apply bg-destructive/10 text-destructive;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from { 
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to { 
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Custom scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
   }
 }
