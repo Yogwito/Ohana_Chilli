@@ -28,7 +28,10 @@
     --chilli-foreground: 0 0% 100%;
     --chilli-muted: 25 100% 94%;
 
-    /* Primary uses Ohana green as default */
+    /* Beverages Brand - Neutral, Refreshing */
+    --beverages: 220 14% 30%;
+    --beverages-light: 220 14% 96%;
+    --beverages-foreground: 0 0% 100%;
     --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
 

@@ -65,6 +65,11 @@ export default {
           foreground: "hsl(var(--chilli-foreground))",
           muted: "hsl(var(--chilli-muted))",
         },
+        beverages: {
+          DEFAULT: "hsl(var(--beverages))",
+          light: "hsl(var(--beverages-light))",
+          foreground: "hsl(var(--beverages-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
