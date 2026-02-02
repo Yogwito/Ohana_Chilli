@@ -28,29 +28,29 @@ export default function HomePage() {
             {/* Ohana Card */}
             <Link 
               to="/ohana"
-              className="group relative overflow-hidden rounded-3xl bg-ohana-gradient p-8 sm:p-10 transition-all duration-300 hover:shadow-2xl hover:shadow-ohana/20"
+              className="group relative overflow-hidden rounded-[2rem] bg-ohana-gradient p-8 sm:p-10 transition-all duration-300 hover:shadow-2xl hover:shadow-ohana/30 border border-ohana/20"
             >
               <div className="absolute top-0 right-0 w-32 h-32 sm:w-48 sm:h-48 bg-ohana/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-ohana/5 rounded-full translate-y-1/2 -translate-x-1/2" />
               
               <div className="relative">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-ohana/10 flex items-center justify-center mb-6 group-hover:bg-ohana/20 transition-colors">
-                  <Leaf className="w-8 h-8 sm:w-10 sm:h-10 text-ohana" />
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-ohana to-ohana-dark flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-ohana/40">
+                  <Leaf className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                 </div>
                 
-                <h2 className="text-3xl sm:text-4xl font-bold text-ohana mb-3">Ohana</h2>
-                <p className="text-lg text-muted-foreground mb-6 max-w-sm">
+                <h2 className="text-3xl sm:text-4xl font-medium text-ohana-dark mb-3 tracking-wide">Ohana</h2>
+                <p className="text-lg text-muted-foreground mb-6 max-w-sm leading-relaxed">
                   Bowls frescos y personalizables. Elige tus ingredientes favoritos y crea tu combinación perfecta.
                 </p>
                 
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <span className="px-3 py-1 rounded-full bg-ohana/10 text-ohana text-sm font-medium">
+                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">
                     🥗 Bowls
                   </span>
-                  <span className="px-3 py-1 rounded-full bg-ohana/10 text-ohana text-sm font-medium">
+                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">
                     🥑 Saludable
                   </span>
-                  <span className="px-3 py-1 rounded-full bg-ohana/10 text-ohana text-sm font-medium">
+                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">
                     ✨ Personalizable
                   </span>
                 </div>
@@ -65,29 +65,29 @@ export default function HomePage() {
             {/* Chilli Card */}
             <Link 
               to="/chilli"
-              className="group relative overflow-hidden rounded-2xl bg-chilli-gradient p-8 sm:p-10 transition-all duration-200 hover:shadow-2xl hover:shadow-chilli/20"
+              className="group relative overflow-hidden bg-chilli-gradient p-8 sm:p-10 transition-all duration-150 hover:shadow-2xl hover:shadow-chilli-dark/30 border-l-4 border-chilli-dark"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 sm:w-48 sm:h-48 bg-chilli/10 rounded-lg rotate-12 -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-chilli-dark/5 rounded-lg -rotate-12 translate-y-1/2 -translate-x-1/2" />
+              <div className="absolute top-0 right-0 w-32 h-32 sm:w-48 sm:h-48 bg-chilli/15 rotate-12 -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-chilli-dark/10 -rotate-12 translate-y-1/2 -translate-x-1/2" />
               
               <div className="relative">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-chilli/10 flex items-center justify-center mb-6 group-hover:bg-chilli/20 transition-colors">
-                  <Flame className="w-8 h-8 sm:w-10 sm:h-10 text-chilli-dark" />
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-chilli to-chilli-dark flex items-center justify-center mb-6 group-hover:scale-105 transition-transform duration-150 shadow-lg shadow-chilli-dark/50">
+                  <Flame className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                 </div>
                 
-                <h2 className="text-3xl sm:text-4xl font-bold text-chilli-dark mb-3">Chilli</h2>
+                <h2 className="text-3xl sm:text-4xl font-black text-chilli-dark mb-3 uppercase tracking-wider">Chilli</h2>
                 <p className="text-lg text-muted-foreground mb-6 max-w-sm">
                   Comida rápida con el sabor que te encanta. Hamburguesas, hot dogs, papas y más.
                 </p>
                 
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <span className="px-3 py-1 rounded-lg bg-chilli/10 text-chilli-dark text-sm font-bold">
+                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">
                     🍔 Burgers
                   </span>
-                  <span className="px-3 py-1 rounded-lg bg-chilli/10 text-chilli-dark text-sm font-bold">
+                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">
                     🌭 Hot Dogs
                   </span>
-                  <span className="px-3 py-1 rounded-lg bg-chilli/10 text-chilli-dark text-sm font-bold">
+                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">
                     🍟 Papas
                   </span>
                 </div>

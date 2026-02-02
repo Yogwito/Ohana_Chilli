@@ -54,12 +54,14 @@ export default {
         ohana: {
           DEFAULT: "hsl(var(--ohana))",
           light: "hsl(var(--ohana-light))",
+          dark: "hsl(var(--ohana-dark))",
           foreground: "hsl(var(--ohana-foreground))",
           muted: "hsl(var(--ohana-muted))",
         },
         chilli: {
           DEFAULT: "hsl(var(--chilli))",
           dark: "hsl(var(--chilli-dark))",
+          light: "hsl(var(--chilli-light))",
           foreground: "hsl(var(--chilli-foreground))",
           muted: "hsl(var(--chilli-muted))",
         },
