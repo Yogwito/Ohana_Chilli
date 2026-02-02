@@ -181,10 +181,13 @@ export default function HomePage() {
       </section>
 
       {/* Beverages Teaser */}
-      <section className="py-16 bg-gradient-to-br from-ohana-light via-background to-chilli-muted">
+      <section className="py-16 bg-beverages-light">
         <div className="container">
           <div className="text-center mb-8">
-            <h2 className="mb-2">Refréscate</h2>
+            <span className="inline-block px-4 py-1.5 rounded-full bg-beverages/10 text-beverages text-sm font-medium mb-4">
+              🥤 Para ambas marcas
+            </span>
+            <h2 className="mb-2 text-beverages">Refréscate</h2>
             <p className="text-muted-foreground">Complementa tu orden con nuestras bebidas</p>
           </div>
 
@@ -196,7 +199,7 @@ export default function HomePage() {
 
           <div className="text-center mt-8">
             <Link to="/bebidas">
-              <Button variant="outline" size="lg">
+              <Button variant="outline" size="lg" className="border-beverages/30 text-beverages hover:bg-beverages/5">
                 Ver todas las bebidas
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
