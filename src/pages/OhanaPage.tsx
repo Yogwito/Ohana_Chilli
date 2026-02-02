@@ -14,15 +14,15 @@ export default function OhanaPage() {
       <section className="bg-ohana-gradient py-12 sm:py-16">
         <div className="container">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-full bg-ohana/10 flex items-center justify-center">
-              <Leaf className="w-7 h-7 text-ohana" />
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-ohana to-ohana-dark flex items-center justify-center shadow-lg shadow-ohana/30">
+              <Leaf className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-ohana">Ohana</h1>
+              <h1 className="text-ohana-dark font-medium tracking-wide">Ohana</h1>
               <p className="text-muted-foreground">Bowls frescos y saludables</p>
             </div>
           </div>
-          <p className="text-lg text-muted-foreground max-w-2xl">
+          <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
             Ingredientes frescos, combinaciones deliciosas. Elige un bowl preparado o crea tu propia obra maestra.
           </p>
         </div>

@@ -17,14 +17,14 @@ export default function ChilliPage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="bg-chilli-gradient py-12 sm:py-16">
+      <section className="bg-chilli-gradient py-12 sm:py-16 border-l-4 border-chilli-dark">
         <div className="container">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-xl bg-chilli/10 flex items-center justify-center">
-              <Flame className="w-7 h-7 text-chilli-dark" />
+            <div className="w-14 h-14 bg-gradient-to-r from-chilli to-chilli-dark flex items-center justify-center shadow-lg shadow-chilli-dark/40">
+              <Flame className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-chilli-dark">Chilli</h1>
+              <h1 className="text-chilli-dark font-black uppercase tracking-wider">Chilli</h1>
               <p className="text-muted-foreground">Comida rápida irresistible</p>
             </div>
           </div>
