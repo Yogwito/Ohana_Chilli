@@ -46,6 +46,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     );
   };
 
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price);
+  };
+
   // Calculate price
   const calculatePrice = useMemo(() => {
     if (!selectedSize) return 0;
@@ -127,7 +131,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
     addCustomBowl(customBowl, notes || undefined);
     toast.success('Bowl personalizado agregado al carrito', {
-      description: `${selectedSize.name} - $${calculatePrice} MXN`,
+      description: `${selectedSize.name} - ${formatPrice(calculatePrice)}`,
     });
 
     // Reset
@@ -177,7 +181,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     >
       <span>{ingredient.name}</span>
       {ingredient.price && ingredient.price > 0 && (
-        <span className="text-xs opacity-70">+${ingredient.price}</span>
+        <span className="text-xs opacity-70">+{formatPrice(ingredient.price)}</span>
       )}
       {isSelected && <Check className="w-4 h-4" />}
     </button>
@@ -255,7 +259,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold">{size.name}</h4>
-                    <span className="text-2xl font-bold text-ohana">${size.price}</span>
+                    <span className="text-2xl font-bold text-ohana">{formatPrice(size.price)}</span>
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li>• {size.maxBases} {size.maxBases === 1 ? 'base' : 'bases'}</li>
@@ -411,7 +415,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             <div className="space-y-4 mb-6">
               <div className="flex justify-between items-center pb-4 border-b">
                 <span className="font-medium">Tamaño</span>
-                <span className="font-bold">{selectedSize.name} - ${selectedSize.price}</span>
+                <span className="font-bold">{selectedSize.name} - {formatPrice(selectedSize.price)}</span>
               </div>
               
               <div className="pb-4 border-b">
@@ -428,7 +432,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                 <div className="flex flex-wrap gap-2">
                   {selectedProteins.map(p => (
                     <span key={p.id} className="badge-ohana">
-                      {p.name} {p.price ? `(+$${p.price})` : ''}
+                      {p.name} {p.price ? `(+${formatPrice(p.price)})` : ''}
                     </span>
                   ))}
                 </div>
@@ -456,7 +460,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
             <div className="flex justify-between items-center p-4 bg-ohana-light rounded-xl">
               <span className="text-lg font-semibold">Total</span>
-              <span className="text-2xl font-bold text-ohana">${calculatePrice} MXN</span>
+              <span className="text-2xl font-bold text-ohana">{formatPrice(calculatePrice)}</span>
             </div>
           </div>
         )}
