@@ -1,5 +1,27 @@
 import { Product, Category, Ingredient, BowlSizeRule, Modifier } from '@/types';
 
+// Product Images
+import bowlHawaianoImg from '@/assets/products/bowl-hawaiano.jpg';
+import bowlMediterraneoImg from '@/assets/products/bowl-mediterraneo.jpg';
+import bowlVeganoImg from '@/assets/products/bowl-vegano.jpg';
+import bowlTropicalImg from '@/assets/products/bowl-tropical.jpg';
+import bowlTexmexImg from '@/assets/products/bowl-texmex.jpg';
+import bowlAtunImg from '@/assets/products/bowl-atun.jpg';
+import burgerClasicaImg from '@/assets/products/burger-clasica.jpg';
+import burgerDobleImg from '@/assets/products/burger-doble.jpg';
+import burgerChickenImg from '@/assets/products/burger-chicken.jpg';
+import burgerMushroomImg from '@/assets/products/burger-mushroom.jpg';
+import hotdogClasicoImg from '@/assets/products/hotdog-clasico.jpg';
+import hotdogChilliImg from '@/assets/products/hotdog-chilli.jpg';
+import hotdogBaconImg from '@/assets/products/hotdog-bacon.jpg';
+import papasClasicasImg from '@/assets/products/papas-clasicas.jpg';
+import papasChilliImg from '@/assets/products/papas-chilli.jpg';
+import papasLoadedImg from '@/assets/products/papas-loaded.jpg';
+import mazorcadaClasicaImg from '@/assets/products/mazorcada-clasica.jpg';
+import mazorcadaChilliImg from '@/assets/products/mazorcada-chilli.jpg';
+import nachosClasicosImg from '@/assets/products/nachos-clasicos.jpg';
+import nachosSupremosImg from '@/assets/products/nachos-supremos.jpg';
+
 // Categories
 export const categories: Category[] = [
   // Ohana Categories
@@ -77,6 +99,7 @@ export const ohanaProducts: Product[] = [
     ingredients: ['Salmón', 'Arroz', 'Aguacate', 'Mango', 'Edamame'],
     calories: 520,
     isPopular: true,
+    image: bowlHawaianoImg,
   },
   {
     id: 'ohana-2',
@@ -88,6 +111,7 @@ export const ohanaProducts: Product[] = [
     ingredients: ['Pollo', 'Quinoa', 'Pepino', 'Tomate', 'Garbanzos'],
     calories: 450,
     isGlutenFree: true,
+    image: bowlMediterraneoImg,
   },
   {
     id: 'ohana-3',
@@ -101,6 +125,7 @@ export const ohanaProducts: Product[] = [
     isVegan: true,
     isGlutenFree: true,
     isNew: true,
+    image: bowlVeganoImg,
   },
   {
     id: 'ohana-4',
@@ -112,6 +137,7 @@ export const ohanaProducts: Product[] = [
     ingredients: ['Camarones', 'Arroz', 'Mango', 'Piña', 'Zanahoria'],
     calories: 420,
     isPopular: true,
+    image: bowlTropicalImg,
   },
   {
     id: 'ohana-5',
@@ -123,6 +149,7 @@ export const ohanaProducts: Product[] = [
     ingredients: ['Carne', 'Arroz', 'Frijoles', 'Elote', 'Aguacate'],
     calories: 580,
     isGlutenFree: true,
+    image: bowlTexmexImg,
   },
   {
     id: 'ohana-6',
@@ -134,6 +161,7 @@ export const ohanaProducts: Product[] = [
     ingredients: ['Atún', 'Lechugas', 'Pepino', 'Wakame', 'Mango'],
     calories: 390,
     isNew: true,
+    image: bowlAtunImg,
   },
 ];
 
@@ -149,6 +177,7 @@ export const chilliProducts: Product[] = [
     categoryId: 'chilli-burgers',
     calories: 650,
     isPopular: true,
+    image: burgerClasicaImg,
   },
   {
     id: 'chilli-burger-2',
@@ -159,6 +188,7 @@ export const chilliProducts: Product[] = [
     categoryId: 'chilli-burgers',
     calories: 980,
     isPopular: true,
+    image: burgerDobleImg,
   },
   {
     id: 'chilli-burger-3',
@@ -168,6 +198,7 @@ export const chilliProducts: Product[] = [
     brand: 'chilli',
     categoryId: 'chilli-burgers',
     calories: 720,
+    image: burgerChickenImg,
   },
   {
     id: 'chilli-burger-4',
@@ -178,6 +209,7 @@ export const chilliProducts: Product[] = [
     categoryId: 'chilli-burgers',
     calories: 680,
     isNew: true,
+    image: burgerMushroomImg,
   },
   
   // Hot Dogs
@@ -189,6 +221,7 @@ export const chilliProducts: Product[] = [
     brand: 'chilli',
     categoryId: 'chilli-hotdogs',
     calories: 380,
+    image: hotdogClasicoImg,
   },
   {
     id: 'chilli-hotdog-2',
@@ -199,6 +232,7 @@ export const chilliProducts: Product[] = [
     categoryId: 'chilli-hotdogs',
     calories: 520,
     isPopular: true,
+    image: hotdogChilliImg,
   },
   {
     id: 'chilli-hotdog-3',
@@ -208,6 +242,7 @@ export const chilliProducts: Product[] = [
     brand: 'chilli',
     categoryId: 'chilli-hotdogs',
     calories: 580,
+    image: hotdogBaconImg,
   },
   
   // Fries
@@ -219,6 +254,7 @@ export const chilliProducts: Product[] = [
     brand: 'chilli',
     categoryId: 'chilli-fries',
     calories: 320,
+    image: papasClasicasImg,
   },
   {
     id: 'chilli-fries-2',
@@ -229,6 +265,7 @@ export const chilliProducts: Product[] = [
     categoryId: 'chilli-fries',
     calories: 580,
     isPopular: true,
+    image: papasChilliImg,
   },
   {
     id: 'chilli-fries-3',
@@ -238,6 +275,7 @@ export const chilliProducts: Product[] = [
     brand: 'chilli',
     categoryId: 'chilli-fries',
     calories: 620,
+    image: papasLoadedImg,
   },
   
   // Mazorcadas
@@ -250,6 +288,7 @@ export const chilliProducts: Product[] = [
     categoryId: 'chilli-mazorcadas',
     calories: 280,
     isPopular: true,
+    image: mazorcadaClasicaImg,
   },
   {
     id: 'chilli-mazorcada-2',
@@ -259,6 +298,7 @@ export const chilliProducts: Product[] = [
     brand: 'chilli',
     categoryId: 'chilli-mazorcadas',
     calories: 340,
+    image: mazorcadaChilliImg,
   },
   
   // Nachos
@@ -270,6 +310,7 @@ export const chilliProducts: Product[] = [
     brand: 'chilli',
     categoryId: 'chilli-nachos',
     calories: 680,
+    image: nachosClasicosImg,
   },
   {
     id: 'chilli-nachos-2',
@@ -280,6 +321,7 @@ export const chilliProducts: Product[] = [
     categoryId: 'chilli-nachos',
     calories: 920,
     isPopular: true,
+    image: nachosSupremosImg,
   },
 ];
 
