@@ -13,10 +13,14 @@ export default function ProductCard({ product, variant = 'default' }: ProductCar
   const { addProduct } = useCart();
   const isOhana = product.brand === 'ohana';
 
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price);
+  };
+
   const handleAddToCart = () => {
     addProduct(product);
     toast.success(`${product.name} agregado al carrito`, {
-      description: `$${product.price} MXN`,
+      description: formatPrice(product.price),
     });
   };
 
@@ -36,7 +40,7 @@ export default function ProductCard({ product, variant = 'default' }: ProductCar
           <h4 className="font-semibold text-sm truncate">{product.name}</h4>
           <p className="text-xs text-muted-foreground line-clamp-1">{product.description}</p>
           <p className={`text-sm font-bold mt-1 ${isOhana ? 'text-ohana' : 'text-chilli-dark'}`}>
-            ${product.price}
+            {formatPrice(product.price)}
           </p>
         </div>
 
@@ -134,7 +138,7 @@ export default function ProductCard({ product, variant = 'default' }: ProductCar
         {/* Price and Add */}
         <div className="flex items-center justify-between mt-auto pt-2 border-t">
           <span className={`text-xl font-bold ${isOhana ? 'text-ohana' : 'text-chilli-dark'}`}>
-            ${product.price}
+            {formatPrice(product.price)}
           </span>
           <Button
             onClick={handleAddToCart}

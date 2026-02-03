@@ -14,6 +14,10 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
   const { cart, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
 
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price);
+  };
+
   const handleCheckout = () => {
     onOpenChange(false);
     navigate('/checkout');
@@ -137,7 +141,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
 
                         {/* Price */}
                         <span className="font-semibold">
-                          ${item.totalPrice}
+                          {formatPrice(item.totalPrice)}
                         </span>
                       </div>
                     </div>
@@ -150,11 +154,11 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
             <div className="border-t pt-4 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-semibold">${cart.subtotal}</span>
+                <span className="font-semibold">{formatPrice(cart.subtotal)}</span>
               </div>
               <div className="flex justify-between items-center text-lg">
                 <span className="font-semibold">Total</span>
-                <span className="font-bold text-ohana">${cart.total} MXN</span>
+                <span className="font-bold text-ohana">{formatPrice(cart.total)}</span>
               </div>
               <Button
                 onClick={handleCheckout}

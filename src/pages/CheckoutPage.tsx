@@ -51,6 +51,10 @@ export default function CheckoutPage() {
     }
   };
 
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price);
+  };
+
   const formatBowlSummary = (item: typeof cart.items[0]) => {
     if (!item.customBowl) return '';
     const bowl = item.customBowl;
@@ -75,9 +79,9 @@ export default function CheckoutPage() {
     cart.items.forEach(item => {
       const brand = item.brand === 'ohana' ? '🥗' : '🍔';
       if (item.type === 'product' && item.product) {
-        lines.push(`${brand} ${item.quantity}x ${item.product.name} - $${item.totalPrice}`);
+        lines.push(`${brand} ${item.quantity}x ${item.product.name} - ${formatPrice(item.totalPrice)}`);
       } else if (item.type === 'custom-bowl' && item.customBowl) {
-        lines.push(`${brand} 1x Bowl Personalizado - $${item.totalPrice}`);
+        lines.push(`${brand} 1x Bowl Personalizado - ${formatPrice(item.totalPrice)}`);
         lines.push(`   └ ${formatBowlSummary(item)}`);
       }
       if (item.notes) {
@@ -85,7 +89,7 @@ export default function CheckoutPage() {
       }
     });
     
-    lines.push(``, `💰 *Total: $${cart.total} MXN*`);
+    lines.push(``, `💰 *Total: ${formatPrice(cart.total)}*`);
     
     if (form.notes) {
       lines.push(``, `📝 *Notas:* ${form.notes}`);
@@ -118,7 +122,7 @@ export default function CheckoutPage() {
     
     // Generate WhatsApp URL
     const message = generateWhatsAppMessage();
-    const whatsappUrl = `https://wa.me/525512345678?text=${message}`;
+    const whatsappUrl = `https://wa.me/573001234567?text=${message}`;
     
     // Open WhatsApp
     window.open(whatsappUrl, '_blank');
@@ -210,7 +214,7 @@ export default function CheckoutPage() {
                       type="tel"
                       value={form.phone}
                       onChange={(e) => updateField('phone', e.target.value)}
-                      placeholder="+52 55 1234 5678"
+                      placeholder="+57 300 123 4567"
                       className={errors.phone ? 'border-destructive' : ''}
                     />
                     {errors.phone && (
@@ -320,10 +324,10 @@ export default function CheckoutPage() {
                         {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.quantity}x ${item.unitPrice}
+                        {item.quantity}x {formatPrice(item.unitPrice)}
                       </p>
                     </div>
-                    <span className="font-medium">${item.totalPrice}</span>
+                    <span className="font-medium">{formatPrice(item.totalPrice)}</span>
                   </div>
                 ))}
               </div>
@@ -331,11 +335,11 @@ export default function CheckoutPage() {
               <div className="border-t pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${cart.subtotal}</span>
+                  <span>{formatPrice(cart.subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-ohana">${cart.total} MXN</span>
+                  <span className="text-ohana">{formatPrice(cart.total)}</span>
                 </div>
               </div>
             </div>
