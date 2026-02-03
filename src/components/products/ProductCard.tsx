@@ -27,13 +27,17 @@ export default function ProductCard({ product, variant = 'default' }: ProductCar
   if (variant === 'compact') {
     return (
       <div className={`product-card ${isOhana ? 'card-ohana' : 'card-chilli'} flex items-center p-3 gap-3`}>
-        {/* Image placeholder */}
-        <div className={`w-16 h-16 rounded-lg flex-shrink-0 flex items-center justify-center ${
+        {/* Image */}
+        <div className={`w-16 h-16 rounded-lg flex-shrink-0 overflow-hidden ${
           isOhana ? 'bg-ohana-light' : 'bg-chilli-muted'
         }`}>
-          <span className="text-2xl">
-            {isOhana ? '🥗' : '🍔'}
-          </span>
+          {product.image ? (
+            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-2xl">{isOhana ? '🥗' : '🍔'}</span>
+            </div>
+          )}
         </div>
         
         <div className="flex-1 min-w-0">
@@ -59,26 +63,36 @@ export default function ProductCard({ product, variant = 'default' }: ProductCar
   return (
     <div className={`product-card ${isOhana ? 'card-ohana' : 'card-chilli'} flex flex-col h-full`}>
       {/* Image area */}
-      <div className={`relative aspect-[4/3] flex items-center justify-center ${
+      <div className={`relative aspect-[4/3] overflow-hidden ${
         isOhana ? 'bg-ohana-light' : 'bg-chilli-muted'
       }`}>
-        <span className="text-6xl">
-          {isOhana ? '🥗' : product.categoryId.includes('burger') ? '🍔' : 
-            product.categoryId.includes('hotdog') ? '🌭' : 
-            product.categoryId.includes('fries') ? '🍟' : 
-            product.categoryId.includes('mazorcada') ? '🌽' : '🧀'}
-        </span>
+        {product.image ? (
+          <img 
+            src={product.image} 
+            alt={product.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-6xl">
+              {isOhana ? '🥗' : product.categoryId.includes('burger') ? '🍔' : 
+                product.categoryId.includes('hotdog') ? '🌭' : 
+                product.categoryId.includes('fries') ? '🍟' : 
+                product.categoryId.includes('mazorcada') ? '🌽' : '🧀'}
+            </span>
+          </div>
+        )}
         
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-wrap gap-1">
           {product.isPopular && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-2xs font-medium">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/90 backdrop-blur-sm text-accent-foreground text-2xs font-medium">
               <Star className="w-3 h-3" />
               Popular
             </span>
           )}
           {product.isNew && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-ohana text-ohana-foreground text-2xs font-medium">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-ohana/90 backdrop-blur-sm text-ohana-foreground text-2xs font-medium">
               <Sparkles className="w-3 h-3" />
               Nuevo
             </span>
@@ -88,12 +102,12 @@ export default function ProductCard({ product, variant = 'default' }: ProductCar
         {/* Diet badges */}
         <div className="absolute top-2 right-2 flex gap-1">
           {product.isVegan && (
-            <span className="p-1 rounded-full bg-ohana/20" title="Vegano">
+            <span className="p-1 rounded-full bg-ohana/20 backdrop-blur-sm" title="Vegano">
               <Leaf className="w-3 h-3 text-ohana" />
             </span>
           )}
           {product.isGlutenFree && (
-            <span className="p-1 rounded-full bg-amber-500/20" title="Sin gluten">
+            <span className="p-1 rounded-full bg-amber-500/20 backdrop-blur-sm" title="Sin gluten">
               <Wheat className="w-3 h-3 text-amber-600" />
             </span>
           )}
