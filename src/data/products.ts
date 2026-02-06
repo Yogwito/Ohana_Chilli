@@ -21,6 +21,16 @@ import mazorcadaClasicaImg from '@/assets/products/mazorcada-clasica.jpg';
 import mazorcadaChilliImg from '@/assets/products/mazorcada-chilli.jpg';
 import nachosClasicosImg from '@/assets/products/nachos-clasicos.jpg';
 import nachosSupremosImg from '@/assets/products/nachos-supremos.jpg';
+import bevCocacolaImg from '@/assets/products/bev-cocacola.jpg';
+import bevCocacolaZeroImg from '@/assets/products/bev-cocacola-zero.jpg';
+import bevSpriteImg from '@/assets/products/bev-sprite.jpg';
+import bevFantaImg from '@/assets/products/bev-fanta.jpg';
+import bevJugoVerdeImg from '@/assets/products/bev-jugo-verde.jpg';
+import bevJugoNaranjaImg from '@/assets/products/bev-jugo-naranja.jpg';
+import bevLimonadaImg from '@/assets/products/bev-limonada.jpg';
+import bevSmoothieImg from '@/assets/products/bev-smoothie.jpg';
+import bevAguaImg from '@/assets/products/bev-agua.jpg';
+import bevMineralImg from '@/assets/products/bev-mineral.jpg';
 
 // Categories
 export const categories: Category[] = [
@@ -328,20 +338,20 @@ export const chilliProducts: Product[] = [
 // Beverages
 export const beverages: Product[] = [
   // Sodas
-  { id: 'bev-1', name: 'Coca-Cola', description: 'Refresco 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 140 },
-  { id: 'bev-2', name: 'Coca-Cola Zero', description: 'Refresco sin azúcar 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 0 },
-  { id: 'bev-3', name: 'Sprite', description: 'Refresco de lima-limón 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 130 },
-  { id: 'bev-4', name: 'Fanta Naranja', description: 'Refresco de naranja 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 150 },
+  { id: 'bev-1', name: 'Coca-Cola', description: 'Refresco 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 140, image: bevCocacolaImg },
+  { id: 'bev-2', name: 'Coca-Cola Zero', description: 'Refresco sin azúcar 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 0, image: bevCocacolaZeroImg },
+  { id: 'bev-3', name: 'Sprite', description: 'Refresco de lima-limón 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 130, image: bevSpriteImg },
+  { id: 'bev-4', name: 'Fanta Naranja', description: 'Refresco de naranja 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-sodas', calories: 150, image: bevFantaImg },
   
   // Juices
-  { id: 'bev-5', name: 'Jugo Verde', description: 'Espinaca, manzana, pepino, jengibre y limón', price: 10900, brand: 'ohana', categoryId: 'beverages-juices', calories: 120, isVegan: true },
-  { id: 'bev-6', name: 'Jugo de Naranja', description: 'Naranja natural recién exprimida', price: 8900, brand: 'ohana', categoryId: 'beverages-juices', calories: 110, isVegan: true },
-  { id: 'bev-7', name: 'Limonada Natural', description: 'Limón fresco, agua y un toque de menta', price: 6900, brand: 'ohana', categoryId: 'beverages-juices', calories: 80, isVegan: true },
-  { id: 'bev-8', name: 'Smoothie Tropical', description: 'Mango, piña, plátano y leche de coco', price: 12900, brand: 'ohana', categoryId: 'beverages-juices', calories: 220, isVegan: true },
+  { id: 'bev-5', name: 'Jugo Verde', description: 'Espinaca, manzana, pepino, jengibre y limón', price: 10900, brand: 'ohana', categoryId: 'beverages-juices', calories: 120, isVegan: true, image: bevJugoVerdeImg },
+  { id: 'bev-6', name: 'Jugo de Naranja', description: 'Naranja natural recién exprimida', price: 8900, brand: 'ohana', categoryId: 'beverages-juices', calories: 110, isVegan: true, image: bevJugoNaranjaImg },
+  { id: 'bev-7', name: 'Limonada Natural', description: 'Limón fresco, agua y un toque de menta', price: 6900, brand: 'ohana', categoryId: 'beverages-juices', calories: 80, isVegan: true, image: bevLimonadaImg },
+  { id: 'bev-8', name: 'Smoothie Tropical', description: 'Mango, piña, plátano y leche de coco', price: 12900, brand: 'ohana', categoryId: 'beverages-juices', calories: 220, isVegan: true, image: bevSmoothieImg },
   
   // Water
-  { id: 'bev-9', name: 'Agua Natural', description: 'Botella 500ml', price: 3500, brand: 'ohana', categoryId: 'beverages-water', calories: 0 },
-  { id: 'bev-10', name: 'Agua Mineral', description: 'Topo Chico 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-water', calories: 0 },
+  { id: 'bev-9', name: 'Agua Natural', description: 'Botella 500ml', price: 3500, brand: 'ohana', categoryId: 'beverages-water', calories: 0, image: bevAguaImg },
+  { id: 'bev-10', name: 'Agua Mineral', description: 'Topo Chico 355ml', price: 4500, brand: 'ohana', categoryId: 'beverages-water', calories: 0, image: bevMineralImg },
 ];
 
 // All products combined
