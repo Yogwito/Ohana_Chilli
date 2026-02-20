@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -120,6 +121,31 @@ export default function CheckoutPage() {
     
     setIsSubmitting(true);
     
+    try {
+      // Guardar pedido en la base de datos
+      const { error: dbError } = await supabase.from('orders').insert({
+        customer_name: form.name,
+        customer_phone: form.phone,
+        order_type: form.orderType,
+        address: form.address || null,
+        notes: form.notes || null,
+        items: cart.items as unknown as any,
+        subtotal: cart.subtotal,
+        total: cart.total,
+        status: 'pending',
+        whatsapp_sent: true,
+      });
+
+      if (dbError) {
+        console.error('Error saving order:', dbError);
+        toast.error('Error al guardar el pedido', {
+          description: 'Pero tu orden se enviará por WhatsApp igualmente',
+        });
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+    }
+
     // Generate WhatsApp URL
     const message = generateWhatsAppMessage();
     const whatsappUrl = `https://wa.me/573001234567?text=${message}`;
