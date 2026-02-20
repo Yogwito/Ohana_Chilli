@@ -43,20 +43,20 @@ export default function Footer() {
             <h4 className="font-semibold mb-4 text-background">Contacto</h4>
             <div className="flex flex-col gap-3">
               <a 
-                href="https://maps.google.com" 
+                href="https://maps.app.goo.gl/9cjJJnHzF415GcWBA?g_st=ic" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="flex items-start gap-2 text-muted-foreground hover:text-background text-sm transition-colors"
               >
                 <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>Av. Principal #123, Col. Centro, Ciudad</span>
+                <span>c.c Cable Plaza Piso 4 Terraza, Manizales, Caldas </span>
               </a>
               <a 
                 href="tel:+525512345678" 
                 className="flex items-center gap-2 text-muted-foreground hover:text-background text-sm transition-colors"
               >
                 <Phone className="h-4 w-4 shrink-0" />
-                <span>+52 55 1234 5678</span>
+                <span>+57 321 5667170</span>
               </a>
             </div>
           </div>
@@ -71,14 +71,14 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 shrink-0" />
-                <span>Sáb - Dom: 12:00 - 22:00</span>
+                <span>Sáb - Dom: 11:00 - 21:00</span>
               </div>
             </div>
             
             {/* Social */}
             <div className="flex gap-4 mt-6">
               <a 
-                href="https://instagram.com" 
+                href="https://www.instagram.com/bowlsohana?igsh=a2lhejY1emxoN2Uy" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-background transition-colors"
@@ -87,7 +87,7 @@ export default function Footer() {
                 <Instagram className="h-5 w-5" />
               </a>
               <a 
-                href="https://facebook.com" 
+                href="https://www.facebook.com/share/1FMJDYhpdD/?mibextid=wwXIfr" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-background transition-colors"
