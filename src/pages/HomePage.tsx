@@ -2,10 +2,13 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Leaf, Flame, Utensils, ShoppingCart, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/products/ProductCard';
-import { getFeaturedProducts, beverages } from '@/data/products';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useFeaturedProducts, useBeverages } from '@/hooks/use-catalog';
 
 export default function HomePage() {
-  const featuredProducts = getFeaturedProducts();
+  const { data: featuredProducts = [], isLoading: loadingFeatured } = useFeaturedProducts();
+  const { data: allBeverages = [], isLoading: loadingBev } = useBeverages();
+  const beveragesPreview = allBeverages.slice(0, 4);
 
   return (
     <div className="min-h-screen">
@@ -44,15 +47,9 @@ export default function HomePage() {
                 </p>
                 
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">
-                    🥗 Bowls
-                  </span>
-                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">
-                    🥑 Saludable
-                  </span>
-                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">
-                    ✨ Personalizable
-                  </span>
+                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">🥗 Bowls</span>
+                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">🥑 Saludable</span>
+                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">✨ Personalizable</span>
                 </div>
 
                 <Button className="btn-ohana group-hover:translate-x-1 transition-transform">
@@ -81,15 +78,9 @@ export default function HomePage() {
                 </p>
                 
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">
-                    🍔 Burgers
-                  </span>
-                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">
-                    🌭 Hot Dogs
-                  </span>
-                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">
-                    🍟 Papas
-                  </span>
+                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">🍔 Burgers</span>
+                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">🌭 Hot Dogs</span>
+                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">🍟 Papas</span>
                 </div>
 
                 <Button className="btn-chilli group-hover:scale-105 transition-transform">
@@ -111,46 +102,29 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Step 1 */}
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-ohana/10 flex items-center justify-center mx-auto mb-4">
                 <Utensils className="w-8 h-8 text-ohana" />
               </div>
-              <div className="w-8 h-8 rounded-full bg-ohana text-ohana-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">
-                1
-              </div>
+              <div className="w-8 h-8 rounded-full bg-ohana text-ohana-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">1</div>
               <h3 className="text-lg font-semibold mb-2">Explora el Menú</h3>
-              <p className="text-muted-foreground">
-                Elige entre bowls saludables de Ohana o los antojitos de Chilli
-              </p>
+              <p className="text-muted-foreground">Elige entre bowls saludables de Ohana o los antojitos de Chilli</p>
             </div>
-
-            {/* Step 2 */}
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center mx-auto mb-4">
                 <ShoppingCart className="w-8 h-8 text-chilli-dark" />
               </div>
-              <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">
-                2
-              </div>
+              <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">2</div>
               <h3 className="text-lg font-semibold mb-2">Personaliza y Agrega</h3>
-              <p className="text-muted-foreground">
-                Arma tu bowl o elige tus extras favoritos
-              </p>
+              <p className="text-muted-foreground">Arma tu bowl o elige tus extras favoritos</p>
             </div>
-
-            {/* Step 3 */}
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <CreditCard className="w-8 h-8 text-primary" />
               </div>
-              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">
-                3
-              </div>
+              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">3</div>
               <h3 className="text-lg font-semibold mb-2">Paga y Recoge</h3>
-              <p className="text-muted-foreground">
-                Completa tu orden y recógela cuando esté lista
-              </p>
+              <p className="text-muted-foreground">Completa tu orden y recógela cuando esté lista</p>
             </div>
           </div>
         </div>
@@ -172,11 +146,17 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loadingFeatured ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-80 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -184,18 +164,22 @@ export default function HomePage() {
       <section className="py-16 bg-beverages-light">
         <div className="container">
           <div className="text-center mb-8">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-beverages/10 text-beverages text-sm font-medium mb-4">
-              🥤 Para ambas marcas
-            </span>
+            <span className="inline-block px-4 py-1.5 rounded-full bg-beverages/10 text-beverages text-sm font-medium mb-4">🥤 Para ambas marcas</span>
             <h2 className="mb-2 text-beverages">Refréscate</h2>
             <p className="text-muted-foreground">Complementa tu orden con nuestras bebidas</p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {beverages.slice(0, 4).map((beverage) => (
-              <ProductCard key={beverage.id} product={beverage} variant="compact" />
-            ))}
-          </div>
+          {loadingBev ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {beveragesPreview.map((beverage) => (
+                <ProductCard key={beverage.id} product={beverage} variant="compact" />
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-8">
             <Link to="/bebidas">
@@ -211,12 +195,8 @@ export default function HomePage() {
       {/* CTA Section */}
       <section className="py-20 bg-foreground text-background">
         <div className="container text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-            ¿Listo para ordenar?
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-            Mezcla lo mejor de ambos mundos en una sola orden
-          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">¿Listo para ordenar?</h2>
+          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">Mezcla lo mejor de ambos mundos en una sola orden</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/ohana">
               <Button size="lg" className="btn-ohana w-full sm:w-auto">

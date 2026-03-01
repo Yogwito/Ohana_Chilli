@@ -14,19 +14,169 @@ export type Database = {
   }
   public: {
     Tables: {
+      bowl_rules: {
+        Row: {
+          accompaniments: number
+          bases: number
+          name: string
+          price_cents: number
+          proteins: number
+          size: string
+        }
+        Insert: {
+          accompaniments?: number
+          bases?: number
+          name: string
+          price_cents?: number
+          proteins?: number
+          size: string
+        }
+        Update: {
+          accompaniments?: number
+          bases?: number
+          name?: string
+          price_cents?: number
+          proteins?: number
+          size?: string
+        }
+        Relationships: []
+      }
+      brands: {
+        Row: {
+          id: string
+          name: string
+        }
+        Insert: {
+          id: string
+          name: string
+        }
+        Update: {
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          brand_id: string
+          icon: string | null
+          id: string
+          name: string
+          slug: string | null
+        }
+        Insert: {
+          brand_id: string
+          icon?: string | null
+          id: string
+          name: string
+          slug?: string | null
+        }
+        Update: {
+          brand_id?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          slug?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingredients: {
+        Row: {
+          calories: number | null
+          id: string
+          is_active: boolean
+          is_gluten_free: boolean | null
+          is_vegan: boolean | null
+          name: string
+          price_cents: number
+          type: string
+        }
+        Insert: {
+          calories?: number | null
+          id: string
+          is_active?: boolean
+          is_gluten_free?: boolean | null
+          is_vegan?: boolean | null
+          name: string
+          price_cents?: number
+          type: string
+        }
+        Update: {
+          calories?: number | null
+          id?: string
+          is_active?: boolean
+          is_gluten_free?: boolean | null
+          is_vegan?: boolean | null
+          name?: string
+          price_cents?: number
+          type?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          brand_id: string | null
+          details: Json | null
+          id: string
+          name: string
+          order_id: string
+          quantity: number
+          unit_price_cents: number
+        }
+        Insert: {
+          brand_id?: string | null
+          details?: Json | null
+          id?: string
+          name: string
+          order_id: string
+          quantity?: number
+          unit_price_cents?: number
+        }
+        Update: {
+          brand_id?: string | null
+          details?: Json | null
+          id?: string
+          name?: string
+          order_id?: string
+          quantity?: number
+          unit_price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           address: string | null
           created_at: string
           customer_name: string
-          customer_phone: string
           id: string
-          items: Json
           notes: string | null
           order_type: string
+          phone: string
           status: string
-          subtotal: number
-          total: number
+          total_cents: number
           updated_at: string
           whatsapp_sent: boolean
         }
@@ -34,14 +184,12 @@ export type Database = {
           address?: string | null
           created_at?: string
           customer_name: string
-          customer_phone: string
           id?: string
-          items?: Json
           notes?: string | null
           order_type: string
+          phone: string
           status?: string
-          subtotal?: number
-          total?: number
+          total_cents?: number
           updated_at?: string
           whatsapp_sent?: boolean
         }
@@ -49,16 +197,95 @@ export type Database = {
           address?: string | null
           created_at?: string
           customer_name?: string
-          customer_phone?: string
           id?: string
-          items?: Json
           notes?: string | null
           order_type?: string
+          phone?: string
           status?: string
-          subtotal?: number
-          total?: number
+          total_cents?: number
           updated_at?: string
           whatsapp_sent?: boolean
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          brand_id: string
+          calories: number | null
+          category_id: string
+          description: string | null
+          id: string
+          image_url: string | null
+          ingredients_list: string[] | null
+          is_active: boolean
+          is_gluten_free: boolean | null
+          is_new: boolean | null
+          is_popular: boolean | null
+          is_vegan: boolean | null
+          name: string
+          price_cents: number
+        }
+        Insert: {
+          brand_id: string
+          calories?: number | null
+          category_id: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          ingredients_list?: string[] | null
+          is_active?: boolean
+          is_gluten_free?: boolean | null
+          is_new?: boolean | null
+          is_popular?: boolean | null
+          is_vegan?: boolean | null
+          name: string
+          price_cents?: number
+        }
+        Update: {
+          brand_id?: string
+          calories?: number | null
+          category_id?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          ingredients_list?: string[] | null
+          is_active?: boolean
+          is_gluten_free?: boolean | null
+          is_new?: boolean | null
+          is_popular?: boolean | null
+          is_vegan?: boolean | null
+          name?: string
+          price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settings: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
         }
         Relationships: []
       }
