@@ -1,17 +1,19 @@
 import { useState, useMemo } from 'react';
 import ProductCard from '@/components/products/ProductCard';
-import { beverages, getBeverageCategories } from '@/data/products';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useBeverages, useBeverageCategories } from '@/hooks/use-catalog';
 import { cn } from '@/lib/utils';
 import { GlassWater } from 'lucide-react';
 
 export default function BeveragesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const beverageCategories = getBeverageCategories();
+  const { data: beverageCategories = [] } = useBeverageCategories();
+  const { data: beverages = [], isLoading, error } = useBeverages();
 
   const filteredBeverages = useMemo(() => {
     if (!selectedCategory) return beverages;
     return beverages.filter(b => b.categoryId === selectedCategory);
-  }, [selectedCategory]);
+  }, [selectedCategory, beverages]);
 
   return (
     <div className="min-h-screen">
@@ -68,11 +70,21 @@ export default function BeveragesPage() {
           </div>
 
           {/* Products Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredBeverages.map((beverage) => (
-              <ProductCard key={beverage.id} product={beverage} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-80 rounded-xl" />)}
+            </div>
+          ) : error ? (
+            <div className="text-center py-12 text-destructive">
+              <p>Error al cargar las bebidas. Intenta de nuevo.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredBeverages.map((beverage) => (
+                <ProductCard key={beverage.id} product={beverage} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

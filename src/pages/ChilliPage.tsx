@@ -1,18 +1,19 @@
 import { useState, useMemo } from 'react';
 import ProductCard from '@/components/products/ProductCard';
 import CategoryFilter from '@/components/products/CategoryFilter';
-import { chilliProducts, categories } from '@/data/products';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useProducts, useCategories } from '@/hooks/use-catalog';
 import { Flame } from 'lucide-react';
 
 export default function ChilliPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
-  const chilliCategories = categories.filter(c => c.brand === 'chilli');
+  const { data: chilliCategories = [] } = useCategories('chilli');
+  const { data: chilliProducts = [], isLoading, error } = useProducts({ brandId: 'chilli' });
 
   const filteredProducts = useMemo(() => {
     if (!selectedCategory) return chilliProducts;
     return chilliProducts.filter(p => p.categoryId === selectedCategory);
-  }, [selectedCategory]);
+  }, [selectedCategory, chilliProducts]);
 
   return (
     <div className="min-h-screen">
@@ -38,7 +39,6 @@ export default function ChilliPage() {
       {/* Menu */}
       <section className="py-8 sm:py-12">
         <div className="container">
-          {/* Category Filter */}
           <div className="mb-8">
             <CategoryFilter
               categories={chilliCategories}
@@ -48,14 +48,23 @@ export default function ChilliPage() {
             />
           </div>
 
-          {/* Products Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-80 rounded-xl" />)}
+            </div>
+          ) : error ? (
+            <div className="text-center py-12 text-destructive">
+              <p>Error al cargar los productos. Intenta de nuevo.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
 
-          {filteredProducts.length === 0 && (
+          {!isLoading && filteredProducts.length === 0 && (
             <div className="text-center py-12">
               <p className="text-muted-foreground">No se encontraron productos en esta categoría</p>
             </div>
