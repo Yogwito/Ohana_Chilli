@@ -88,6 +88,30 @@ export type Database = {
           },
         ]
       }
+      delivery_zones: {
+        Row: {
+          created_at: string
+          fee_cents: number
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          fee_cents: number
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          fee_cents?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       ingredients: {
         Row: {
           calories: number | null
@@ -171,6 +195,8 @@ export type Database = {
           address: string | null
           created_at: string
           customer_name: string
+          delivery_fee_cents: number
+          delivery_zone: string | null
           id: string
           notes: string | null
           order_type: string
@@ -184,6 +210,8 @@ export type Database = {
           address?: string | null
           created_at?: string
           customer_name: string
+          delivery_fee_cents?: number
+          delivery_zone?: string | null
           id?: string
           notes?: string | null
           order_type: string
@@ -197,6 +225,8 @@ export type Database = {
           address?: string | null
           created_at?: string
           customer_name?: string
+          delivery_fee_cents?: number
+          delivery_zone?: string | null
           id?: string
           notes?: string | null
           order_type?: string

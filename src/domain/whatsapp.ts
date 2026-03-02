@@ -7,35 +7,45 @@ interface OrderInfo {
   phone: string;
   orderType: 'pickup' | 'delivery';
   address?: string;
+  deliveryZone?: string;
+  deliveryFeeCents?: number;
   notes?: string;
   orderId: string;
 }
 
 export function generateWhatsAppMessage(items: CartItem[], total: number, info: OrderInfo): string {
   const lines = [
-    `🛒 *Nueva Orden - Ohana & Chilli*`,
-    `📋 *Ref:* ${info.orderId.slice(0, 8).toUpperCase()}`,
+    'Nueva Orden - Ohana & Chilli',
+    `Ref: ${info.orderId.slice(0, 8).toUpperCase()}`,
     '',
-    `👤 *Cliente:* ${info.name}`,
-    `📞 *Teléfono:* ${info.phone}`,
-    `📍 *Tipo:* ${info.orderType === 'pickup' ? 'Recoger en sucursal' : 'Entrega a domicilio'}`,
+    `Cliente: ${info.name}`,
+    `Telefono: ${info.phone}`,
+    `Tipo: ${info.orderType === 'pickup' ? 'Recoger en sucursal' : 'Entrega a domicilio'}`,
   ];
-  if (info.orderType === 'delivery' && info.address) {
-    lines.push(`🏠 *Dirección:* ${info.address}`);
+
+  if (info.orderType === 'delivery') {
+    if (info.address) {
+      lines.push(`Direccion: ${info.address}`);
+    }
+    lines.push(`Barrio: ${info.deliveryZone ?? 'No especificado'}`);
+    lines.push(`Domicilio: ${formatPrice(info.deliveryFeeCents ?? 0)}`);
   }
-  lines.push('', '*Productos:*');
-  items.forEach(item => {
-    const brand = item.brand === 'ohana' ? '🥗' : '🍔';
+
+  lines.push('', 'Productos:');
+
+  items.forEach((item) => {
+    const brand = item.brand === 'ohana' ? '[Ohana]' : '[Chilli]';
     if (item.type === 'product' && item.product) {
       lines.push(`${brand} ${item.quantity}x ${item.product.name} - ${formatPrice(item.totalPrice)}`);
     } else if (item.type === 'custom-bowl' && item.customBowl) {
       lines.push(`${brand} 1x Bowl Personalizado - ${formatPrice(item.totalPrice)}`);
-      lines.push(`   └ ${formatBowlDetail(item.customBowl)}`);
+      lines.push(`   - ${formatBowlDetail(item.customBowl)}`);
     }
-    if (item.notes) lines.push(`   └ Nota: ${item.notes}`);
+    if (item.notes) lines.push(`   - Nota: ${item.notes}`);
   });
-  lines.push('', `💰 *Total: ${formatPrice(total)}*`);
-  if (info.notes) lines.push('', `📝 *Notas:* ${info.notes}`);
+
+  lines.push('', `Total: ${formatPrice(total)}`);
+  if (info.notes) lines.push('', `Notas: ${info.notes}`);
   return lines.join('\n');
 }
 
@@ -55,7 +65,7 @@ export function tryOpenWhatsApp(url: string): WhatsAppResult {
       return { ok: false, reason: 'popup_blocked' };
     }
     return { ok: true };
-  } catch (e) {
+  } catch {
     return { ok: false, reason: 'exception' };
   }
 }

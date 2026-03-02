@@ -1,9 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveImage } from '@/lib/image-map';
-import type { Product, Category, Ingredient, BowlSizeRule, Brand } from '@/types';
+import type { Product, Category, Ingredient, BowlSizeRule, Brand, DeliveryZone } from '@/types';
 
-// ─── Brands ───────────────────────────────────────────
+interface ProductQueryRow {
+  id: string;
+  name: string;
+  description: string | null;
+  price_cents: number;
+  brand_id: string;
+  category_id: string;
+  image_url: string | null;
+  ingredients_list: string[] | null;
+  calories: number | null;
+  is_vegan: boolean | null;
+  is_gluten_free: boolean | null;
+  is_popular: boolean | null;
+  is_new: boolean | null;
+}
+
 export function useBrands() {
   return useQuery({
     queryKey: ['brands'],
@@ -12,11 +27,10 @@ export function useBrands() {
       if (error) throw error;
       return data as { id: string; name: string }[];
     },
-    staleTime: 1000 * 60 * 30, // 30 min
+    staleTime: 1000 * 60 * 30,
   });
 }
 
-// ─── Categories ───────────────────────────────────────
 export function useCategories(brandId?: Brand) {
   return useQuery({
     queryKey: ['categories', brandId],
@@ -37,7 +51,6 @@ export function useCategories(brandId?: Brand) {
   });
 }
 
-// ─── Products ─────────────────────────────────────────
 export function useProducts(opts?: { brandId?: Brand; categoryId?: string }) {
   return useQuery({
     queryKey: ['products', opts?.brandId, opts?.categoryId],
@@ -73,10 +86,19 @@ export function useBeverages() {
   return useQuery({
     queryKey: ['products', 'beverages'],
     queryFn: async () => {
+      const { data: beverageCategories, error: categoriesError } = await supabase
+        .from('categories')
+        .select('id')
+        .or('slug.like.bebidas%,slug.like.cafe%');
+      if (categoriesError) throw categoriesError;
+
+      const categoryIds = (beverageCategories ?? []).map((c) => c.id);
+      if (categoryIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .like('category_id', 'beverages-%');
+        .in('category_id', categoryIds);
       if (error) throw error;
       return (data ?? []).map(mapProduct);
     },
@@ -84,7 +106,6 @@ export function useBeverages() {
   });
 }
 
-// ─── Ingredients ──────────────────────────────────────
 export function useIngredients(type?: Ingredient['type']) {
   return useQuery({
     queryKey: ['ingredients', type],
@@ -107,7 +128,6 @@ export function useIngredients(type?: Ingredient['type']) {
   });
 }
 
-// ─── Bowl Rules ───────────────────────────────────────
 export function useBowlRules() {
   return useQuery({
     queryKey: ['bowl_rules'],
@@ -127,7 +147,6 @@ export function useBowlRules() {
   });
 }
 
-// ─── Settings ─────────────────────────────────────────
 export function useWhatsAppNumber() {
   return useQuery({
     queryKey: ['settings', 'whatsapp_number'],
@@ -144,7 +163,6 @@ export function useWhatsAppNumber() {
   });
 }
 
-// ─── Beverage Categories ──────────────────────────────
 export function useBeverageCategories() {
   return useQuery({
     queryKey: ['categories', 'beverages'],
@@ -152,7 +170,7 @@ export function useBeverageCategories() {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
-        .like('id', 'beverages-%');
+        .or('slug.like.bebidas%,slug.like.cafe%');
       if (error) throw error;
       return (data ?? []).map((c): Category => ({
         id: c.id,
@@ -166,8 +184,27 @@ export function useBeverageCategories() {
   });
 }
 
-// ─── Helpers ──────────────────────────────────────────
-function mapProduct(p: any): Product {
+export function useActiveDeliveryZones() {
+  return useQuery({
+    queryKey: ['delivery_zones', 'active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('delivery_zones')
+        .select('id,name,fee_cents')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return (data ?? []).map((zone): DeliveryZone => ({
+        id: zone.id,
+        name: zone.name,
+        feeCents: zone.fee_cents,
+      }));
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+}
+
+function mapProduct(p: ProductQueryRow): Product {
   return {
     id: p.id,
     name: p.name,

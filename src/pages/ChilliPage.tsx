@@ -9,6 +9,10 @@ export default function ChilliPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { data: chilliCategories = [] } = useCategories('chilli');
   const { data: chilliProducts = [], isLoading, error } = useProducts({ brandId: 'chilli' });
+  const categoryNameById = useMemo(
+    () => Object.fromEntries(chilliCategories.map((category) => [category.id, category.name])),
+    [chilliCategories],
+  );
 
   const filteredProducts = useMemo(() => {
     if (!selectedCategory) return chilliProducts;
@@ -49,17 +53,17 @@ export default function ChilliPage() {
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-80 rounded-xl" />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-56 rounded-xl" />)}
             </div>
           ) : error ? (
             <div className="text-center py-12 text-destructive">
               <p>Error al cargar los productos. Intenta de nuevo.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} categoryName={categoryNameById[product.categoryId]} />
               ))}
             </div>
           )}

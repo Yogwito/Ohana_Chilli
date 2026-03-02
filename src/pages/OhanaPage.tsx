@@ -8,7 +8,7 @@ import { Leaf, Sparkles, ChefHat } from 'lucide-react';
 
 export default function OhanaPage() {
   const [activeTab, setActiveTab] = useState('premade');
-  const { data: ohanaProducts = [], isLoading, error } = useProducts({ brandId: 'ohana', categoryId: 'ohana-premade' });
+  const { data: ohanaProducts = [], isLoading, error } = useProducts({ brandId: 'ohana', categoryId: 'ohana-bowls-sugeridos' });
 
   return (
     <div className="min-h-screen">
@@ -37,7 +37,7 @@ export default function OhanaPage() {
             <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
               <TabsTrigger value="premade" className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4" />
-                Bowls Preparados
+                Bowls sugeridos
               </TabsTrigger>
               <TabsTrigger value="custom" className="flex items-center gap-2">
                 <ChefHat className="w-4 h-4" />
@@ -47,8 +47,8 @@ export default function OhanaPage() {
 
             <TabsContent value="premade" className="animate-fade-in">
               <div className="mb-6">
-                <h2 className="text-2xl font-bold mb-2">Bowls Preparados</h2>
-                <p className="text-muted-foreground">Nuestras combinaciones favoritas, listas para disfrutar</p>
+                <h2 className="text-2xl font-bold mb-2">Bowls sugeridos</h2>
+                <p className="text-muted-foreground">Combinaciones de la carta oficial listas para disfrutar</p>
               </div>
               
               {isLoading ? (
@@ -66,7 +66,7 @@ export default function OhanaPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {ohanaProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                    <ProductCard key={product.id} product={product} categoryName="Bowls sugeridos" />
                   ))}
                 </div>
               )}

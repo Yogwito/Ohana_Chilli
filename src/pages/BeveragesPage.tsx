@@ -9,6 +9,10 @@ export default function BeveragesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { data: beverageCategories = [] } = useBeverageCategories();
   const { data: beverages = [], isLoading, error } = useBeverages();
+  const categoryNameById = useMemo(
+    () => Object.fromEntries(beverageCategories.map((category) => [category.id, category.name])),
+    [beverageCategories],
+  );
 
   const filteredBeverages = useMemo(() => {
     if (!selectedCategory) return beverages;
@@ -26,12 +30,11 @@ export default function BeveragesPage() {
             </div>
             <div>
               <h1>Bebidas</h1>
-              <p className="text-muted-foreground">Refrescos, jugos y más</p>
+              <p className="text-muted-foreground">Refrescos, cerveza y cafe</p>
             </div>
           </div>
           <p className="text-lg text-muted-foreground max-w-2xl">
-            Complementa tu orden con nuestras refrescantes bebidas. 
-            Desde jugos naturales hasta tus refrescos favoritos.
+            Complementa tu orden con bebidas de la carta oficial de Ohana y Chilli.
           </p>
         </div>
       </section>
@@ -71,17 +74,17 @@ export default function BeveragesPage() {
 
           {/* Products Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-80 rounded-xl" />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-56 rounded-xl" />)}
             </div>
           ) : error ? (
             <div className="text-center py-12 text-destructive">
               <p>Error al cargar las bebidas. Intenta de nuevo.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBeverages.map((beverage) => (
-                <ProductCard key={beverage.id} product={beverage} />
+                <ProductCard key={beverage.id} product={beverage} categoryName={categoryNameById[beverage.categoryId]} />
               ))}
             </div>
           )}

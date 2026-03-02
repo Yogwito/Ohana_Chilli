@@ -8,11 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatPrice } from '@/domain/formatPrice';
 import {
-  LogOut, Package, Salad, Ruler, Settings, Plus, Pencil, Trash2, Save, ClipboardList,
-  Leaf, Flame,
+  LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
+  Leaf, Flame, Search, Truck, Upload,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────
@@ -35,6 +37,14 @@ interface BowlRuleRow {
 interface OrderRow {
   id: string; customer_name: string; phone: string; order_type: string;
   total_cents: number; status: string; created_at: string; notes: string | null; address: string | null;
+}
+
+interface DeliveryZoneRow {
+  id: string;
+  name: string;
+  fee_cents: number;
+  is_active: boolean;
+  created_at: string;
 }
 
 export default function AdminPage() {
@@ -73,6 +83,7 @@ export default function AdminPage() {
             <TabsTrigger value="products" className="flex items-center gap-1"><Package className="w-4 h-4" />Productos</TabsTrigger>
             <TabsTrigger value="ingredients" className="flex items-center gap-1"><Salad className="w-4 h-4" />Ingredientes</TabsTrigger>
             <TabsTrigger value="bowl_rules" className="flex items-center gap-1"><Ruler className="w-4 h-4" />Bowl Rules</TabsTrigger>
+            <TabsTrigger value="delivery_zones" className="flex items-center gap-1"><Truck className="w-4 h-4" />Domicilios</TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-1"><Settings className="w-4 h-4" />Config</TabsTrigger>
           </TabsList>
 
@@ -80,6 +91,7 @@ export default function AdminPage() {
           <TabsContent value="products"><ProductsAdmin /></TabsContent>
           <TabsContent value="ingredients"><IngredientsAdmin /></TabsContent>
           <TabsContent value="bowl_rules"><BowlRulesAdmin /></TabsContent>
+          <TabsContent value="delivery_zones"><DeliveryZonesAdmin /></TabsContent>
           <TabsContent value="settings"><SettingsAdmin /></TabsContent>
         </Tabs>
       </div>
@@ -340,6 +352,320 @@ function BowlRulesAdmin() {
 }
 
 // ─── Settings Admin ──────────────────────────────────────
+function normalizeZoneName(value: string) {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function normalizeZoneKey(value: string) {
+  return normalizeZoneName(value).toLowerCase();
+}
+
+function parseFeeToCents(raw: string) {
+  const digits = raw.replace(/[^\d]/g, '');
+  if (!digits) return null;
+  return Number(digits) * 100;
+}
+
+function parseCsvLine(line: string) {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      values.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current);
+  return values.map((value) => value.trim());
+}
+
+function DeliveryZonesAdmin() {
+  const [zones, setZones] = useState<DeliveryZoneRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [summary, setSummary] = useState<{ created: number; updated: number; errors: string[] } | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, { name: string; feeInput: string; is_active: boolean }>>({});
+
+  const loadZones = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('delivery_zones').select('*').order('name');
+    if (error) {
+      toast.error('No se pudieron cargar los domicilios');
+      setLoading(false);
+      return;
+    }
+
+    const list = (data ?? []) as DeliveryZoneRow[];
+    setZones(list);
+    setDrafts(
+      list.reduce<Record<string, { name: string; feeInput: string; is_active: boolean }>>((acc, zone) => {
+        acc[zone.id] = { name: zone.name, feeInput: String(Math.round(zone.fee_cents / 100)), is_active: zone.is_active };
+        return acc;
+      }, {}),
+    );
+    setLoading(false);
+  };
+
+  useEffect(() => { loadZones(); }, []);
+
+  const saveZone = async (zoneId: string) => {
+    const draft = drafts[zoneId];
+    if (!draft) return;
+
+    const name = normalizeZoneName(draft.name);
+    const feeCents = parseFeeToCents(draft.feeInput);
+
+    if (!name) {
+      toast.error('El nombre no puede estar vacio');
+      return;
+    }
+
+    if (feeCents === null) {
+      toast.error('La tarifa debe ser un numero valido');
+      return;
+    }
+
+    setSavingId(zoneId);
+    const { error } = await supabase
+      .from('delivery_zones')
+      .update({
+        name,
+        fee_cents: feeCents,
+        is_active: draft.is_active,
+      })
+      .eq('id', zoneId);
+    setSavingId(null);
+
+    if (error) {
+      toast.error(error.message.includes('duplicate') ? 'Ya existe un domicilio con ese nombre' : 'Error al guardar domicilio');
+      return;
+    }
+
+    toast.success('Domicilio actualizado');
+    loadZones();
+  };
+
+  const importCsv = async () => {
+    const lines = csvText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      toast.error('El CSV debe incluir encabezado y al menos una fila');
+      return;
+    }
+
+    const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase());
+    const nameIndex = headers.indexOf('name');
+    const feeIndex = headers.indexOf('fee');
+
+    if (nameIndex === -1 || feeIndex === -1) {
+      toast.error('Encabezados requeridos: name,fee');
+      return;
+    }
+
+    setImporting(true);
+    const { data: existingRows, error: existingError } = await supabase.from('delivery_zones').select('name');
+    if (existingError) {
+      setImporting(false);
+      toast.error('No se pudo validar domicilios existentes');
+      return;
+    }
+
+    const existingByKey = new Map(
+      (existingRows ?? []).map((row) => [normalizeZoneKey(row.name), row.name]),
+    );
+    const upsertByKey = new Map<string, { name: string; fee_cents: number; existed: boolean }>();
+    const errors: string[] = [];
+
+    lines.slice(1).forEach((line, index) => {
+      const lineNumber = index + 2;
+      const columns = parseCsvLine(line);
+      const rawName = columns[nameIndex] ?? '';
+      const rawFee = columns[feeIndex] ?? '';
+      const displayName = normalizeZoneName(rawName);
+
+      if (!displayName) {
+        errors.push(`Fila ${lineNumber}: name vacio`);
+        return;
+      }
+
+      const feeCents = parseFeeToCents(rawFee);
+      if (feeCents === null) {
+        errors.push(`Fila ${lineNumber}: fee invalido (${rawFee || 'vacio'})`);
+        return;
+      }
+
+      const key = normalizeZoneKey(displayName);
+      upsertByKey.set(key, {
+        name: existingByKey.get(key) ?? displayName,
+        fee_cents: feeCents,
+        existed: existingByKey.has(key),
+      });
+    });
+
+    const payload = Array.from(upsertByKey.values()).map((item) => ({
+      name: item.name,
+      fee_cents: item.fee_cents,
+    }));
+
+    if (payload.length > 0) {
+      const { error } = await supabase.from('delivery_zones').upsert(payload, { onConflict: 'name' });
+      if (error) errors.push(`Error Supabase: ${error.message}`);
+    }
+
+    const created = Array.from(upsertByKey.values()).filter((item) => !item.existed).length;
+    const updated = Array.from(upsertByKey.values()).filter((item) => item.existed).length;
+    const result = { created, updated, errors };
+    setSummary(result);
+    setImporting(false);
+
+    if (errors.length > 0) {
+      toast.warning('Importacion finalizada con errores');
+    } else {
+      toast.success(`Importacion lista: ${created} creados, ${updated} actualizados`);
+    }
+
+    loadZones();
+  };
+
+  const filtered = zones.filter((zone) => normalizeZoneKey(zone.name).includes(normalizeZoneKey(search)));
+
+  if (loading) return <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-14" />)}</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-xl font-bold">Domicilios ({zones.length})</h2>
+        <Button variant="outline" onClick={() => setCsvOpen(true)}>
+          <Upload className="w-4 h-4 mr-2" />
+          Importar CSV
+        </Button>
+      </div>
+
+      <div className="relative max-w-md">
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre..."
+          className="pl-9"
+        />
+      </div>
+
+      <div className="border rounded-xl overflow-x-auto bg-card">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="p-3 font-semibold min-w-48">Nombre</th>
+              <th className="p-3 font-semibold min-w-36">Tarifa (COP)</th>
+              <th className="p-3 font-semibold">Activo</th>
+              <th className="p-3 font-semibold text-right">Accion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td className="p-6 text-center text-muted-foreground" colSpan={4}>
+                  No hay domicilios para mostrar
+                </td>
+              </tr>
+            )}
+            {filtered.map((zone) => (
+              <tr key={zone.id} className="border-b last:border-b-0">
+                <td className="p-3">
+                  <Input
+                    value={drafts[zone.id]?.name ?? zone.name}
+                    onChange={(e) => setDrafts((prev) => ({ ...prev, [zone.id]: { ...prev[zone.id], name: e.target.value } }))}
+                  />
+                </td>
+                <td className="p-3">
+                  <Input
+                    value={drafts[zone.id]?.feeInput ?? String(Math.round(zone.fee_cents / 100))}
+                    onChange={(e) => setDrafts((prev) => ({ ...prev, [zone.id]: { ...prev[zone.id], feeInput: e.target.value } }))}
+                  />
+                </td>
+                <td className="p-3">
+                  <Switch
+                    checked={drafts[zone.id]?.is_active ?? zone.is_active}
+                    onCheckedChange={(checked) => setDrafts((prev) => ({ ...prev, [zone.id]: { ...prev[zone.id], is_active: checked } }))}
+                  />
+                </td>
+                <td className="p-3 text-right">
+                  <Button size="sm" onClick={() => saveZone(zone.id)} disabled={savingId === zone.id}>
+                    <Save className="w-3.5 h-3.5 mr-1" />
+                    Guardar
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={csvOpen} onOpenChange={setCsvOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Importar domicilios desde CSV</DialogTitle>
+            <DialogDescription>
+              Pega el CSV manualmente con encabezados <code>name,fee</code>. No se usa OCR.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Textarea
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            placeholder={'name,fee\nChapinero,5000\nUsaquen,6.500'}
+            rows={12}
+          />
+
+          {summary && (
+            <div className="rounded-lg border p-3 text-sm space-y-1">
+              <p><span className="font-semibold">Creados:</span> {summary.created}</p>
+              <p><span className="font-semibold">Actualizados:</span> {summary.updated}</p>
+              <p><span className="font-semibold">Errores:</span> {summary.errors.length}</p>
+              {summary.errors.length > 0 && (
+                <div className="max-h-28 overflow-auto text-xs text-muted-foreground border-t pt-2">
+                  {summary.errors.map((error) => <p key={error}>{error}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCsvOpen(false)}>Cerrar</Button>
+            <Button onClick={importCsv} disabled={importing}>
+              {importing ? 'Importando...' : 'Importar CSV'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function SettingsAdmin() {
   const [whatsapp, setWhatsapp] = useState('');
   const [loading, setLoading] = useState(true);

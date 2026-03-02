@@ -10,6 +10,13 @@ export interface Category {
   icon?: string;
 }
 
+// Delivery Zone Types
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  feeCents: number;
+}
+
 // Ingredient Types for Bowl Builder
 export interface Ingredient {
   id: string;
@@ -94,6 +101,8 @@ export interface CustomerInfo {
   phone: string;
   orderType: 'pickup' | 'delivery';
   address?: string;
+  deliveryZone?: string;
+  deliveryFeeCents?: number;
   notes?: string;
 }
 

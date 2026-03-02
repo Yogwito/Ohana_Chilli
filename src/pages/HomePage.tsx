@@ -3,11 +3,13 @@ import { ArrowRight, Leaf, Flame, Utensils, ShoppingCart, CreditCard } from 'luc
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/products/ProductCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFeaturedProducts, useBeverages } from '@/hooks/use-catalog';
+import { useFeaturedProducts, useBeverages, useCategories } from '@/hooks/use-catalog';
 
 export default function HomePage() {
   const { data: featuredProducts = [], isLoading: loadingFeatured } = useFeaturedProducts();
   const { data: allBeverages = [], isLoading: loadingBev } = useBeverages();
+  const { data: categories = [] } = useCategories();
+  const categoryNameById = Object.fromEntries(categories.map((category) => [category.id, category.name]));
   const beveragesPreview = allBeverages.slice(0, 4);
 
   return (
@@ -153,7 +155,7 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} categoryName={categoryNameById[product.categoryId]} />
               ))}
             </div>
           )}
@@ -176,7 +178,12 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {beveragesPreview.map((beverage) => (
-                <ProductCard key={beverage.id} product={beverage} variant="compact" />
+                <ProductCard
+                  key={beverage.id}
+                  product={beverage}
+                  variant="compact"
+                  categoryName={categoryNameById[beverage.categoryId]}
+                />
               ))}
             </div>
           )}
