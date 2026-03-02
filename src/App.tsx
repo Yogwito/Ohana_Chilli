@@ -4,18 +4,29 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
+import { lazy, Suspense } from "react";
 import Layout from "@/components/layout/Layout";
 import HomePage from "./pages/HomePage";
-import OhanaPage from "./pages/OhanaPage";
-import ChilliPage from "./pages/ChilliPage";
-import BeveragesPage from "./pages/BeveragesPage";
-import CheckoutPage from "./pages/CheckoutPage";
-import AboutPage from "./pages/AboutPage";
-import ContactPage from "./pages/ContactPage";
-import OrdersPage from "./pages/OrdersPage";
 import NotFound from "./pages/NotFound";
 
+// Lazy-loaded routes
+const OhanaPage = lazy(() => import("./pages/OhanaPage"));
+const ChilliPage = lazy(() => import("./pages/ChilliPage"));
+const BeveragesPage = lazy(() => import("./pages/BeveragesPage"));
+const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
+const AboutPage = lazy(() => import("./pages/AboutPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+
 const queryClient = new QueryClient();
+
+const PageFallback = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -24,19 +35,25 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Layout>
+          <Suspense fallback={<PageFallback />}>
             <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/ohana" element={<OhanaPage />} />
-              <Route path="/chilli" element={<ChilliPage />} />
-              <Route path="/bebidas" element={<BeveragesPage />} />
-              <Route path="/checkout" element={<CheckoutPage />} />
-              <Route path="/nosotros" element={<AboutPage />} />
-              <Route path="/contacto" element={<ContactPage />} />
-              <Route path="/pedidos" element={<OrdersPage />} />
-              <Route path="*" element={<NotFound />} />
+              {/* Admin routes without Layout */}
+              <Route path="/admin/login" element={<AdminLoginPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+
+              {/* Public routes with Layout */}
+              <Route element={<Layout><Routes><Route path="*" element={null} /></Routes></Layout>} />
+              <Route path="/" element={<Layout><HomePage /></Layout>} />
+              <Route path="/ohana" element={<Layout><OhanaPage /></Layout>} />
+              <Route path="/chilli" element={<Layout><ChilliPage /></Layout>} />
+              <Route path="/bebidas" element={<Layout><BeveragesPage /></Layout>} />
+              <Route path="/checkout" element={<Layout><CheckoutPage /></Layout>} />
+              <Route path="/nosotros" element={<Layout><AboutPage /></Layout>} />
+              <Route path="/contacto" element={<Layout><ContactPage /></Layout>} />
+              <Route path="/pedidos" element={<Layout><OrdersPage /></Layout>} />
+              <Route path="*" element={<Layout><NotFound /></Layout>} />
             </Routes>
-          </Layout>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </CartProvider>
