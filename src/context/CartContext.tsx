@@ -1,7 +1,33 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { CartItem, CartState, Product, CustomBowl, Brand } from '@/types';
+import { calculateBowlPrice } from '@/domain/bowlPricing';
+import { z } from 'zod';
+import { toast } from 'sonner';
 
-// Cart Actions
+// ─── Cart validation schema (versioned) ─────────────────
+const CART_VERSION = 'cart:v1';
+const CART_STORAGE_KEY = 'ohana-chilli-cart';
+
+const cartItemSchema = z.object({
+  id: z.string(),
+  brand: z.enum(['ohana', 'chilli']),
+  type: z.enum(['product', 'custom-bowl']),
+  product: z.any().optional().nullable(),
+  customBowl: z.any().optional().nullable(),
+  quantity: z.number().int().positive(),
+  notes: z.string().optional().nullable(),
+  unitPrice: z.number(),
+  totalPrice: z.number(),
+});
+
+const cartStateSchema = z.object({
+  version: z.literal(CART_VERSION).optional(),
+  items: z.array(cartItemSchema),
+  subtotal: z.number(),
+  total: z.number(),
+});
+
+// ─── Actions ─────────────────────────────────────────────
 type CartAction =
   | { type: 'ADD_PRODUCT'; payload: { product: Product; quantity: number; notes?: string } }
   | { type: 'ADD_CUSTOM_BOWL'; payload: { customBowl: CustomBowl; notes?: string } }
@@ -10,148 +36,78 @@ type CartAction =
   | { type: 'CLEAR_CART' }
   | { type: 'LOAD_CART'; payload: CartState };
 
-// Initial State
-const initialState: CartState = {
-  items: [],
-  subtotal: 0,
-  total: 0,
-};
+const initialState: CartState = { items: [], subtotal: 0, total: 0 };
 
-// Calculate totals
-const calculateTotals = (items: CartItem[]): { subtotal: number; total: number } => {
+const calculateTotals = (items: CartItem[]) => {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   return { subtotal, total: subtotal };
 };
 
-// Calculate custom bowl price
-const calculateBowlPrice = (bowl: CustomBowl): number => {
-  let price = bowl.size.price;
-  
-  // Add extra protein costs
-  bowl.proteins.forEach(protein => {
-    if (protein.price) {
-      price += protein.price;
-    }
-  });
-  
-  return price;
-};
+const generateId = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-// Generate unique ID
-const generateId = (): string => {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-};
-
-// Cart Reducer
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
     case 'ADD_PRODUCT': {
       const { product, quantity, notes } = action.payload;
-      
-      // Check if product already exists in cart
       const existingIndex = state.items.findIndex(
         item => item.type === 'product' && item.product?.id === product.id && item.notes === notes
       );
-      
       let newItems: CartItem[];
-      
       if (existingIndex >= 0) {
-        // Update existing item quantity
         newItems = state.items.map((item, index) => {
           if (index === existingIndex) {
             const newQuantity = item.quantity + quantity;
-            return {
-              ...item,
-              quantity: newQuantity,
-              totalPrice: item.unitPrice * newQuantity,
-            };
+            return { ...item, quantity: newQuantity, totalPrice: item.unitPrice * newQuantity };
           }
           return item;
         });
       } else {
-        // Add new item
-        const newItem: CartItem = {
-          id: generateId(),
-          brand: product.brand,
-          type: 'product',
-          product,
-          quantity,
-          notes,
-          unitPrice: product.price,
-          totalPrice: product.price * quantity,
-        };
-        newItems = [...state.items, newItem];
+        newItems = [...state.items, {
+          id: generateId(), brand: product.brand, type: 'product', product, quantity, notes,
+          unitPrice: product.price, totalPrice: product.price * quantity,
+        }];
       }
-      
-      const totals = calculateTotals(newItems);
-      return { items: newItems, ...totals };
+      return { items: newItems, ...calculateTotals(newItems) };
     }
-    
     case 'ADD_CUSTOM_BOWL': {
       const { customBowl, notes } = action.payload;
       const unitPrice = calculateBowlPrice(customBowl);
-      
-      const newItem: CartItem = {
-        id: generateId(),
-        brand: 'ohana',
-        type: 'custom-bowl',
-        customBowl,
-        quantity: 1,
-        notes,
-        unitPrice,
-        totalPrice: unitPrice,
-      };
-      
-      const newItems = [...state.items, newItem];
-      const totals = calculateTotals(newItems);
-      return { items: newItems, ...totals };
+      const newItems = [...state.items, {
+        id: generateId(), brand: 'ohana' as Brand, type: 'custom-bowl' as const,
+        customBowl, quantity: 1, notes, unitPrice, totalPrice: unitPrice,
+      }];
+      return { items: newItems, ...calculateTotals(newItems) };
     }
-    
     case 'UPDATE_QUANTITY': {
       const { itemId, quantity } = action.payload;
-      
       if (quantity <= 0) {
-        // Remove item if quantity is 0 or less
         const newItems = state.items.filter(item => item.id !== itemId);
-        const totals = calculateTotals(newItems);
-        return { items: newItems, ...totals };
+        return { items: newItems, ...calculateTotals(newItems) };
       }
-      
-      const newItems = state.items.map(item => {
-        if (item.id === itemId) {
-          return {
-            ...item,
-            quantity,
-            totalPrice: item.unitPrice * quantity,
-          };
-        }
-        return item;
-      });
-      
-      const totals = calculateTotals(newItems);
-      return { items: newItems, ...totals };
+      const newItems = state.items.map(item =>
+        item.id === itemId ? { ...item, quantity, totalPrice: item.unitPrice * quantity } : item
+      );
+      return { items: newItems, ...calculateTotals(newItems) };
     }
-    
     case 'REMOVE_ITEM': {
       const newItems = state.items.filter(item => item.id !== action.payload.itemId);
-      const totals = calculateTotals(newItems);
-      return { items: newItems, ...totals };
+      return { items: newItems, ...calculateTotals(newItems) };
     }
-    
     case 'CLEAR_CART':
       return initialState;
-    
     case 'LOAD_CART':
       return action.payload;
-    
     default:
       return state;
   }
 };
 
-// Context Types
-interface CartContextType {
+// ─── Separate contexts for performance ───────────────────
+interface CartStateContextType {
   cart: CartState;
+}
+
+interface CartActionsContextType {
   addProduct: (product: Product, quantity?: number, notes?: string) => void;
   addCustomBowl: (customBowl: CustomBowl, notes?: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -161,85 +117,97 @@ interface CartContextType {
   getItemsByBrand: (brand: Brand) => CartItem[];
 }
 
-// Create Context
-const CartContext = createContext<CartContextType | undefined>(undefined);
+const CartStateContext = createContext<CartStateContextType | undefined>(undefined);
+const CartActionsContext = createContext<CartActionsContextType | undefined>(undefined);
 
-// Storage key
-const CART_STORAGE_KEY = 'ohana-chilli-cart';
+function loadCartFromStorage(): CartState {
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return initialState;
+    const parsed = JSON.parse(raw);
+    const result = cartStateSchema.safeParse(parsed);
+    if (result.success) return { items: result.data.items as CartItem[], subtotal: result.data.subtotal, total: result.data.total };
+    console.warn('Cart schema mismatch, resetting cart');
+    localStorage.removeItem(CART_STORAGE_KEY);
+    return initialState;
+  } catch {
+    console.warn('Corrupt cart data, resetting');
+    localStorage.removeItem(CART_STORAGE_KEY);
+    return initialState;
+  }
+}
 
-// Provider Component
+function saveCartToStorage(cart: CartState) {
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({ ...cart, version: CART_VERSION }));
+  } catch {
+    toast.error('No se pudo guardar el carrito localmente');
+  }
+}
+
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [cart, dispatch] = useReducer(cartReducer, initialState);
-  
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        dispatch({ type: 'LOAD_CART', payload: parsedCart });
-      } catch (error) {
-        console.error('Failed to load cart from storage:', error);
-      }
-    }
-  }, []);
-  
-  // Save cart to localStorage on changes
-  useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-  }, [cart]);
-  
-  const addProduct = (product: Product, quantity = 1, notes?: string) => {
+  const [cart, dispatch] = useReducer(cartReducer, initialState, () => loadCartFromStorage());
+
+  useEffect(() => { saveCartToStorage(cart); }, [cart]);
+
+  const addProduct = useCallback((product: Product, quantity = 1, notes?: string) => {
     dispatch({ type: 'ADD_PRODUCT', payload: { product, quantity, notes } });
-  };
-  
-  const addCustomBowl = (customBowl: CustomBowl, notes?: string) => {
+  }, []);
+
+  const addCustomBowl = useCallback((customBowl: CustomBowl, notes?: string) => {
     dispatch({ type: 'ADD_CUSTOM_BOWL', payload: { customBowl, notes } });
-  };
-  
-  const updateQuantity = (itemId: string, quantity: number) => {
+  }, []);
+
+  const updateQuantity = useCallback((itemId: string, quantity: number) => {
     dispatch({ type: 'UPDATE_QUANTITY', payload: { itemId, quantity } });
-  };
-  
-  const removeItem = (itemId: string) => {
+  }, []);
+
+  const removeItem = useCallback((itemId: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: { itemId } });
-  };
-  
-  const clearCart = () => {
-    dispatch({ type: 'CLEAR_CART' });
-  };
-  
-  const getItemCount = (): number => {
-    return cart.items.reduce((count, item) => count + item.quantity, 0);
-  };
-  
-  const getItemsByBrand = (brand: Brand): CartItem[] => {
-    return cart.items.filter(item => item.brand === brand);
-  };
-  
+  }, []);
+
+  const clearCart = useCallback(() => { dispatch({ type: 'CLEAR_CART' }); }, []);
+
+  const getItemCount = useCallback(() => cart.items.reduce((c, i) => c + i.quantity, 0), [cart.items]);
+
+  const getItemsByBrand = useCallback((brand: Brand) => cart.items.filter(i => i.brand === brand), [cart.items]);
+
+  const stateValue = useMemo(() => ({ cart }), [cart]);
+  const actionsValue = useMemo(() => ({
+    addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand,
+  }), [addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand]);
+
   return (
-    <CartContext.Provider
-      value={{
-        cart,
-        addProduct,
-        addCustomBowl,
-        updateQuantity,
-        removeItem,
-        clearCart,
-        getItemCount,
-        getItemsByBrand,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
+    <CartStateContext.Provider value={stateValue}>
+      <CartActionsContext.Provider value={actionsValue}>
+        {children}
+      </CartActionsContext.Provider>
+    </CartStateContext.Provider>
   );
 };
 
-// Custom Hook
-export const useCart = (): CartContextType => {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error('useCart must be used within a CartProvider');
-  }
-  return context;
+// ─── Hooks ───────────────────────────────────────────────
+export function useCartState() {
+  const ctx = useContext(CartStateContext);
+  if (!ctx) throw new Error('useCartState must be used within CartProvider');
+  return ctx.cart;
+}
+
+export function useCartActions() {
+  const ctx = useContext(CartActionsContext);
+  if (!ctx) throw new Error('useCartActions must be used within CartProvider');
+  return ctx;
+}
+
+export function useCartCount() {
+  const ctx = useContext(CartActionsContext);
+  if (!ctx) throw new Error('useCartCount must be used within CartProvider');
+  return ctx.getItemCount();
+}
+
+// Backward-compatible hook
+export const useCart = () => {
+  const cart = useCartState();
+  const actions = useCartActions();
+  return { cart, ...actions };
 };

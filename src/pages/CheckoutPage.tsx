@@ -7,12 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { 
-  ArrowLeft, CheckCircle, Leaf, Flame, MapPin, Store, MessageCircle
+import {
+  ArrowLeft, CheckCircle, Leaf, Flame, MapPin, Store, MessageCircle,
+  Minus, Plus, Trash2, Copy, RotateCcw, Phone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
+import { formatPrice } from '@/domain/formatPrice';
+import { formatBowlSummary } from '@/domain/bowlSummary';
+import { generateWhatsAppMessage, buildWhatsAppUrl, tryOpenWhatsApp } from '@/domain/whatsapp';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -24,13 +28,17 @@ const checkoutSchema = z.object({
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
+type OrderStatus = 'idle' | 'submitting' | 'created' | 'whatsapp_sent' | 'whatsapp_blocked';
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const { cart, clearCart } = useCart();
+  const { cart, updateQuantity, removeItem, clearCart } = useCart();
   const { data: whatsappNumber } = useWhatsAppNumber();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderComplete, setOrderComplete] = useState(false);
-  
+  const [orderStatus, setOrderStatus] = useState<OrderStatus>('idle');
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [whatsappMessage, setWhatsappMessage] = useState<string>('');
+  const [whatsappUrl, setWhatsappUrl] = useState<string>('');
+
   const [form, setForm] = useState<CheckoutForm>({
     name: '', phone: '', orderType: 'pickup', address: '', notes: '',
   });
@@ -39,41 +47,6 @@ export default function CheckoutPage() {
   const updateField = <K extends keyof CheckoutForm>(field: K, value: CheckoutForm[K]) => {
     setForm(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }));
-  };
-
-  const formatPrice = (price: number) =>
-    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price);
-
-  const formatBowlSummary = (item: typeof cart.items[0]) => {
-    if (!item.customBowl) return '';
-    const bowl = item.customBowl;
-    return `${bowl.size.name}: ${bowl.bases.map(b => b.name).join(', ')} + ${bowl.proteins.map(p => p.name).join(', ')} + ${bowl.acompanantes.map(a => a.name).join(', ')}`;
-  };
-
-  const generateWhatsAppMessage = () => {
-    const lines = [
-      `🛒 *Nueva Orden - Ohana & Chilli*`, '',
-      `👤 *Cliente:* ${form.name}`,
-      `📞 *Teléfono:* ${form.phone}`,
-      `📍 *Tipo:* ${form.orderType === 'pickup' ? 'Recoger en sucursal' : 'Entrega a domicilio'}`,
-    ];
-    if (form.orderType === 'delivery' && form.address) {
-      lines.push(`🏠 *Dirección:* ${form.address}`);
-    }
-    lines.push('', '*Productos:*');
-    cart.items.forEach(item => {
-      const brand = item.brand === 'ohana' ? '🥗' : '🍔';
-      if (item.type === 'product' && item.product) {
-        lines.push(`${brand} ${item.quantity}x ${item.product.name} - ${formatPrice(item.totalPrice)}`);
-      } else if (item.type === 'custom-bowl' && item.customBowl) {
-        lines.push(`${brand} 1x Bowl Personalizado - ${formatPrice(item.totalPrice)}`);
-        lines.push(`   └ ${formatBowlSummary(item)}`);
-      }
-      if (item.notes) lines.push(`   └ Nota: ${item.notes}`);
-    });
-    lines.push('', `💰 *Total: ${formatPrice(cart.total)}*`);
-    if (form.notes) lines.push('', `📝 *Notas:* ${form.notes}`);
-    return encodeURIComponent(lines.join('\n'));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,10 +65,10 @@ export default function CheckoutPage() {
       return;
     }
 
-    setIsSubmitting(true);
+    setOrderStatus('submitting');
 
     try {
-      // 1. Create order
+      // 1. Create order in DB
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -113,7 +86,7 @@ export default function CheckoutPage() {
       if (orderError || !orderData) {
         console.error('Error saving order:', orderError);
         toast.error('Error al crear el pedido. Intenta de nuevo.');
-        setIsSubmitting(false);
+        setOrderStatus('idle');
         return;
       }
 
@@ -136,24 +109,58 @@ export default function CheckoutPage() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
       if (itemsError) console.error('Error saving order items:', itemsError);
 
-      // 3. Open WhatsApp
-      const phone = whatsappNumber || '573215667170';
-      const message = generateWhatsAppMessage();
-      const whatsappUrl = `https://wa.me/${phone}?text=${message}`;
-      window.open(whatsappUrl, '_blank');
+      setOrderId(orderData.id);
+      setOrderStatus('created');
 
-      setOrderComplete(true);
-      clearCart();
-      toast.success('¡Orden enviada!', { description: 'Te contactaremos pronto por WhatsApp' });
+      // 3. Try WhatsApp
+      const phone = whatsappNumber || '573215667170';
+      const message = generateWhatsAppMessage(cart.items, cart.total, {
+        name: form.name, phone: form.phone, orderType: form.orderType,
+        address: form.address, notes: form.notes, orderId: orderData.id,
+      });
+      const url = buildWhatsAppUrl(phone, message);
+      setWhatsappMessage(message);
+      setWhatsappUrl(url);
+
+      const waResult = tryOpenWhatsApp(url);
+      if (waResult.ok) {
+        setOrderStatus('whatsapp_sent');
+        clearCart();
+        toast.success('¡Orden enviada!', { description: 'Te contactaremos pronto por WhatsApp' });
+      } else {
+        setOrderStatus('whatsapp_blocked');
+        clearCart();
+        toast.warning('No se pudo abrir WhatsApp automáticamente');
+      }
     } catch (err) {
       console.error('Unexpected error:', err);
       toast.error('Error inesperado. Intenta de nuevo.');
+      setOrderStatus('idle');
     }
-
-    setIsSubmitting(false);
   };
 
-  if (cart.items.length === 0 && !orderComplete) {
+  const handleCopyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(whatsappMessage);
+      toast.success('Mensaje copiado al portapapeles');
+    } catch {
+      // fallback: select textarea
+      toast.info('Selecciona y copia el mensaje manualmente');
+    }
+  };
+
+  const handleRetryWhatsApp = () => {
+    const result = tryOpenWhatsApp(whatsappUrl);
+    if (result.ok) {
+      setOrderStatus('whatsapp_sent');
+      toast.success('WhatsApp abierto correctamente');
+    } else {
+      toast.error('Sigue sin poder abrir WhatsApp. Usa el botón de copiar.');
+    }
+  };
+
+  // ─── Empty cart ────────────────────────────────────────
+  if (cart.items.length === 0 && orderStatus === 'idle') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -166,23 +173,71 @@ export default function CheckoutPage() {
     );
   }
 
-  if (orderComplete) {
+  // ─── Order completion states ───────────────────────────
+  if (orderStatus === 'whatsapp_sent' || orderStatus === 'whatsapp_blocked' || (orderStatus === 'created' && cart.items.length === 0)) {
+    const phone = whatsappNumber || '573215667170';
     return (
       <div className="min-h-screen flex items-center justify-center py-12">
-        <div className="text-center max-w-md mx-auto px-4 animate-scale-in">
-          <div className="w-20 h-20 rounded-full bg-ohana/10 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-ohana" />
+        <div className="max-w-lg mx-auto px-4 animate-scale-in">
+          <div className="text-center mb-8">
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
+              orderStatus === 'whatsapp_sent' ? 'bg-ohana/10' : 'bg-accent/20'
+            }`}>
+              <CheckCircle className={`w-10 h-10 ${orderStatus === 'whatsapp_sent' ? 'text-ohana' : 'text-accent'}`} />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">
+              {orderStatus === 'whatsapp_sent' ? '¡Orden enviada por WhatsApp!' : '¡Pedido creado!'}
+            </h2>
+            {orderId && (
+              <p className="text-sm text-muted-foreground mb-2">
+                Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
+              </p>
+            )}
+            <p className="text-muted-foreground">
+              {orderStatus === 'whatsapp_sent'
+                ? 'Te contactaremos por WhatsApp para confirmar los detalles.'
+                : 'No se pudo abrir WhatsApp automáticamente. Usa las opciones abajo para enviarnos tu pedido.'}
+            </p>
           </div>
-          <h2 className="text-2xl font-bold mb-4">¡Gracias por tu orden!</h2>
-          <p className="text-muted-foreground mb-8">
-            Hemos recibido tu pedido. Te contactaremos por WhatsApp para confirmar los detalles.
-          </p>
-          <Button onClick={() => navigate('/')} className="btn-ohana">Volver al inicio</Button>
+
+          {orderStatus === 'whatsapp_blocked' && (
+            <div className="bg-card border rounded-xl p-6 space-y-4 mb-6">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Phone className="w-4 h-4" />
+                <span>Número: <strong className="text-foreground">{phone}</strong></span>
+              </div>
+
+              <div className="flex gap-2">
+              <Button onClick={handleRetryWhatsApp} className="flex-1 btn-ohana">
+                  <RotateCcw className="w-4 h-4 mr-2" /> Reintentar WhatsApp
+                </Button>
+                <Button onClick={handleCopyMessage} variant="outline" className="flex-1">
+                  <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
+                </Button>
+              </div>
+
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  Ver mensaje completo
+                </summary>
+                <textarea
+                  readOnly
+                  value={whatsappMessage}
+                  rows={10}
+                  className="w-full mt-2 p-3 bg-muted rounded-lg text-xs font-mono resize-none border-0 focus:ring-0"
+                  onFocus={(e) => e.target.select()}
+                />
+              </details>
+            </div>
+          )}
+
+          <Button onClick={() => navigate('/')} className="w-full btn-ohana">Volver al inicio</Button>
         </div>
       </div>
     );
   }
 
+  // ─── Checkout form ─────────────────────────────────────
   return (
     <div className="min-h-screen py-8 sm:py-12">
       <div className="container max-w-4xl">
@@ -192,6 +247,7 @@ export default function CheckoutPage() {
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          {/* Form */}
           <div className="lg:col-span-3">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-card rounded-xl p-6 border">
@@ -236,13 +292,14 @@ export default function CheckoutPage() {
                 <Textarea value={form.notes} onChange={(e) => updateField('notes', e.target.value)} placeholder="Instrucciones especiales, alergias, etc." rows={3} />
               </div>
 
-              <Button type="submit" disabled={isSubmitting} className="w-full btn-ohana" size="lg">
+              <Button type="submit" disabled={orderStatus === 'submitting'} className="w-full btn-ohana" size="lg">
                 <MessageCircle className="w-5 h-5 mr-2" />
-                {isSubmitting ? 'Enviando...' : 'Enviar Orden por WhatsApp'}
+                {orderStatus === 'submitting' ? 'Enviando...' : 'Enviar Orden por WhatsApp'}
               </Button>
             </form>
           </div>
 
+          {/* Order summary with inline editing */}
           <div className="lg:col-span-2">
             <div className="bg-card rounded-xl border p-6 sticky top-24">
               <h3 className="font-semibold mb-4">Resumen de tu orden</h3>
@@ -253,10 +310,28 @@ export default function CheckoutPage() {
                       {item.brand === 'ohana' ? <Leaf className="h-5 w-5 text-ohana" /> : <Flame className="h-5 w-5 text-chilli-dark" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}</p>
-                      <p className="text-xs text-muted-foreground">{item.quantity}x {formatPrice(item.unitPrice)}</p>
+                      <div className="flex items-start justify-between gap-1">
+                        <p className="font-medium text-sm">{item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}</p>
+                        <button onClick={() => removeItem(item.id)} className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0" aria-label="Eliminar producto">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {item.type === 'custom-bowl' && item.customBowl && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{formatBowlSummary(item.customBowl)}</p>
+                      )}
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-muted transition-colors" aria-label="Reducir cantidad">
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span className="w-6 text-center text-xs font-medium">{item.quantity}</span>
+                          <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-muted transition-colors" aria-label="Aumentar cantidad">
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <span className="font-semibold text-sm">{formatPrice(item.totalPrice)}</span>
+                      </div>
                     </div>
-                    <span className="font-medium">{formatPrice(item.totalPrice)}</span>
                   </div>
                 ))}
               </div>
