@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import ProductCard from '@/components/products/ProductCard';
+import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBeverages, useBeverageCategories } from '@/hooks/use-catalog';
 import { cn } from '@/lib/utils';
@@ -21,28 +22,16 @@ export default function BeveragesPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-ohana-light/50 to-chilli-muted/50 py-12 sm:py-16">
-        <div className="container">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <GlassWater className="w-7 h-7 text-primary" />
-            </div>
-            <div>
-              <h1>Bebidas</h1>
-              <p className="text-muted-foreground">Refrescos, cerveza y cafe</p>
-            </div>
-          </div>
-          <p className="text-lg text-muted-foreground max-w-2xl">
-            Complementa tu orden con bebidas de la carta oficial de Ohana y Chilli.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        icon={GlassWater}
+        title="Bebidas"
+        subtitle="Refrescos, cerveza y café"
+        description="Complementa tu orden con bebidas de la carta oficial de Ohana y Chilli."
+        brand="beverages"
+      />
 
-      {/* Menu */}
       <section className="py-8 sm:py-12">
         <div className="container">
-          {/* Category Filter */}
           <div className="flex flex-wrap gap-2 mb-8">
             <button
               onClick={() => setSelectedCategory(null)}
@@ -72,10 +61,9 @@ export default function BeveragesPage() {
             ))}
           </div>
 
-          {/* Products Grid */}
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-56 rounded-xl" />)}
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-72 rounded-2xl" />)}
             </div>
           ) : error ? (
             <div className="text-center py-12 text-destructive">
