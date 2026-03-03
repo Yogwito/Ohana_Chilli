@@ -8,7 +8,7 @@ import { Leaf, Sparkles, ChefHat } from 'lucide-react';
 
 export default function OhanaPage() {
   const [activeTab, setActiveTab] = useState('premade');
-  const { data: ohanaProducts = [], isLoading, error } = useProducts({ brandId: 'ohana', categoryId: 'ohana-bowls-sugeridos' });
+  const { data: ohanaProducts = [], isLoading, error } = useProducts({ brandId: 'ohana', categoryId: 'ohana-premade' });
 
   return (
     <div className="min-h-screen">
