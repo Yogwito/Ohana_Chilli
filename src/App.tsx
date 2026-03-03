@@ -42,7 +42,6 @@ const App = () => (
               <Route path="/admin" element={<AdminPage />} />
 
               {/* Public routes with Layout */}
-              <Route element={<Layout><Routes><Route path="*" element={null} /></Routes></Layout>} />
               <Route path="/" element={<Layout><HomePage /></Layout>} />
               <Route path="/ohana" element={<Layout><OhanaPage /></Layout>} />
               <Route path="/chilli" element={<Layout><ChilliPage /></Layout>} />
