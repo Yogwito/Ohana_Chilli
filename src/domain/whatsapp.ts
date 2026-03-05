@@ -58,12 +58,9 @@ export interface WhatsAppResult {
   reason?: string;
 }
 
-export function tryOpenWhatsApp(url: string): WhatsAppResult {
+export function redirectToWhatsApp(url: string): WhatsAppResult {
   try {
-    const win = window.open(url, '_blank');
-    if (!win) {
-      return { ok: false, reason: 'popup_blocked' };
-    }
+    window.location.assign(url);
     return { ok: true };
   } catch {
     return { ok: false, reason: 'exception' };
