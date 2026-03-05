@@ -7,16 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   ArrowLeft, CheckCircle, Leaf, Flame, MapPin, Store, MessageCircle,
-  Minus, Plus, Trash2, Copy, RotateCcw, Phone,
+  Minus, Plus, Trash2, Copy, RotateCcw, Phone, AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
-import { generateWhatsAppMessage, buildWhatsAppUrl, tryOpenWhatsApp } from '@/domain/whatsapp';
+import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp } from '@/domain/whatsapp';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -53,6 +54,7 @@ export default function CheckoutPage() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [whatsappMessage, setWhatsappMessage] = useState<string>('');
   const [whatsappUrl, setWhatsappUrl] = useState<string>('');
+  const [submitError, setSubmitError] = useState<string>('');
   const [zoneInput, setZoneInput] = useState('');
   const [manualZoneFallbackEnabled, setManualZoneFallbackEnabled] = useState(false);
 
@@ -86,6 +88,7 @@ export default function CheckoutPage() {
   const updateField = <K extends keyof CheckoutForm>(field: K, value: CheckoutForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (submitError) setSubmitError('');
   };
 
   const handleOrderTypeChange = (nextType: 'pickup' | 'delivery') => {
@@ -101,6 +104,7 @@ export default function CheckoutPage() {
       setManualZoneFallbackEnabled(false);
     }
 
+    setSubmitError('');
     setErrors((prev) => ({
       ...prev,
       orderType: undefined,
@@ -139,6 +143,7 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setSubmitError('');
 
     const result = checkoutSchema.safeParse(form);
     if (!result.success) {
@@ -147,6 +152,7 @@ export default function CheckoutPage() {
         fieldErrors[err.path[0] as keyof CheckoutForm] = err.message;
       });
       setErrors(fieldErrors);
+      setSubmitError('Revisa los campos marcados antes de enviar tu pedido.');
       return;
     }
 
@@ -155,6 +161,7 @@ export default function CheckoutPage() {
         ...prev,
         address: 'La direccion es requerida para entregas a domicilio',
       }));
+      setSubmitError('Completa la direccion de entrega para continuar.');
       return;
     }
 
@@ -163,11 +170,14 @@ export default function CheckoutPage() {
         ...prev,
         deliveryZone: 'Selecciona un barrio/zona valido para calcular el domicilio',
       }));
+      setSubmitError('Selecciona un barrio o zona valida para calcular el domicilio.');
       return;
     }
 
     if (mustExplicitlyEnableFallback) {
-      toast.error('No se pudieron cargar las zonas activas. Activa el modo manual para continuar.');
+      const message = 'No se pudieron cargar las zonas activas. Activa el modo manual para continuar.';
+      setSubmitError(message);
+      toast.error(message);
       return;
     }
 
@@ -192,6 +202,7 @@ export default function CheckoutPage() {
 
       if (orderError || !orderData) {
         console.error('Error saving order:', orderError);
+        setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
         toast.error('Error al crear el pedido. Intenta de nuevo.');
         setOrderStatus('idle');
         return;
@@ -215,10 +226,10 @@ export default function CheckoutPage() {
       }));
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-      if (itemsError) console.error('Error saving order items:', itemsError);
-
-      setOrderId(orderData.id);
-      setOrderStatus('created');
+      if (itemsError) {
+        console.error('Error saving order items:', itemsError);
+        setSubmitError('El pedido fue creado, pero hubo un problema guardando algunos items.');
+      }
 
       const phone = whatsappNumber || '573215667170';
       const message = generateWhatsAppMessage(cart.items, orderTotal, {
@@ -232,21 +243,24 @@ export default function CheckoutPage() {
         orderId: orderData.id,
       });
       const url = buildWhatsAppUrl(phone, message);
+
+      setOrderId(orderData.id);
       setWhatsappMessage(message);
       setWhatsappUrl(url);
+      clearCart();
 
-      const waResult = tryOpenWhatsApp(url);
-      if (waResult.ok) {
-        setOrderStatus('whatsapp_sent');
-        clearCart();
-        toast.success('Orden enviada', { description: 'Te contactaremos pronto por WhatsApp' });
-      } else {
+      const waResult = redirectToWhatsApp(url);
+      if (!waResult.ok) {
         setOrderStatus('whatsapp_blocked');
-        clearCart();
-        toast.warning('No se pudo abrir WhatsApp automaticamente');
+        toast.warning('Pedido creado, pero no se pudo abrir WhatsApp automaticamente.');
+        return;
       }
+
+      setOrderStatus('whatsapp_sent');
+      toast.success('Pedido creado. Redirigiendo a WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);
+      setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
       toast.error('Error inesperado. Intenta de nuevo.');
       setOrderStatus('idle');
     }
@@ -262,10 +276,10 @@ export default function CheckoutPage() {
   };
 
   const handleRetryWhatsApp = () => {
-    const result = tryOpenWhatsApp(whatsappUrl);
+    const result = redirectToWhatsApp(whatsappUrl);
     if (result.ok) {
       setOrderStatus('whatsapp_sent');
-      toast.success('WhatsApp abierto correctamente');
+      toast.success('Redirigiendo a WhatsApp...');
     } else {
       toast.error('Sigue sin poder abrir WhatsApp. Usa el boton de copiar.');
     }
@@ -323,10 +337,10 @@ export default function CheckoutPage() {
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={handleRetryWhatsApp} className="flex-1 btn-ohana">
-                  <RotateCcw className="w-4 h-4 mr-2" /> Reintentar WhatsApp
+                <Button type="button" onClick={handleRetryWhatsApp} className="flex-1 btn-ohana">
+                  <RotateCcw className="w-4 h-4 mr-2" /> Abrir WhatsApp
                 </Button>
-                <Button onClick={handleCopyMessage} variant="outline" className="flex-1">
+                <Button type="button" onClick={handleCopyMessage} variant="outline" className="flex-1">
                   <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
                 </Button>
               </div>
@@ -346,7 +360,7 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          <Button onClick={() => navigate('/')} className="w-full btn-ohana">Volver al inicio</Button>
+          <Button type="button" onClick={() => navigate('/')} className="w-full btn-ohana">Volver al inicio</Button>
         </div>
       </div>
     );
@@ -356,6 +370,7 @@ export default function CheckoutPage() {
     <div className="min-h-screen py-8 sm:py-12">
       <div className="container max-w-4xl">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
         >
@@ -366,6 +381,14 @@ export default function CheckoutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-3">
             <form onSubmit={handleSubmit} className="space-y-6">
+              {submitError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>No pudimos enviar tu pedido</AlertTitle>
+                  <AlertDescription>{submitError}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="bg-card rounded-xl p-6 border">
                 <h3 className="font-semibold mb-4">Informacion de contacto</h3>
                 <div className="space-y-4">
@@ -489,7 +512,7 @@ export default function CheckoutPage() {
                       )}
 
                       {isDeliveryZoneQueryError && manualZoneFallbackEnabled && (
-                        <p className="text-sm text-amber-700 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           Modo manual activo: el domicilio se registrara en $0 hasta recuperar las zonas.
                         </p>
                       )}
@@ -499,7 +522,7 @@ export default function CheckoutPage() {
                       )}
 
                       {!isDeliveryZoneQueryError && zoneInput && !hasSelectedDeliveryZone && (
-                        <p className="text-sm text-amber-700 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           Selecciona un barrio/zona valido de la lista para habilitar el envio.
                         </p>
                       )}
@@ -528,11 +551,11 @@ export default function CheckoutPage() {
                   size="lg"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
-                  {orderStatus === 'submitting' ? 'Enviando...' : 'Enviar Orden por WhatsApp'}
+                  {orderStatus === 'submitting' ? 'Creando pedido...' : 'Enviar Orden por WhatsApp'}
                 </Button>
 
                 {submitBlockedByZone && (
-                  <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                  <p className="text-sm text-foreground bg-muted border border-border rounded-md px-3 py-2">
                     {mustExplicitlyEnableFallback
                       ? 'No hay zonas disponibles ahora. Activa el modo manual para continuar.'
                       : 'Debes seleccionar un barrio/zona para calcular el domicilio y habilitar el envio.'}
@@ -562,6 +585,7 @@ export default function CheckoutPage() {
                           {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
                         </p>
                         <button
+                          type="button"
                           onClick={() => removeItem(item.id)}
                           className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
                           aria-label="Eliminar producto"
@@ -575,6 +599,7 @@ export default function CheckoutPage() {
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-1">
                           <button
+                            type="button"
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
                             className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-muted transition-colors"
                             aria-label="Reducir cantidad"
@@ -583,6 +608,7 @@ export default function CheckoutPage() {
                           </button>
                           <span className="w-6 text-center text-xs font-medium">{item.quantity}</span>
                           <button
+                            type="button"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-muted transition-colors"
                             aria-label="Aumentar cantidad"
@@ -623,3 +649,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
