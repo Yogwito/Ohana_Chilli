@@ -184,9 +184,12 @@ export default function CheckoutPage() {
     setOrderStatus('submitting');
 
     try {
-      const { data: orderData, error: orderError } = await supabase
+      const generatedOrderId = crypto.randomUUID();
+
+      const { error: orderError } = await supabase
         .from('orders')
         .insert({
+          id: generatedOrderId,
           customer_name: form.name,
           phone: form.phone,
           order_type: form.orderType,
@@ -196,11 +199,9 @@ export default function CheckoutPage() {
           notes: form.notes || null,
           total_cents: orderTotal,
           status: 'pending',
-        })
-        .select('id')
-        .single();
+        });
 
-      if (orderError || !orderData) {
+      if (orderError) {
         console.error('Error saving order:', orderError);
         setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
         toast.error('Error al crear el pedido. Intenta de nuevo.');
@@ -209,7 +210,7 @@ export default function CheckoutPage() {
       }
 
       const orderItems = cart.items.map((item) => ({
-        order_id: orderData.id,
+        order_id: generatedOrderId,
         brand_id: item.brand,
         name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
         quantity: item.quantity,
@@ -240,11 +241,11 @@ export default function CheckoutPage() {
         deliveryZone: form.deliveryZone,
         deliveryFeeCents,
         notes: form.notes,
-        orderId: orderData.id,
+        orderId: generatedOrderId,
       });
       const url = buildWhatsAppUrl(phone, message);
 
-      setOrderId(orderData.id);
+      setOrderId(generatedOrderId);
       setWhatsappMessage(message);
       setWhatsappUrl(url);
       clearCart();
