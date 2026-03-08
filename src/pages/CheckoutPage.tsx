@@ -385,8 +385,8 @@ export default function CheckoutPage() {
         </button>
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
+          <div className="lg:col-span-3 order-2 lg:order-1">
             <form onSubmit={handleSubmit} className="space-y-6">
               {submitError && (
                 <Alert variant="destructive">
