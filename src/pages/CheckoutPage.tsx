@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp, preOpenWindow } from '@/domain/whatsapp';
+import { trackEvent } from '@/lib/analytics';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -181,6 +182,7 @@ export default function CheckoutPage() {
     }
 
     setOrderStatus('submitting');
+    trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
     // Pre-open window SYNCHRONOUSLY inside user gesture to bypass popup blockers
     const waWindow = preOpenWindow();
@@ -255,13 +257,17 @@ export default function CheckoutPage() {
 
       // Redirect the pre-opened window to WhatsApp
       const waResult = redirectToWhatsApp(url, waWindow);
+      trackEvent({ type: 'checkout_complete', orderId: generatedOrderId, totalCents: orderTotal, orderType: form.orderType, itemCount: cart.items.length });
+
       if (!waResult.ok) {
         setOrderStatus('whatsapp_blocked');
+        trackEvent({ type: 'whatsapp_blocked', orderId: generatedOrderId });
         toast.warning('Pedido creado, pero no se pudo abrir WhatsApp automaticamente.');
         return;
       }
 
       setOrderStatus('whatsapp_sent');
+      trackEvent({ type: 'whatsapp_sent', orderId: generatedOrderId });
       toast.success('Pedido creado. Redirigiendo a WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);

@@ -5,6 +5,7 @@ import { Product, Brand } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { trackEvent } from '@/lib/analytics';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface ProductCardProps {
@@ -55,6 +56,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
 
   const handleAddToCart = () => {
     addProduct(product);
+    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: product.price });
     toast.success(`${product.name} agregado`, { description: formatPrice(product.price) });
   };
 
