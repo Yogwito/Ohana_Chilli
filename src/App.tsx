@@ -29,34 +29,36 @@ const PageFallback = () => (
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <CartProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Suspense fallback={<PageFallback />}>
-            <Routes>
-              {/* Admin routes without Layout */}
-              <Route path="/admin/login" element={<AdminLoginPage />} />
-              <Route path="/admin" element={<AdminPage />} />
+  <HelmetProvider>
+    <QueryClientProvider client={queryClient}>
+      <CartProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                {/* Admin routes without Layout */}
+                <Route path="/admin/login" element={<AdminLoginPage />} />
+                <Route path="/admin" element={<AdminPage />} />
 
-              {/* Public routes with Layout */}
-              <Route path="/" element={<Layout><HomePage /></Layout>} />
-              <Route path="/ohana" element={<Layout><OhanaPage /></Layout>} />
-              <Route path="/chilli" element={<Layout><ChilliPage /></Layout>} />
-              <Route path="/bebidas" element={<Layout><BeveragesPage /></Layout>} />
-              <Route path="/checkout" element={<Layout><CheckoutPage /></Layout>} />
-              <Route path="/nosotros" element={<Layout><AboutPage /></Layout>} />
-              <Route path="/contacto" element={<Layout><ContactPage /></Layout>} />
-              <Route path="/pedidos" element={<Layout><OrdersPage /></Layout>} />
-              <Route path="*" element={<Layout><NotFound /></Layout>} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </TooltipProvider>
-    </CartProvider>
-  </QueryClientProvider>
+                {/* Public routes with Layout */}
+                <Route path="/" element={<Layout><HomePage /></Layout>} />
+                <Route path="/ohana" element={<Layout><OhanaPage /></Layout>} />
+                <Route path="/chilli" element={<Layout><ChilliPage /></Layout>} />
+                <Route path="/bebidas" element={<Layout><BeveragesPage /></Layout>} />
+                <Route path="/checkout" element={<Layout><CheckoutPage /></Layout>} />
+                <Route path="/nosotros" element={<Layout><AboutPage /></Layout>} />
+                <Route path="/contacto" element={<Layout><ContactPage /></Layout>} />
+                <Route path="/pedidos" element={<Layout><OrdersPage /></Layout>} />
+                <Route path="*" element={<Layout><NotFound /></Layout>} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </TooltipProvider>
+      </CartProvider>
+    </QueryClientProvider>
+  </HelmetProvider>
 );
 
 export default App;
