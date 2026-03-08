@@ -11,6 +11,16 @@ export default function OhanaPage() {
   const [activeTab, setActiveTab] = useState('premade');
   const { data: ohanaProducts = [], isLoading, error } = useProducts({ brandId: 'ohana', categoryId: 'ohana-premade' });
 
+  // Validation: ensure the 5 required bowls are present
+  const REQUIRED_BOWLS = ['Teriyaki', 'Chicago', 'Veggie', 'Paisa', 'Pulled Pork'];
+  const missingBowls = !isLoading && !error && ohanaProducts.length > 0
+    ? REQUIRED_BOWLS.filter(name => !ohanaProducts.some(p => p.name === name))
+    : [];
+
+  if (missingBowls.length > 0) {
+    console.error(`[OhanaPage] Missing required bowls: ${missingBowls.join(', ')}`);
+  }
+
   return (
     <div className="min-h-screen">
       <PageHero
