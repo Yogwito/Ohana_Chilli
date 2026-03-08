@@ -268,7 +268,7 @@ export default function CheckoutPage() {
 
       setOrderStatus('whatsapp_sent');
       trackEvent({ type: 'whatsapp_sent', orderId: generatedOrderId });
-      toast.success('Pedido creado. Redirigiendo a WhatsApp...');
+      toast.success('Pedido creado. Intentando abrir WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);
       // Close pre-opened window on error
