@@ -113,25 +113,31 @@ export default function CheckoutPage() {
     }));
   };
 
-  const handleDeliveryZoneChange = (rawValue: string) => {
-    setZoneInput(rawValue);
-    const normalizedName = normalizeZoneName(rawValue);
-
-    if (isDeliveryZoneQueryError && manualZoneFallbackEnabled) {
-      updateField('deliveryZone', normalizedName);
+  const handleDeliveryZoneChange = (selectedZoneId: string) => {
+    if (!selectedZoneId) {
+      setZoneInput('');
+      updateField('deliveryZone', '');
       updateField('deliveryFeeCents', 0);
       return;
     }
 
-    const zone = zonesByKey.get(normalizeZoneKey(rawValue));
-    if (zone) {
-      updateField('deliveryZone', zone.name);
-      updateField('deliveryFeeCents', zone.feeCents);
+    if (isDeliveryZoneQueryError && manualZoneFallbackEnabled) {
+      setZoneInput(selectedZoneId);
+      updateField('deliveryZone', selectedZoneId);
+      updateField('deliveryFeeCents', 0);
       return;
     }
 
-    updateField('deliveryZone', '');
-    updateField('deliveryFeeCents', 0);
+    const zone = deliveryZones.find((z) => z.id === selectedZoneId);
+    if (zone) {
+      setZoneInput(zone.id);
+      updateField('deliveryZone', zone.name);
+      updateField('deliveryFeeCents', zone.feeCents);
+    } else {
+      setZoneInput('');
+      updateField('deliveryZone', '');
+      updateField('deliveryFeeCents', 0);
+    }
   };
 
   const enableManualZoneFallback = () => {
