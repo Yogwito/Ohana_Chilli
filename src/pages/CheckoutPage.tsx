@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
-import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp } from '@/domain/whatsapp';
+import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp, preOpenWindow } from '@/domain/whatsapp';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -182,6 +182,9 @@ export default function CheckoutPage() {
 
     setOrderStatus('submitting');
 
+    // Pre-open window SYNCHRONOUSLY inside user gesture to bypass popup blockers
+    const waWindow = preOpenWindow();
+
     try {
       const generatedOrderId = crypto.randomUUID();
 
@@ -202,6 +205,8 @@ export default function CheckoutPage() {
 
       if (orderError) {
         console.error('Error saving order:', orderError);
+        // Close pre-opened window on error
+        if (waWindow && !waWindow.closed) waWindow.close();
         setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
         toast.error('Error al crear el pedido. Intenta de nuevo.');
         setOrderStatus('idle');
@@ -228,7 +233,6 @@ export default function CheckoutPage() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
       if (itemsError) {
         console.error('Error saving order items:', itemsError);
-        setSubmitError('El pedido fue creado, pero hubo un problema guardando algunos items.');
       }
 
       const phone = whatsappNumber || '573215667170';
@@ -249,7 +253,8 @@ export default function CheckoutPage() {
       setWhatsappUrl(url);
       clearCart();
 
-      const waResult = redirectToWhatsApp(url);
+      // Redirect the pre-opened window to WhatsApp
+      const waResult = redirectToWhatsApp(url, waWindow);
       if (!waResult.ok) {
         setOrderStatus('whatsapp_blocked');
         toast.warning('Pedido creado, pero no se pudo abrir WhatsApp automaticamente.');
@@ -260,6 +265,8 @@ export default function CheckoutPage() {
       toast.success('Pedido creado. Redirigiendo a WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);
+      // Close pre-opened window on error
+      if (waWindow && !waWindow.closed) waWindow.close();
       setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
       toast.error('Error inesperado. Intenta de nuevo.');
       setOrderStatus('idle');
