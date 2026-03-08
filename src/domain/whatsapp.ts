@@ -65,34 +65,6 @@ export function buildWhatsAppUrl(phone: string, message: string): string {
   return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
 }
 
-export interface WhatsAppResult {
-  ok: boolean;
-  reason?: 'popup_blocked' | 'blocked' | 'closed_immediately';
-  window?: Window | null;
-}
-
-/**
- * Open WhatsApp URL directly. Uses window.open and detects if the popup was blocked.
- * If blocked, falls back gracefully.
- */
-export function openWhatsApp(url: string): WhatsAppResult {
-  try {
-    const popup = window.open(url, '_blank');
-
-    // Popup blocked by browser
-    if (!popup || popup.closed) {
-      return { ok: false, reason: 'popup_blocked' };
-    }
-
-    // Some browsers open then immediately close — detect after a short delay
-    // We can't reliably detect this synchronously, so we return ok: true
-    // and the caller can check later or provide a manual fallback.
-    return { ok: true, window: popup };
-  } catch {
-    return { ok: false, reason: 'blocked' };
-  }
-}
-
 /**
  * Navigate current tab to WhatsApp URL as a last-resort fallback.
  * This always works but leaves the app.

@@ -31,7 +31,7 @@ const checkoutSchema = z.object({
 });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
-type OrderStatus = 'idle' | 'submitting' | 'created' | 'whatsapp_sent' | 'whatsapp_blocked';
+type OrderStatus = 'idle' | 'submitting' | 'created';
 
 function normalizeZoneName(value: string) {
   return value.trim().replace(/\s+/g, ' ');
