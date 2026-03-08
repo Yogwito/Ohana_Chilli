@@ -154,9 +154,9 @@ export function useWhatsAppNumber() {
         .from('settings')
         .select('value')
         .eq('key', 'whatsapp_number')
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data.value;
+      return data?.value ?? null;
     },
     staleTime: 1000 * 60 * 60,
   });
