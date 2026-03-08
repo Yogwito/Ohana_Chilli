@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
-import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp, preOpenWindow } from '@/domain/whatsapp';
+import { generateWhatsAppMessage, buildWhatsAppUrl, openWhatsApp, navigateToWhatsApp } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 
 const checkoutSchema = z.object({
@@ -184,9 +184,6 @@ export default function CheckoutPage() {
     setOrderStatus('submitting');
     trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
-    // Pre-open window SYNCHRONOUSLY inside user gesture to bypass popup blockers
-    const waWindow = preOpenWindow();
-
     try {
       const generatedOrderId = crypto.randomUUID();
 
@@ -207,8 +204,6 @@ export default function CheckoutPage() {
 
       if (orderError) {
         console.error('Error saving order:', orderError);
-        // Close pre-opened window on error
-        if (waWindow && !waWindow.closed) waWindow.close();
         setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
         toast.error('Error al crear el pedido. Intenta de nuevo.');
         setOrderStatus('idle');
@@ -255,9 +250,10 @@ export default function CheckoutPage() {
       setWhatsappUrl(url);
       clearCart();
 
-      // Redirect the pre-opened window to WhatsApp
-      const waResult = redirectToWhatsApp(url, waWindow);
       trackEvent({ type: 'checkout_complete', orderId: generatedOrderId, totalCents: orderTotal, orderType: form.orderType, itemCount: cart.items.length });
+
+      // Try to open WhatsApp
+      const waResult = openWhatsApp(url);
 
       if (!waResult.ok) {
         setOrderStatus('whatsapp_blocked');
@@ -268,11 +264,9 @@ export default function CheckoutPage() {
 
       setOrderStatus('whatsapp_sent');
       trackEvent({ type: 'whatsapp_sent', orderId: generatedOrderId });
-      toast.success('Pedido creado. Intentando abrir WhatsApp...');
+      toast.success('Pedido creado. Abriendo WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);
-      // Close pre-opened window on error
-      if (waWindow && !waWindow.closed) waWindow.close();
       setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
       toast.error('Error inesperado. Intenta de nuevo.');
       setOrderStatus('idle');
@@ -289,14 +283,17 @@ export default function CheckoutPage() {
   };
 
   const handleRetryWhatsApp = () => {
-    const waWindow = preOpenWindow();
-    const result = redirectToWhatsApp(whatsappUrl, waWindow);
+    const result = openWhatsApp(whatsappUrl);
     if (result.ok) {
       setOrderStatus('whatsapp_sent');
       toast.success('Abriendo WhatsApp...');
     } else {
-      toast.error('Tu navegador está bloqueando la ventana. Usa el botón de copiar mensaje.');
+      toast.error('Tu navegador está bloqueando la ventana. Usa el enlace directo abajo.');
     }
+  };
+
+  const handleDirectLink = () => {
+    navigateToWhatsApp(whatsappUrl);
   };
 
   if (cart.items.length === 0 && orderStatus === 'idle') {
@@ -348,14 +345,39 @@ export default function CheckoutPage() {
                 <span>Numero: <strong className="text-foreground">{phone}</strong></span>
               </div>
 
+              {/* Primary: open WhatsApp in new tab */}
+              <Button type="button" onClick={handleRetryWhatsApp} className="w-full btn-ohana">
+                <MessageCircle className="w-4 h-4 mr-2" /> Abrir WhatsApp
+              </Button>
+
+              {/* Fallback: navigate current tab (always works) */}
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full rounded-md text-sm font-medium h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" /> Enlace directo (si no abre)
+              </a>
+
               <div className="flex gap-2">
-                <Button type="button" onClick={handleRetryWhatsApp} className="flex-1 btn-ohana">
-                  <RotateCcw className="w-4 h-4 mr-2" /> Abrir WhatsApp
-                </Button>
                 <Button type="button" onClick={handleCopyMessage} variant="outline" className="flex-1">
                   <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
                 </Button>
+                <Button type="button" onClick={handleDirectLink} variant="outline" className="flex-1">
+                  <Phone className="w-4 h-4 mr-2" /> Ir a WhatsApp
+                </Button>
               </div>
+
+              {orderStatus === 'whatsapp_blocked' && (
+                <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>¿No se abrió WhatsApp?</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    Tu navegador bloqueó la ventana emergente. Usa el enlace directo o copia el mensaje y pégalo manualmente en WhatsApp al número indicado arriba.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <details className="text-sm">
                 <summary className="cursor-pointer text-muted-foreground hover:text-foreground">

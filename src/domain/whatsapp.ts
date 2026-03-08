@@ -62,42 +62,41 @@ function normalizeWhatsAppPhone(phone: string): string {
 export function buildWhatsAppUrl(phone: string, message: string): string {
   const sanitizedPhone = normalizeWhatsAppPhone(phone);
   const encodedMessage = encodeURIComponent(message);
-
-  // Use wa.me for both desktop and mobile to avoid web.whatsapp.com blocking in embedded contexts.
   return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
 }
 
 export interface WhatsAppResult {
   ok: boolean;
-  reason?: string;
+  reason?: 'popup_blocked' | 'blocked' | 'closed_immediately';
   window?: Window | null;
 }
 
 /**
- * Pre-open a blank window synchronously (inside user gesture).
- * This avoids popup blockers since it runs in the click handler stack.
+ * Open WhatsApp URL directly. Uses window.open and detects if the popup was blocked.
+ * If blocked, falls back gracefully.
  */
-export function preOpenWindow(): Window | null {
+export function openWhatsApp(url: string): WhatsAppResult {
   try {
-    return window.open('about:blank', '_blank');
+    const popup = window.open(url, '_blank');
+
+    // Popup blocked by browser
+    if (!popup || popup.closed) {
+      return { ok: false, reason: 'popup_blocked' };
+    }
+
+    // Some browsers open then immediately close — detect after a short delay
+    // We can't reliably detect this synchronously, so we return ok: true
+    // and the caller can check later or provide a manual fallback.
+    return { ok: true, window: popup };
   } catch {
-    return null;
+    return { ok: false, reason: 'blocked' };
   }
 }
 
 /**
- * Redirect a pre-opened window to the WhatsApp URL.
- * If no pre-opened window is available, return blocked to avoid losing app state.
+ * Navigate current tab to WhatsApp URL as a last-resort fallback.
+ * This always works but leaves the app.
  */
-export function redirectToWhatsApp(url: string, preOpened?: Window | null): WhatsAppResult {
-  try {
-    if (preOpened && !preOpened.closed) {
-      preOpened.location.href = url;
-      return { ok: true, window: preOpened };
-    }
-
-    return { ok: false, reason: 'popup_blocked' };
-  } catch {
-    return { ok: false, reason: 'blocked' };
-  }
+export function navigateToWhatsApp(url: string): void {
+  window.location.href = url;
 }
