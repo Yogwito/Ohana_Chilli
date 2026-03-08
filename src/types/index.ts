@@ -46,7 +46,7 @@ export interface Product {
   price: number;
   brand: Brand;
   categoryId: string;
-  
+  imageUrl?: string;
   ingredients?: string[];
   calories?: number;
   isVegan?: boolean;
