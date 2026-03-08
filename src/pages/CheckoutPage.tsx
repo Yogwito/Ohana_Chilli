@@ -327,19 +327,17 @@ export default function CheckoutPage() {
             >
               <CheckCircle className={`w-10 h-10 ${orderStatus === 'whatsapp_sent' ? 'text-ohana' : 'text-accent'}`} />
             </div>
-            <h2 className="text-2xl font-bold mb-2">
-              {orderStatus === 'whatsapp_sent' ? 'Orden enviada por WhatsApp' : 'Pedido creado'}
-            </h2>
-            {orderId && (
-              <p className="text-sm text-muted-foreground mb-2">
-                Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
+              <h2 className="text-2xl font-bold mb-2">Pedido creado</h2>
+              {orderId && (
+                <p className="text-sm text-muted-foreground mb-2">
+                  Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
+                </p>
+              )}
+              <p className="text-muted-foreground">
+                {orderStatus === 'whatsapp_sent'
+                  ? 'Intentamos abrir WhatsApp para que confirmes el pedido.'
+                  : 'No se pudo abrir WhatsApp automaticamente. Usa las opciones abajo para enviarnos tu pedido.'}
               </p>
-            )}
-            <p className="text-muted-foreground">
-              {orderStatus === 'whatsapp_sent'
-                ? 'Te contactaremos por WhatsApp para confirmar los detalles.'
-                : 'No se pudo abrir WhatsApp automaticamente. Usa las opciones abajo para enviarnos tu pedido.'}
-            </p>
           </div>
 
           {orderStatus === 'whatsapp_blocked' && (
