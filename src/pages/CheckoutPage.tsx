@@ -568,7 +568,7 @@ export default function CheckoutPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-card rounded-xl border p-6 sticky top-24">
+            <div className="bg-card rounded-xl border p-4 sm:p-6 sticky top-20 lg:top-24">
               <h3 className="font-semibold mb-4">Resumen de tu orden</h3>
               <div className="space-y-4 mb-6">
                 {cart.items.map((item) => (
