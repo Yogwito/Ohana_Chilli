@@ -283,14 +283,17 @@ export default function CheckoutPage() {
   };
 
   const handleRetryWhatsApp = () => {
-    const waWindow = preOpenWindow();
-    const result = redirectToWhatsApp(whatsappUrl, waWindow);
+    const result = openWhatsApp(whatsappUrl);
     if (result.ok) {
       setOrderStatus('whatsapp_sent');
       toast.success('Abriendo WhatsApp...');
     } else {
-      toast.error('Tu navegador está bloqueando la ventana. Usa el botón de copiar mensaje.');
+      toast.error('Tu navegador está bloqueando la ventana. Usa el enlace directo abajo.');
     }
+  };
+
+  const handleDirectLink = () => {
+    navigateToWhatsApp(whatsappUrl);
   };
 
   if (cart.items.length === 0 && orderStatus === 'idle') {
