@@ -37,6 +37,7 @@ interface BowlRuleRow {
 interface OrderRow {
   id: string; customer_name: string; phone: string; order_type: string;
   total_cents: number; status: string; created_at: string; notes: string | null; address: string | null;
+  delivery_zone: string | null; delivery_fee_cents: number;
 }
 
 interface DeliveryZoneRow {
