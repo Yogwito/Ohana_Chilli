@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
-import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp } from '@/domain/whatsapp';
+import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp, preOpenWindow } from '@/domain/whatsapp';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
