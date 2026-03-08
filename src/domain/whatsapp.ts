@@ -14,6 +14,7 @@ interface OrderInfo {
 }
 
 export function generateWhatsAppMessage(items: CartItem[], total: number, info: OrderInfo): string {
+  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const lines = [
     'Nueva Orden - Ohana & Chilli',
     `Ref: ${info.orderId.slice(0, 8).toUpperCase()}`,
@@ -44,7 +45,12 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
     if (item.notes) lines.push(`   - Nota: ${item.notes}`);
   });
 
-  lines.push('', `Total: ${formatPrice(total)}`);
+  lines.push('');
+  lines.push(`Subtotal: ${formatPrice(subtotal)}`);
+  if (info.orderType === 'delivery' && (info.deliveryFeeCents ?? 0) > 0) {
+    lines.push(`Domicilio: ${formatPrice(info.deliveryFeeCents!)}`);
+  }
+  lines.push(`Total: ${formatPrice(total)}`);
   if (info.notes) lines.push('', `Notas: ${info.notes}`);
   return lines.join('\n');
 }
@@ -56,13 +62,35 @@ export function buildWhatsAppUrl(phone: string, message: string): string {
 export interface WhatsAppResult {
   ok: boolean;
   reason?: string;
+  window?: Window | null;
 }
 
-export function redirectToWhatsApp(url: string): WhatsAppResult {
+/**
+ * Pre-open a blank window synchronously (inside user gesture).
+ * This avoids popup blockers since it runs in the click handler stack.
+ */
+export function preOpenWindow(): Window | null {
+  try {
+    return window.open('about:blank', '_blank');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Redirect a pre-opened window to the WhatsApp URL.
+ * Falls back to same-tab redirect if no window was pre-opened.
+ */
+export function redirectToWhatsApp(url: string, preOpened?: Window | null): WhatsAppResult {
+  if (preOpened && !preOpened.closed) {
+    preOpened.location.href = url;
+    return { ok: true, window: preOpened };
+  }
+  // Fallback: try same-tab redirect
   try {
     window.location.assign(url);
     return { ok: true };
   } catch {
-    return { ok: false, reason: 'exception' };
+    return { ok: false, reason: 'blocked' };
   }
 }
