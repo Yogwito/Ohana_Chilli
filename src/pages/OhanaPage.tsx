@@ -25,6 +25,7 @@ export default function OhanaPage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead title="Ohana Bowls" description="Arma tu bowl personalizado con ingredientes frescos. Bowls saludables en Manizales con bases, proteínas y acompañamientos a tu gusto." path="/ohana" />
       <PageHero
         icon={Leaf}
         title="Ohana"

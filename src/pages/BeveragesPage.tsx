@@ -23,6 +23,7 @@ export default function BeveragesPage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead title="Bebidas" description="Refrescos, jugos naturales, smoothies y más. Complementa tu orden con las bebidas de Ohana & Chilli." path="/bebidas" />
       <PageHero
         icon={GlassWater}
         title="Bebidas"

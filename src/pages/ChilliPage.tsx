@@ -23,6 +23,7 @@ export default function ChilliPage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead title="Chilli Tex-Mex" description="Hamburguesas, hot dogs, nachos y papas con sabor Tex-Mex en Manizales. Pide tu favorito a domicilio o para recoger." path="/chilli" />
       <PageHero
         icon={Flame}
         title="Chilli"
