@@ -56,6 +56,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
 
   const handleAddToCart = () => {
     addProduct(product);
+    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: product.price });
     toast.success(`${product.name} agregado`, { description: formatPrice(product.price) });
   };
 
