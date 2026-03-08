@@ -182,6 +182,7 @@ export default function CheckoutPage() {
     }
 
     setOrderStatus('submitting');
+    trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
     // Pre-open window SYNCHRONOUSLY inside user gesture to bypass popup blockers
     const waWindow = preOpenWindow();
