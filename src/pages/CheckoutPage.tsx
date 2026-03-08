@@ -36,9 +36,6 @@ function normalizeZoneName(value: string) {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-function normalizeZoneKey(value: string) {
-  return normalizeZoneName(value).toLowerCase();
-}
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
