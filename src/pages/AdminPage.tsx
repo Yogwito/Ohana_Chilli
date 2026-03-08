@@ -14,8 +14,9 @@ import { toast } from 'sonner';
 import { formatPrice } from '@/domain/formatPrice';
 import {
   LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
-  Leaf, Flame, Search, Truck, Upload,
+  Leaf, Flame, Search, Truck, Upload, BarChart3,
 } from 'lucide-react';
+import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 
 // ─── Types ───────────────────────────────────────────────
 interface ProductRow {
