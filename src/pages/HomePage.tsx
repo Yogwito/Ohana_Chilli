@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/products/ProductCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFeaturedProducts, useBeverages, useCategories } from '@/hooks/use-catalog';
+import SEOHead from '@/components/SEOHead';
 
 export default function HomePage() {
   const { data: featuredProducts = [], isLoading: loadingFeatured } = useFeaturedProducts();
@@ -14,6 +15,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead path="/" />
       {/* Hero Section - Split Brand */}
       <section className="relative overflow-hidden">
         <div className="container py-12 sm:py-20">

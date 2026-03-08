@@ -1,8 +1,10 @@
 import { MapPin, Phone, Clock, Mail, Leaf, Flame } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen">
+      <SEOHead title="Nosotros" description="Conoce la historia de Ohana & Chilli. Dos conceptos gastronómicos bajo un mismo techo en Manizales, Colombia." path="/nosotros" />
       {/* Hero */}
       <section className="py-16 sm:py-24 bg-gradient-to-br from-ohana-light via-background to-chilli-muted">
         <div className="container">

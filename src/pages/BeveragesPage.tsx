@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBeverages, useBeverageCategories } from '@/hooks/use-catalog';
 import { cn } from '@/lib/utils';
 import { GlassWater } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function BeveragesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export default function BeveragesPage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead title="Bebidas" description="Refrescos, jugos naturales, smoothies y más. Complementa tu orden con las bebidas de Ohana & Chilli." path="/bebidas" />
       <PageHero
         icon={GlassWater}
         title="Bebidas"

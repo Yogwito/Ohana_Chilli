@@ -5,6 +5,7 @@ import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProducts } from '@/hooks/use-catalog';
 import { Leaf, Sparkles, ChefHat } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 
@@ -24,6 +25,7 @@ export default function OhanaPage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead title="Ohana Bowls" description="Arma tu bowl personalizado con ingredientes frescos. Bowls saludables en Manizales con bases, proteínas y acompañamientos a tu gusto." path="/ohana" />
       <PageHero
         icon={Leaf}
         title="Ohana"

@@ -1,5 +1,6 @@
 import { MapPin, Phone, Clock, Mail, Instagram, Facebook } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import SEOHead from '@/components/SEOHead';
 
 export default function ContactPage() {
   const handleWhatsApp = () => {
@@ -9,6 +10,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen py-12 sm:py-16">
+      <SEOHead title="Contacto" description="Contáctanos por WhatsApp, teléfono o visítanos en Manizales. Horarios, ubicación y redes sociales de Ohana & Chilli." path="/contacto" />
       <div className="container">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">

@@ -5,6 +5,7 @@ import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProducts, useCategories } from '@/hooks/use-catalog';
 import { Flame } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function ChilliPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export default function ChilliPage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead title="Chilli Tex-Mex" description="Hamburguesas, hot dogs, nachos y papas con sabor Tex-Mex en Manizales. Pide tu favorito a domicilio o para recoger." path="/chilli" />
       <PageHero
         icon={Flame}
         title="Chilli"
