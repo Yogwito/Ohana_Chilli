@@ -273,7 +273,7 @@ export default function CheckoutPage() {
     }
   };
 
-
+  const handleCopyMessage = async () => {
     try {
       await navigator.clipboard.writeText(whatsappMessage);
       toast.success('Mensaje copiado al portapapeles');
