@@ -294,90 +294,64 @@ export default function CheckoutPage() {
     );
   }
 
-  if (
-    orderStatus === 'whatsapp_sent'
-    || orderStatus === 'whatsapp_blocked'
-    || (orderStatus === 'created' && cart.items.length === 0)
-  ) {
+  if (orderStatus === 'created') {
     const phone = whatsappNumber || '573215667170';
     return (
       <div className="min-h-screen flex items-center justify-center py-12">
         <div className="max-w-lg mx-auto px-4 animate-scale-in">
           <div className="text-center mb-8">
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
-              orderStatus === 'whatsapp_sent' ? 'bg-ohana/10' : 'bg-accent/20'
-            }`}
-            >
-              <CheckCircle className={`w-10 h-10 ${orderStatus === 'whatsapp_sent' ? 'text-ohana' : 'text-accent'}`} />
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 bg-accent/20">
+              <CheckCircle className="w-10 h-10 text-accent" />
             </div>
-              <h2 className="text-2xl font-bold mb-2">Pedido creado</h2>
-              {orderId && (
-                <p className="text-sm text-muted-foreground mb-2">
-                  Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
-                </p>
-              )}
-              <p className="text-muted-foreground">
-                {orderStatus === 'whatsapp_sent'
-                  ? 'Intentamos abrir WhatsApp para que confirmes el pedido.'
-                  : 'No se pudo abrir WhatsApp automaticamente. Usa las opciones abajo para enviarnos tu pedido.'}
+            <h2 className="text-2xl font-bold mb-2">Pedido creado</h2>
+            {orderId && (
+              <p className="text-sm text-muted-foreground mb-2">
+                Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
               </p>
+            )}
+            <p className="text-muted-foreground">
+              Abre WhatsApp para confirmar el envío de tu pedido.
+            </p>
           </div>
 
-          {(orderStatus === 'whatsapp_blocked' || orderStatus === 'whatsapp_sent') && (
-            <div className="bg-card border rounded-xl p-6 space-y-4 mb-6">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Phone className="w-4 h-4" />
-                <span>Numero: <strong className="text-foreground">{phone}</strong></span>
-              </div>
-
-              {/* Primary: open WhatsApp in new tab */}
-              <Button type="button" onClick={handleRetryWhatsApp} className="w-full btn-ohana">
-                <MessageCircle className="w-4 h-4 mr-2" /> Abrir WhatsApp
-              </Button>
-
-              {/* Fallback: navigate current tab (always works) */}
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full rounded-md text-sm font-medium h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" /> Enlace directo (si no abre)
-              </a>
-
-              <div className="flex gap-2">
-                <Button type="button" onClick={handleCopyMessage} variant="outline" className="flex-1">
-                  <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
-                </Button>
-                <Button type="button" onClick={handleDirectLink} variant="outline" className="flex-1">
-                  <Phone className="w-4 h-4 mr-2" /> Ir a WhatsApp
-                </Button>
-              </div>
-
-              {orderStatus === 'whatsapp_blocked' && (
-                <Alert className="border-amber-200 bg-amber-50 text-amber-800">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>¿No se abrió WhatsApp?</AlertTitle>
-                  <AlertDescription className="text-xs">
-                    Tu navegador bloqueó la ventana emergente. Usa el enlace directo o copia el mensaje y pégalo manualmente en WhatsApp al número indicado arriba.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <details className="text-sm">
-                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                  Ver mensaje completo
-                </summary>
-                <textarea
-                  readOnly
-                  value={whatsappMessage}
-                  rows={10}
-                  className="w-full mt-2 p-3 bg-muted rounded-lg text-xs font-mono resize-none border-0 focus:ring-0"
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-              </details>
+          <div className="bg-card border rounded-xl p-6 space-y-4 mb-6">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Phone className="w-4 h-4" />
+              <span>Numero: <strong className="text-foreground">{phone}</strong></span>
             </div>
-          )}
+
+            {/* Primary: anchor link to WhatsApp — works in all contexts */}
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 w-full rounded-md text-sm font-medium h-11 px-4 py-2 btn-ohana"
+            >
+              <MessageCircle className="w-4 h-4" /> Abrir WhatsApp
+            </a>
+
+            {/* Fallback: navigate current tab */}
+            <Button type="button" onClick={handleDirectLink} variant="outline" className="w-full">
+              <RotateCcw className="w-4 h-4 mr-2" /> Enlace directo (si no abre)
+            </Button>
+
+            <Button type="button" onClick={handleCopyMessage} variant="outline" className="w-full">
+              <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
+            </Button>
+
+            <details className="text-sm" open>
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                Ver mensaje completo
+              </summary>
+              <textarea
+                readOnly
+                value={whatsappMessage}
+                rows={10}
+                className="w-full mt-2 p-3 bg-muted rounded-lg text-xs font-mono resize-none border-0 focus:ring-0"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </details>
+          </div>
 
           <Button type="button" onClick={() => navigate('/')} className="w-full btn-ohana">Volver al inicio</Button>
         </div>
