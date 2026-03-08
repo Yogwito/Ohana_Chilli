@@ -66,10 +66,6 @@ export default function CheckoutPage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
-  const zonesByKey = useMemo(
-    () => new Map(deliveryZones.map((zone) => [normalizeZoneKey(zone.name), zone])),
-    [deliveryZones],
-  );
 
   const isDeliveryZoneQueryError = Boolean(deliveryZonesError);
   const hasSelectedDeliveryZone = Boolean(form.deliveryZone && form.deliveryZone.trim().length > 0);
