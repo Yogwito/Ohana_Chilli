@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useCart } from '@/context/CartContext';
 import BrandSelectorModal from './BrandSelectorModal';
-import CartDrawer from '@/components/cart/CartDrawer';
+
+const CartDrawer = lazy(() => import('@/components/cart/CartDrawer'));
 
 const navLinks = [
   { href: '/', label: 'Inicio' },
@@ -132,11 +133,13 @@ export default function Navbar() {
         onOpenChange={setBrandModalOpen} 
       />
 
-      {/* Cart Drawer */}
-      <CartDrawer 
-        open={cartOpen} 
-        onOpenChange={setCartOpen} 
-      />
+      {/* Cart Drawer - lazy loaded */}
+      <Suspense fallback={null}>
+        <CartDrawer
+          open={cartOpen}
+          onOpenChange={setCartOpen}
+        />
+      </Suspense>
     </>
   );
 }
