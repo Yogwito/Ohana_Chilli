@@ -55,7 +55,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
 
   const handleAddToCart = () => {
     addProduct(product);
-    toast.success(`${product.name} agregado al carrito`, { description: formatPrice(product.price) });
+    toast.success(`${product.name} agregado`, { description: formatPrice(product.price) });
   };
 
   const isCompact = variant === 'compact';
@@ -64,37 +64,37 @@ export default function ProductCard({ product, variant = 'default', categoryName
     <>
       <article
         className={cn(
-          'flex flex-col h-full rounded-2xl overflow-hidden border bg-card shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5',
+          'group flex flex-col rounded-xl overflow-hidden border bg-card transition-all duration-200',
           isOhana ? 'border-ohana/15 hover:border-ohana/30' : 'border-chilli-dark/15 hover:border-chilli-dark/30',
         )}
       >
         {/* Color accent bar */}
-        <div className={cn('h-1', isOhana ? 'bg-gradient-to-r from-ohana to-ohana-dark' : 'bg-gradient-to-r from-chilli to-chilli-dark')} />
+        <div className={cn('h-0.5', isOhana ? 'bg-gradient-to-r from-ohana to-ohana-dark' : 'bg-gradient-to-r from-chilli to-chilli-dark')} />
 
-        <div className={cn('flex flex-col flex-1', isCompact ? 'p-3 sm:p-4 gap-2' : 'p-4 sm:p-5 gap-3')}>
-          {/* Header */}
-          <header className="flex items-start justify-between gap-3">
-            <h3 className={cn('text-base font-semibold leading-tight', isCompact && 'text-sm')}>
+        <div className={cn('flex flex-col flex-1', isCompact ? 'p-3 gap-1.5' : 'p-4 gap-2')}>
+          {/* Name + Price row — restaurant menu style */}
+          <header className="flex items-baseline justify-between gap-3">
+            <h3 className={cn(
+              'font-semibold leading-tight',
+              isCompact ? 'text-sm' : 'text-base',
+            )}>
               {product.name}
             </h3>
             <span className={cn(
-              'shrink-0 font-bold tabular-nums',
-              isCompact ? 'text-sm' : 'text-base sm:text-lg',
+              'shrink-0 font-bold tabular-nums whitespace-nowrap',
+              isCompact ? 'text-sm' : 'text-base',
               isOhana ? 'text-ohana-dark' : 'text-chilli-dark',
             )}>
               {formatPrice(product.price)}
             </span>
           </header>
 
-          {/* Description */}
+          {/* Description / ingredients — compact on mobile */}
           {hasDetailContent && !isCompact && (
-            <div className="space-y-1 text-sm text-muted-foreground leading-relaxed">
+            <div className="text-sm text-muted-foreground leading-relaxed">
               {descriptionText && <p className="line-clamp-2">{descriptionText}</p>}
-              {ingredientsText && (
-                <p className="line-clamp-2">
-                  <span className="font-medium text-foreground/80">Ingredientes: </span>
-                  {ingredientsText}
-                </p>
+              {ingredientsText && !descriptionText && (
+                <p className="line-clamp-1 text-xs">{ingredientsText}</p>
               )}
             </div>
           )}
@@ -109,57 +109,47 @@ export default function ProductCard({ product, variant = 'default', categoryName
             </button>
           )}
 
-          {/* Badges */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-auto">
+          {/* Badges — minimal row */}
+          <div className="flex flex-wrap items-center gap-1 mt-auto">
             <span className={cn(
-              'text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider',
+              'text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider',
               isOhana
                 ? 'bg-ohana/10 text-ohana-dark border border-ohana/25'
                 : 'bg-chilli-dark/10 text-chilli-dark border border-chilli-dark/25',
             )}>
               {BRAND_LABEL[product.brand]}
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border border-border">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border border-border">
               {resolvedCategoryName}
             </span>
             {product.isPopular && (
-              <span className="flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-accent/15 text-accent-foreground border border-accent/30">
-                <Star className="w-2.5 h-2.5" /> Popular
-              </span>
+              <Star className="w-3 h-3 text-accent fill-accent" />
             )}
             {product.isNew && (
-              <span className="flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                <Sparkles className="w-2.5 h-2.5" /> Nuevo
-              </span>
+              <Sparkles className="w-3 h-3 text-primary" />
             )}
             {product.isVegan && (
-              <span className="flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-ohana/10 text-ohana-dark border border-ohana/20">
-                <Leaf className="w-2.5 h-2.5" /> Vegano
-              </span>
+              <Leaf className="w-3 h-3 text-ohana" />
             )}
             {product.isGlutenFree && (
-              <span className="flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 border border-amber-500/25">
-                <Wheat className="w-2.5 h-2.5" /> Sin gluten
-              </span>
+              <Wheat className="w-3 h-3 text-amber-600" />
             )}
           </div>
 
-          {/* Add button */}
-          <div className="pt-3 border-t border-border/60">
-            <Button
-              onClick={handleAddToCart}
-              size={isCompact ? 'sm' : 'default'}
-              className={cn(
-                'w-full justify-center rounded-xl font-semibold transition-all',
-                isOhana
-                  ? 'bg-ohana text-ohana-foreground hover:bg-ohana-dark shadow-sm shadow-ohana/20 hover:shadow-ohana/30'
-                  : 'bg-gradient-to-r from-chilli to-chilli-dark text-chilli-foreground hover:from-chilli-dark hover:to-chilli-dark shadow-sm shadow-chilli-dark/20 hover:shadow-chilli-dark/30',
-              )}
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Agregar
-            </Button>
-          </div>
+          {/* Large add-to-cart button — tap-friendly */}
+          <Button
+            onClick={handleAddToCart}
+            size="lg"
+            className={cn(
+              'w-full justify-center rounded-xl font-semibold mt-2 min-h-[48px] text-base active:scale-[0.97] transition-all',
+              isOhana
+                ? 'bg-ohana text-ohana-foreground hover:bg-ohana-dark shadow-sm shadow-ohana/20'
+                : 'bg-gradient-to-r from-chilli to-chilli-dark text-chilli-foreground hover:from-chilli-dark hover:to-chilli-dark shadow-sm shadow-chilli-dark/20',
+            )}
+          >
+            <Plus className="h-5 w-5 mr-1.5" />
+            Agregar
+          </Button>
         </div>
       </article>
 
