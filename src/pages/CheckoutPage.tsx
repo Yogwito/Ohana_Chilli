@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
 import { useActiveDeliveryZones, useWhatsAppNumber } from '@/hooks/use-catalog';
@@ -36,9 +36,6 @@ function normalizeZoneName(value: string) {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-function normalizeZoneKey(value: string) {
-  return normalizeZoneName(value).toLowerCase();
-}
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -69,10 +66,6 @@ export default function CheckoutPage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
-  const zonesByKey = useMemo(
-    () => new Map(deliveryZones.map((zone) => [normalizeZoneKey(zone.name), zone])),
-    [deliveryZones],
-  );
 
   const isDeliveryZoneQueryError = Boolean(deliveryZonesError);
   const hasSelectedDeliveryZone = Boolean(form.deliveryZone && form.deliveryZone.trim().length > 0);
@@ -113,25 +106,31 @@ export default function CheckoutPage() {
     }));
   };
 
-  const handleDeliveryZoneChange = (rawValue: string) => {
-    setZoneInput(rawValue);
-    const normalizedName = normalizeZoneName(rawValue);
-
-    if (isDeliveryZoneQueryError && manualZoneFallbackEnabled) {
-      updateField('deliveryZone', normalizedName);
+  const handleDeliveryZoneChange = (selectedZoneId: string) => {
+    if (!selectedZoneId) {
+      setZoneInput('');
+      updateField('deliveryZone', '');
       updateField('deliveryFeeCents', 0);
       return;
     }
 
-    const zone = zonesByKey.get(normalizeZoneKey(rawValue));
-    if (zone) {
-      updateField('deliveryZone', zone.name);
-      updateField('deliveryFeeCents', zone.feeCents);
+    if (isDeliveryZoneQueryError && manualZoneFallbackEnabled) {
+      setZoneInput(selectedZoneId);
+      updateField('deliveryZone', selectedZoneId);
+      updateField('deliveryFeeCents', 0);
       return;
     }
 
-    updateField('deliveryZone', '');
-    updateField('deliveryFeeCents', 0);
+    const zone = deliveryZones.find((z) => z.id === selectedZoneId);
+    if (zone) {
+      setZoneInput(zone.id);
+      updateField('deliveryZone', zone.name);
+      updateField('deliveryFeeCents', zone.feeCents);
+    } else {
+      setZoneInput('');
+      updateField('deliveryZone', '');
+      updateField('deliveryFeeCents', 0);
+    }
   };
 
   const enableManualZoneFallback = () => {
@@ -467,65 +466,60 @@ export default function CheckoutPage() {
 
                     <div>
                       <Label htmlFor="delivery-zone">Barrio/Zona *</Label>
-                      <Input
-                        id="delivery-zone"
-                        list={isDeliveryZoneQueryError ? undefined : 'delivery-zones-list'}
-                        value={zoneInput}
-                        onChange={(e) => handleDeliveryZoneChange(e.target.value)}
-                        placeholder={
-                          loadingDeliveryZones
-                            ? 'Cargando zonas activas...'
-                            : manualZoneFallbackEnabled
-                              ? 'Escribe tu barrio/zona'
-                              : 'Escribe y selecciona tu barrio/zona'
-                        }
-                        className={errors.deliveryZone ? 'border-destructive' : ''}
-                        disabled={loadingDeliveryZones}
-                        autoComplete="off"
-                      />
 
-                      {!isDeliveryZoneQueryError && (
-                        <datalist id="delivery-zones-list">
-                          {deliveryZones.map((zone) => (
-                            <option
-                              key={zone.id}
-                              value={zone.name}
-                              label={`${zone.name} - ${formatPrice(zone.feeCents)}`}
-                            />
-                          ))}
-                        </datalist>
-                      )}
-
-                      {loadingDeliveryZones && (
-                        <p className="text-sm text-muted-foreground mt-1">Consultando zonas activas...</p>
-                      )}
-
-                      {isDeliveryZoneQueryError && !manualZoneFallbackEnabled && (
+                      {isDeliveryZoneQueryError && !manualZoneFallbackEnabled ? (
                         <div className="mt-2 space-y-2">
                           <p className="text-sm text-destructive">
-                            No se pudieron cargar las zonas de domicilio. Para continuar debes activar
-                            manualmente el modo de contingencia.
+                            No se pudieron cargar las zonas de domicilio.
                           </p>
                           <Button type="button" variant="outline" size="sm" onClick={enableManualZoneFallback}>
                             Usar barrio manual (domicilio $0)
                           </Button>
                         </div>
-                      )}
+                      ) : isDeliveryZoneQueryError && manualZoneFallbackEnabled ? (
+                        <>
+                          <Input
+                            id="delivery-zone"
+                            value={zoneInput}
+                            onChange={(e) => {
+                              setZoneInput(e.target.value);
+                              const val = normalizeZoneName(e.target.value);
+                              updateField('deliveryZone', val);
+                              updateField('deliveryFeeCents', 0);
+                            }}
+                            placeholder="Escribe tu barrio/zona"
+                            className={errors.deliveryZone ? 'border-destructive' : ''}
+                            autoComplete="off"
+                          />
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Modo manual activo: el domicilio se registrará en $0.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <select
+                            id="delivery-zone"
+                            value={zoneInput}
+                            onChange={(e) => handleDeliveryZoneChange(e.target.value)}
+                            disabled={loadingDeliveryZones}
+                            className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm ${
+                              errors.deliveryZone ? 'border-destructive' : 'border-input'
+                            }`}
+                          >
+                            <option value="">
+                              {loadingDeliveryZones ? 'Cargando zonas...' : 'Selecciona tu barrio/zona'}
+                            </option>
+                            {deliveryZones.map((zone) => (
+                              <option key={zone.id} value={zone.id}>
+                                {zone.name} — {formatPrice(zone.feeCents)}
+                              </option>
+                            ))}
+                          </select>
 
-                      {isDeliveryZoneQueryError && manualZoneFallbackEnabled && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Modo manual activo: el domicilio se registrara en $0 hasta recuperar las zonas.
-                        </p>
-                      )}
-
-                      {!isDeliveryZoneQueryError && hasSelectedDeliveryZone && (
-                        <p className="text-sm text-ohana mt-1">Domicilio: {formatPrice(deliveryFeeCents)}</p>
-                      )}
-
-                      {!isDeliveryZoneQueryError && zoneInput && !hasSelectedDeliveryZone && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Selecciona un barrio/zona valido de la lista para habilitar el envio.
-                        </p>
+                          {hasSelectedDeliveryZone && (
+                            <p className="text-sm text-ohana mt-1">Domicilio: {formatPrice(deliveryFeeCents)}</p>
+                          )}
+                        </>
                       )}
 
                       {errors.deliveryZone && <p className="text-sm text-destructive mt-1">{errors.deliveryZone}</p>}
