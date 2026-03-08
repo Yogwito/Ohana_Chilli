@@ -385,8 +385,8 @@ export default function CheckoutPage() {
         </button>
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
+          <div className="lg:col-span-3 order-2 lg:order-1">
             <form onSubmit={handleSubmit} className="space-y-6">
               {submitError && (
                 <Alert variant="destructive">
@@ -567,8 +567,8 @@ export default function CheckoutPage() {
             </form>
           </div>
 
-          <div className="lg:col-span-2">
-            <div className="bg-card rounded-xl border p-6 sticky top-24">
+          <div className="lg:col-span-2 order-1 lg:order-2">
+            <div className="bg-card rounded-xl border p-4 sm:p-6 sticky top-20 lg:top-24">
               <h3 className="font-semibold mb-4">Resumen de tu orden</h3>
               <div className="space-y-4 mb-6">
                 {cart.items.map((item) => (
