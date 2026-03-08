@@ -271,8 +271,9 @@ export default function CheckoutPage() {
       toast.error('Error inesperado. Intenta de nuevo.');
       setOrderStatus('idle');
     }
+  };
 
-  const handleCopyMessage = async () => {
+
     try {
       await navigator.clipboard.writeText(whatsappMessage);
       toast.success('Mensaje copiado al portapapeles');
