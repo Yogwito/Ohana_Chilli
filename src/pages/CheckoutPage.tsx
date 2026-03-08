@@ -289,12 +289,13 @@ export default function CheckoutPage() {
   };
 
   const handleRetryWhatsApp = () => {
-    const result = redirectToWhatsApp(whatsappUrl);
+    const waWindow = preOpenWindow();
+    const result = redirectToWhatsApp(whatsappUrl, waWindow);
     if (result.ok) {
       setOrderStatus('whatsapp_sent');
-      toast.success('Redirigiendo a WhatsApp...');
+      toast.success('Abriendo WhatsApp...');
     } else {
-      toast.error('Sigue sin poder abrir WhatsApp. Usa el boton de copiar.');
+      toast.error('Tu navegador está bloqueando la ventana. Usa el botón de copiar mensaje.');
     }
   };
 
