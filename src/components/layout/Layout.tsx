@@ -1,8 +1,9 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, lazy, Suspense } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
-import CartDrawer from '@/components/cart/CartDrawer';
 import StickyCartFab from '@/components/cart/StickyCartFab';
+
+const CartDrawer = lazy(() => import('@/components/cart/CartDrawer'));
 
 interface LayoutProps {
   children: ReactNode;
