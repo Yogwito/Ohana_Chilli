@@ -184,9 +184,6 @@ export default function CheckoutPage() {
     setOrderStatus('submitting');
     trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
-    // Pre-open window SYNCHRONOUSLY inside user gesture to bypass popup blockers
-    const waWindow = preOpenWindow();
-
     try {
       const generatedOrderId = crypto.randomUUID();
 
@@ -207,8 +204,6 @@ export default function CheckoutPage() {
 
       if (orderError) {
         console.error('Error saving order:', orderError);
-        // Close pre-opened window on error
-        if (waWindow && !waWindow.closed) waWindow.close();
         setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
         toast.error('Error al crear el pedido. Intenta de nuevo.');
         setOrderStatus('idle');
@@ -255,9 +250,10 @@ export default function CheckoutPage() {
       setWhatsappUrl(url);
       clearCart();
 
-      // Redirect the pre-opened window to WhatsApp
-      const waResult = redirectToWhatsApp(url, waWindow);
       trackEvent({ type: 'checkout_complete', orderId: generatedOrderId, totalCents: orderTotal, orderType: form.orderType, itemCount: cart.items.length });
+
+      // Try to open WhatsApp
+      const waResult = openWhatsApp(url);
 
       if (!waResult.ok) {
         setOrderStatus('whatsapp_blocked');
@@ -268,11 +264,9 @@ export default function CheckoutPage() {
 
       setOrderStatus('whatsapp_sent');
       trackEvent({ type: 'whatsapp_sent', orderId: generatedOrderId });
-      toast.success('Pedido creado. Intentando abrir WhatsApp...');
+      toast.success('Pedido creado. Abriendo WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);
-      // Close pre-opened window on error
-      if (waWindow && !waWindow.closed) waWindow.close();
       setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
       toast.error('Error inesperado. Intenta de nuevo.');
       setOrderStatus('idle');
