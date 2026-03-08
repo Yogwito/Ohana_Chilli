@@ -154,9 +154,9 @@ export function useWhatsAppNumber() {
         .from('settings')
         .select('value')
         .eq('key', 'whatsapp_number')
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data.value;
+      return data?.value ?? null;
     },
     staleTime: 1000 * 60 * 60,
   });
@@ -211,7 +211,7 @@ function mapProduct(p: ProductQueryRow): Product {
     price: p.price_cents,
     brand: p.brand_id as Brand,
     categoryId: p.category_id,
-    
+    imageUrl: p.image_url ?? undefined,
     ingredients: p.ingredients_list ?? undefined,
     calories: p.calories ?? undefined,
     isVegan: p.is_vegan ?? false,
