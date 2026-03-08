@@ -345,14 +345,39 @@ export default function CheckoutPage() {
                 <span>Numero: <strong className="text-foreground">{phone}</strong></span>
               </div>
 
+              {/* Primary: open WhatsApp in new tab */}
+              <Button type="button" onClick={handleRetryWhatsApp} className="w-full btn-ohana">
+                <MessageCircle className="w-4 h-4 mr-2" /> Abrir WhatsApp
+              </Button>
+
+              {/* Fallback: navigate current tab (always works) */}
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full rounded-md text-sm font-medium h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" /> Enlace directo (si no abre)
+              </a>
+
               <div className="flex gap-2">
-                <Button type="button" onClick={handleRetryWhatsApp} className="flex-1 btn-ohana">
-                  <RotateCcw className="w-4 h-4 mr-2" /> Abrir WhatsApp
-                </Button>
                 <Button type="button" onClick={handleCopyMessage} variant="outline" className="flex-1">
                   <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
                 </Button>
+                <Button type="button" onClick={handleDirectLink} variant="outline" className="flex-1">
+                  <Phone className="w-4 h-4 mr-2" /> Ir a WhatsApp
+                </Button>
               </div>
+
+              {orderStatus === 'whatsapp_blocked' && (
+                <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>¿No se abrió WhatsApp?</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    Tu navegador bloqueó la ventana emergente. Usa el enlace directo o copia el mensaje y pégalo manualmente en WhatsApp al número indicado arriba.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <details className="text-sm">
                 <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
