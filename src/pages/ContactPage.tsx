@@ -1,5 +1,6 @@
 import { MapPin, Phone, Clock, Mail, Instagram, Facebook } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import SEOHead from '@/components/SEOHead';
 
 export default function ContactPage() {
   const handleWhatsApp = () => {

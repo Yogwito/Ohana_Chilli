@@ -5,6 +5,7 @@ import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProducts } from '@/hooks/use-catalog';
 import { Leaf, Sparkles, ChefHat } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 

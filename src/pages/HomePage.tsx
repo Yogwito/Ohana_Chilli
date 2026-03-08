@@ -15,6 +15,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen">
+      <SEOHead path="/" />
       {/* Hero Section - Split Brand */}
       <section className="relative overflow-hidden">
         <div className="container py-12 sm:py-20">

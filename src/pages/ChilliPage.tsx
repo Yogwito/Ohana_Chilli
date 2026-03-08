@@ -5,6 +5,7 @@ import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProducts, useCategories } from '@/hooks/use-catalog';
 import { Flame } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function ChilliPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

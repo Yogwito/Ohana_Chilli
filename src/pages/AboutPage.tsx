@@ -1,4 +1,5 @@
 import { MapPin, Phone, Clock, Mail, Leaf, Flame } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function AboutPage() {
   return (

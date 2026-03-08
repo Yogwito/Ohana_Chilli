@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBeverages, useBeverageCategories } from '@/hooks/use-catalog';
 import { cn } from '@/lib/utils';
 import { GlassWater } from 'lucide-react';
+import SEOHead from '@/components/SEOHead';
 
 export default function BeveragesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
