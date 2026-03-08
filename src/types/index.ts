@@ -26,7 +26,6 @@ export interface Ingredient {
   calories?: number;
   isVegan?: boolean;
   isGlutenFree?: boolean;
-  image?: string;
 }
 
 // Bowl Size Rules
