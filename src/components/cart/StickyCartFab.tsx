@@ -11,7 +11,7 @@ const formatPrice = (price: number) =>
 
 export default function StickyCartFab({ onClick }: StickyCartFabProps) {
   const count = useCartCount();
-  const { cart } = useCartState();
+  const cart = useCartState();
 
   if (count === 0) return null;
 
