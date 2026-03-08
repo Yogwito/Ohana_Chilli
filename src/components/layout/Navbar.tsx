@@ -133,11 +133,13 @@ export default function Navbar() {
         onOpenChange={setBrandModalOpen} 
       />
 
-      {/* Cart Drawer */}
-      <CartDrawer 
-        open={cartOpen} 
-        onOpenChange={setCartOpen} 
-      />
+      {/* Cart Drawer - lazy loaded */}
+      <Suspense fallback={null}>
+        <CartDrawer
+          open={cartOpen}
+          onOpenChange={setCartOpen}
+        />
+      </Suspense>
     </>
   );
 }

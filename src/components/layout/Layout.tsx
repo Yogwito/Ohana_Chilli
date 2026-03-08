@@ -18,7 +18,9 @@ export default function Layout({ children }: LayoutProps) {
       <main className="flex-1 pb-20 lg:pb-0">{children}</main>
       <Footer />
       <StickyCartFab onClick={() => setCartOpen(true)} />
-      <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
+      <Suspense fallback={null}>
+        <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
+      </Suspense>
     </div>
   );
 }
