@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProductCard from '@/components/products/ProductCard';
-import BowlBuilder from '@/components/ohana/BowlBuilder';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProducts } from '@/hooks/use-catalog';
