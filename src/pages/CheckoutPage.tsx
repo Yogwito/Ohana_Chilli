@@ -257,13 +257,17 @@ export default function CheckoutPage() {
 
       // Redirect the pre-opened window to WhatsApp
       const waResult = redirectToWhatsApp(url, waWindow);
+      trackEvent({ type: 'checkout_complete', orderId: generatedOrderId, totalCents: orderTotal, orderType: form.orderType, itemCount: cart.items.length });
+
       if (!waResult.ok) {
         setOrderStatus('whatsapp_blocked');
+        trackEvent({ type: 'whatsapp_blocked', orderId: generatedOrderId });
         toast.warning('Pedido creado, pero no se pudo abrir WhatsApp automaticamente.');
         return;
       }
 
       setOrderStatus('whatsapp_sent');
+      trackEvent({ type: 'whatsapp_sent', orderId: generatedOrderId });
       toast.success('Pedido creado. Redirigiendo a WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);
