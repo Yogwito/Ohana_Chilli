@@ -268,7 +268,7 @@ export default function CheckoutPage() {
 
       setOrderStatus('whatsapp_sent');
       trackEvent({ type: 'whatsapp_sent', orderId: generatedOrderId });
-      toast.success('Pedido creado. Redirigiendo a WhatsApp...');
+      toast.success('Pedido creado. Intentando abrir WhatsApp...');
     } catch (err) {
       console.error('Unexpected error:', err);
       // Close pre-opened window on error
@@ -289,12 +289,13 @@ export default function CheckoutPage() {
   };
 
   const handleRetryWhatsApp = () => {
-    const result = redirectToWhatsApp(whatsappUrl);
+    const waWindow = preOpenWindow();
+    const result = redirectToWhatsApp(whatsappUrl, waWindow);
     if (result.ok) {
       setOrderStatus('whatsapp_sent');
-      toast.success('Redirigiendo a WhatsApp...');
+      toast.success('Abriendo WhatsApp...');
     } else {
-      toast.error('Sigue sin poder abrir WhatsApp. Usa el boton de copiar.');
+      toast.error('Tu navegador está bloqueando la ventana. Usa el botón de copiar mensaje.');
     }
   };
 
@@ -327,22 +328,20 @@ export default function CheckoutPage() {
             >
               <CheckCircle className={`w-10 h-10 ${orderStatus === 'whatsapp_sent' ? 'text-ohana' : 'text-accent'}`} />
             </div>
-            <h2 className="text-2xl font-bold mb-2">
-              {orderStatus === 'whatsapp_sent' ? 'Orden enviada por WhatsApp' : 'Pedido creado'}
-            </h2>
-            {orderId && (
-              <p className="text-sm text-muted-foreground mb-2">
-                Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
+              <h2 className="text-2xl font-bold mb-2">Pedido creado</h2>
+              {orderId && (
+                <p className="text-sm text-muted-foreground mb-2">
+                  Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
+                </p>
+              )}
+              <p className="text-muted-foreground">
+                {orderStatus === 'whatsapp_sent'
+                  ? 'Intentamos abrir WhatsApp para que confirmes el pedido.'
+                  : 'No se pudo abrir WhatsApp automaticamente. Usa las opciones abajo para enviarnos tu pedido.'}
               </p>
-            )}
-            <p className="text-muted-foreground">
-              {orderStatus === 'whatsapp_sent'
-                ? 'Te contactaremos por WhatsApp para confirmar los detalles.'
-                : 'No se pudo abrir WhatsApp automaticamente. Usa las opciones abajo para enviarnos tu pedido.'}
-            </p>
           </div>
 
-          {orderStatus === 'whatsapp_blocked' && (
+          {(orderStatus === 'whatsapp_blocked' || orderStatus === 'whatsapp_sent') && (
             <div className="bg-card border rounded-xl p-6 space-y-4 mb-6">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Phone className="w-4 h-4" />

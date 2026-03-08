@@ -55,8 +55,20 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
   return lines.join('\n');
 }
 
+function normalizeWhatsAppPhone(phone: string): string {
+  return phone.replace(/[^\d]/g, '');
+}
+
 export function buildWhatsAppUrl(phone: string, message: string): string {
-  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  const sanitizedPhone = normalizeWhatsAppPhone(phone);
+  const encodedMessage = encodeURIComponent(message);
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
+  }
+
+  return `https://web.whatsapp.com/send?phone=${sanitizedPhone}&text=${encodedMessage}`;
 }
 
 export interface WhatsAppResult {
@@ -79,17 +91,16 @@ export function preOpenWindow(): Window | null {
 
 /**
  * Redirect a pre-opened window to the WhatsApp URL.
- * Falls back to same-tab redirect if no window was pre-opened.
+ * If no pre-opened window is available, return blocked to avoid losing app state.
  */
 export function redirectToWhatsApp(url: string, preOpened?: Window | null): WhatsAppResult {
-  if (preOpened && !preOpened.closed) {
-    preOpened.location.href = url;
-    return { ok: true, window: preOpened };
-  }
-  // Fallback: try same-tab redirect
   try {
-    window.location.assign(url);
-    return { ok: true };
+    if (preOpened && !preOpened.closed) {
+      preOpened.location.href = url;
+      return { ok: true, window: preOpened };
+    }
+
+    return { ok: false, reason: 'popup_blocked' };
   } catch {
     return { ok: false, reason: 'blocked' };
   }
