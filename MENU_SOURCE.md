@@ -23,4 +23,4 @@ Se mantiene temporalmente como referencia/respaldo. Para eliminarlo:
 
 ## Imágenes
 
-Las imágenes de productos están en `src/assets/products/`. La resolución se hace via `src/lib/image-map.ts` que mapea el campo `image_url` de la DB (e.g. `"bowl-hawaiano.jpg"`) al import local correspondiente.
+Las imágenes de productos se almacenan en el campo `image_url` de la tabla `products`. El campo `imageUrl` del tipo `Product` lo mapea directamente. Si un producto no tiene imagen asignada, el campo será `undefined` y la UI no renderiza imagen (diseño texto-only por defecto).
