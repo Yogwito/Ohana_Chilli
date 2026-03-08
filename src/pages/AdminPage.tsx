@@ -150,7 +150,14 @@ function OrdersAdmin() {
               <span className="font-bold text-primary">{formatPrice(order.total_cents)}</span>
             </div>
           </div>
-          {order.address && <p className="text-xs text-muted-foreground">📍 {order.address}</p>}
+          {order.order_type === 'delivery' && (
+            <div className="text-xs text-muted-foreground space-x-2">
+              {order.address && <span>📍 {order.address}</span>}
+              {order.delivery_zone && <span>• 🏘️ {order.delivery_zone}</span>}
+              {order.delivery_fee_cents > 0 && <span>• 🚚 {formatPrice(order.delivery_fee_cents)}</span>}
+            </div>
+          )}
+          {order.order_type === 'pickup' && <p className="text-xs text-muted-foreground">🏪 Recoger en sucursal</p>}
           {order.notes && <p className="text-xs text-muted-foreground">📝 {order.notes}</p>}
           <p className="text-xs font-mono text-muted-foreground">ID: {order.id.slice(0, 8)}</p>
         </div>
