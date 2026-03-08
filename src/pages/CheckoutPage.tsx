@@ -252,19 +252,8 @@ export default function CheckoutPage() {
 
       trackEvent({ type: 'checkout_complete', orderId: generatedOrderId, totalCents: orderTotal, orderType: form.orderType, itemCount: cart.items.length });
 
-      // Try to open WhatsApp
-      const waResult = openWhatsApp(url);
-
-      if (!waResult.ok) {
-        setOrderStatus('whatsapp_blocked');
-        trackEvent({ type: 'whatsapp_blocked', orderId: generatedOrderId });
-        toast.warning('Pedido creado, pero no se pudo abrir WhatsApp automaticamente.');
-        return;
-      }
-
-      setOrderStatus('whatsapp_sent');
-      trackEvent({ type: 'whatsapp_sent', orderId: generatedOrderId });
-      toast.success('Pedido creado. Abriendo WhatsApp...');
+      setOrderStatus('created');
+      toast.success('Pedido creado. Abre WhatsApp para confirmar el envío.');
     } catch (err) {
       console.error('Unexpected error:', err);
       setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
