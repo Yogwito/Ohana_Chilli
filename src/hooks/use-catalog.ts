@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { resolveImage } from '@/lib/image-map';
 import type { Product, Category, Ingredient, BowlSizeRule, Brand, DeliveryZone } from '@/types';
 
 interface ProductQueryRow {
@@ -212,7 +211,7 @@ function mapProduct(p: ProductQueryRow): Product {
     price: p.price_cents,
     brand: p.brand_id as Brand,
     categoryId: p.category_id,
-    image: resolveImage(p.image_url),
+    
     ingredients: p.ingredients_list ?? undefined,
     calories: p.calories ?? undefined,
     isVegan: p.is_vegan ?? false,
