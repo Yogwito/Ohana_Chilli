@@ -10,11 +10,14 @@ import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+const MAX_SAUCES = 2;
+
 const steps: { id: BowlBuilderStep; label: string }[] = [
   { id: 'size', label: 'Tamaño' },
   { id: 'bases', label: 'Bases' },
   { id: 'proteins', label: 'Proteínas' },
   { id: 'acompanantes', label: 'Acompañantes' },
+  { id: 'salsas', label: 'Salsas' },
   { id: 'summary', label: 'Resumen' },
 ];
 
@@ -29,14 +32,16 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const { data: bases = [], isLoading: loadingBases } = useIngredients('base');
   const { data: proteins = [], isLoading: loadingProteins } = useIngredients('protein');
   const { data: acompanantes = [], isLoading: loadingAcc } = useIngredients('acompanante');
+  const { data: sauces = [], isLoading: loadingSauces } = useIngredients('sauce');
 
-  const isLoadingData = loadingRules || loadingBases || loadingProteins || loadingAcc;
+  const isLoadingData = loadingRules || loadingBases || loadingProteins || loadingAcc || loadingSauces;
 
   const [currentStep, setCurrentStep] = useState<BowlBuilderStep>('size');
   const [selectedSize, setSelectedSize] = useState<BowlSizeRule | null>(null);
   const [selectedBases, setSelectedBases] = useState<Ingredient[]>([]);
   const [selectedProteins, setSelectedProteins] = useState<Ingredient[]>([]);
   const [selectedAcompanantes, setSelectedAcompanantes] = useState<Ingredient[]>([]);
+  const [selectedSauces, setSelectedSauces] = useState<Ingredient[]>([]);
   const [notes, setNotes] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -65,6 +70,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       case 'bases': return selectedBases.length === selectedSize.maxBases;
       case 'proteins': return selectedProteins.length > 0 && selectedProteins.length <= selectedSize.maxProteins;
       case 'acompanantes': return selectedAcompanantes.length > 0 && selectedAcompanantes.length <= selectedSize.maxAcompanantes;
+      case 'salsas': return true; // salsas are optional, always complete
       case 'summary': return true;
       default: return false;
     }
@@ -110,6 +116,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       bases: selectedBases,
       proteins: selectedProteins,
       acompanantes: selectedAcompanantes,
+      sauces: selectedSauces.length > 0 ? selectedSauces : undefined,
       notes: notes || undefined,
     };
     addCustomBowl(customBowl, notes || undefined);
@@ -120,6 +127,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedBases([]);
     setSelectedProteins([]);
     setSelectedAcompanantes([]);
+    setSelectedSauces([]);
     setNotes('');
     setCurrentStep('size');
     onComplete?.();
@@ -227,6 +235,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                     <li>• {size.maxBases} {size.maxBases === 1 ? 'base' : 'bases'}</li>
                     <li>• {size.maxProteins} {size.maxProteins === 1 ? 'proteína' : 'proteínas'}</li>
                     <li>• {size.maxAcompanantes} acompañantes</li>
+                    <li>• Hasta {MAX_SAUCES} salsas</li>
                   </ul>
                   {selectedSize?.size === size.size && (
                     <div className="mt-4 flex items-center gap-2 text-ohana font-medium">
@@ -320,6 +329,34 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           </div>
         )}
 
+        {currentStep === 'salsas' && selectedSize && (
+          <div className="animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-semibold">Elige tus salsas</h3>
+                <p className="text-muted-foreground">Opcional — elige hasta {MAX_SAUCES} salsas para tu bowl</p>
+              </div>
+              <CounterBadge current={selectedSauces.length} max={MAX_SAUCES} label="Salsas" />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {sauces.map((sauce) => (
+                <IngredientChip
+                  key={sauce.id}
+                  ingredient={sauce}
+                  isSelected={selectedSauces.some(s => s.id === sauce.id)}
+                  isDisabled={selectedSauces.length >= MAX_SAUCES}
+                  onClick={() => toggleIngredient(sauce, selectedSauces, setSelectedSauces, MAX_SAUCES)}
+                />
+              ))}
+            </div>
+            {selectedSauces.length === 0 && (
+              <p className="text-sm text-muted-foreground mt-4 italic">
+                Puedes continuar sin elegir salsas si prefieres.
+              </p>
+            )}
+          </div>
+        )}
+
         {currentStep === 'summary' && selectedSize && (
           <div className="animate-fade-in">
             <h3 className="text-xl font-semibold mb-6">Resumen de tu bowl</h3>
@@ -348,6 +385,14 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   {selectedAcompanantes.map(a => <span key={a.id} className="badge-ohana">{a.name}</span>)}
                 </div>
               </div>
+              {selectedSauces.length > 0 && (
+                <div className="pb-4 border-b">
+                  <span className="font-medium block mb-2">Salsas ({selectedSauces.length})</span>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSauces.map(s => <span key={s.id} className="badge-ohana">{s.name}</span>)}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mb-6">
               <label className="font-medium block mb-2">Notas adicionales (opcional)</label>

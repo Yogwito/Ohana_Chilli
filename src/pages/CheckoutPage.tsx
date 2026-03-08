@@ -222,6 +222,7 @@ export default function CheckoutPage() {
             bases: item.customBowl.bases.map((b) => b.name),
             proteins: item.customBowl.proteins.map((p) => p.name),
             acompanantes: item.customBowl.acompanantes.map((a) => a.name),
+            sauces: item.customBowl.sauces?.map((s) => s.name),
             notes: item.notes,
           }
           : { product_id: item.product?.id, notes: item.notes },
