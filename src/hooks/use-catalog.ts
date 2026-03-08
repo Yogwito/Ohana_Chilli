@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { resolveImage } from '@/lib/image-map';
 import type { Product, Category, Ingredient, BowlSizeRule, Brand, DeliveryZone } from '@/types';
 
 interface ProductQueryRow {
