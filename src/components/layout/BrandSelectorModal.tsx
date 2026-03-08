@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -25,6 +26,7 @@ export default function BrandSelectorModal({ open, onOpenChange }: BrandSelector
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">¿Qué se te antoja?</DialogTitle>
+          <DialogDescription className="text-center text-sm">Elige una marca para ver su menú</DialogDescription>
         </DialogHeader>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
