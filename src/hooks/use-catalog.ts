@@ -88,7 +88,7 @@ export function useBeverages() {
       const { data: beverageCategories, error: categoriesError } = await supabase
         .from('categories')
         .select('id')
-        .or('slug.eq.sodas,slug.eq.juices,slug.eq.water,slug.like.bebidas%,slug.like.cafe%');
+        .or('slug.eq.bebidas,slug.eq.cafe');
       if (categoriesError) throw categoriesError;
 
       const categoryIds = (beverageCategories ?? []).map((c) => c.id);
@@ -169,7 +169,7 @@ export function useBeverageCategories() {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
-        .or('slug.eq.sodas,slug.eq.juices,slug.eq.water,slug.like.bebidas%,slug.like.cafe%');
+        .or('slug.eq.bebidas,slug.eq.cafe');
       if (error) throw error;
       return (data ?? []).map((c): Category => ({
         id: c.id,
