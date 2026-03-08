@@ -79,7 +79,9 @@ export default function OhanaPage() {
                 <p className="text-muted-foreground">Elige tus ingredientes favoritos paso a paso</p>
               </div>
               <div className="max-w-3xl mx-auto">
-                <BowlBuilder />
+                <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
+                  <BowlBuilder />
+                </Suspense>
               </div>
             </TabsContent>
           </Tabs>
