@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/products/ProductCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFeaturedProducts, useBeverages, useCategories } from '@/hooks/use-catalog';
+import SEOHead from '@/components/SEOHead';
 
 export default function HomePage() {
   const { data: featuredProducts = [], isLoading: loadingFeatured } = useFeaturedProducts();
