@@ -1,13 +1,12 @@
 import { useState, lazy, Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProductCard from '@/components/products/ProductCard';
-import { Skeleton } from '@/components/ui/skeleton';
-
-const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProducts } from '@/hooks/use-catalog';
 import { Leaf, Sparkles, ChefHat } from 'lucide-react';
+
+const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 
 export default function OhanaPage() {
   const [activeTab, setActiveTab] = useState('premade');
