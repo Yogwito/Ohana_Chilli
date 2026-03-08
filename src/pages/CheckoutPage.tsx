@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
-import { generateWhatsAppMessage, buildWhatsAppUrl, redirectToWhatsApp, preOpenWindow } from '@/domain/whatsapp';
+import { generateWhatsAppMessage, buildWhatsAppUrl, openWhatsApp, navigateToWhatsApp } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 
 const checkoutSchema = z.object({
