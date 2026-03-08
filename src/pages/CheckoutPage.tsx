@@ -341,7 +341,7 @@ export default function CheckoutPage() {
               </p>
           </div>
 
-          {orderStatus === 'whatsapp_blocked' && (
+          {(orderStatus === 'whatsapp_blocked' || orderStatus === 'whatsapp_sent') && (
             <div className="bg-card border rounded-xl p-6 space-y-4 mb-6">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Phone className="w-4 h-4" />
