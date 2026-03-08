@@ -87,6 +87,7 @@ export default function AdminPage() {
             <TabsTrigger value="bowl_rules" className="flex items-center gap-1"><Ruler className="w-4 h-4" />Bowl Rules</TabsTrigger>
             <TabsTrigger value="delivery_zones" className="flex items-center gap-1"><Truck className="w-4 h-4" />Domicilios</TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-1"><Settings className="w-4 h-4" />Config</TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-1"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders"><OrdersAdmin /></TabsContent>
@@ -95,6 +96,7 @@ export default function AdminPage() {
           <TabsContent value="bowl_rules"><BowlRulesAdmin /></TabsContent>
           <TabsContent value="delivery_zones"><DeliveryZonesAdmin /></TabsContent>
           <TabsContent value="settings"><SettingsAdmin /></TabsContent>
+          <TabsContent value="analytics"><AnalyticsAdmin /></TabsContent>
         </Tabs>
       </div>
     </div>
