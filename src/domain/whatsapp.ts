@@ -62,13 +62,9 @@ function normalizeWhatsAppPhone(phone: string): string {
 export function buildWhatsAppUrl(phone: string, message: string): string {
   const sanitizedPhone = normalizeWhatsAppPhone(phone);
   const encodedMessage = encodeURIComponent(message);
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-  if (isMobile) {
-    return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
-  }
-
-  return `https://web.whatsapp.com/send?phone=${sanitizedPhone}&text=${encodedMessage}`;
+  // Use wa.me for both desktop and mobile to avoid web.whatsapp.com blocking in embedded contexts.
+  return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
 }
 
 export interface WhatsAppResult {
