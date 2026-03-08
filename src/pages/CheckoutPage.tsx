@@ -272,13 +272,9 @@ export default function CheckoutPage() {
   };
 
   const handleRetryWhatsApp = () => {
-    const result = openWhatsApp(whatsappUrl);
-    if (result.ok) {
-      setOrderStatus('whatsapp_sent');
-      toast.success('Abriendo WhatsApp...');
-    } else {
-      toast.error('Tu navegador está bloqueando la ventana. Usa el enlace directo abajo.');
-    }
+    // Use anchor-based navigation handled by the <a> tag in the UI
+    // This function is kept as a fallback for the "Ir a WhatsApp" button
+    navigateToWhatsApp(whatsappUrl);
   };
 
   const handleDirectLink = () => {
