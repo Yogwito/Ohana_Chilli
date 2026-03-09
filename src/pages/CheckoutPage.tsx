@@ -163,14 +163,11 @@ export default function CheckoutPage() {
     updateField('deliveryFeeCents', 0);
   };
 
-  const attemptOpenWhatsApp = (mode: 'auto' | 'popup') => {
+  const attemptOpenWhatsApp = () => {
     if (!whatsappUrl) return;
 
     setWhatsAppOpenStatus('opening');
-    const result = openWhatsAppHandoff(whatsappUrl, {
-      preferTopNavigation: mode === 'auto',
-      debugLabel: mode === 'auto' ? 'checkout_auto' : 'checkout_popup',
-    });
+    const result = openWhatsAppHandoff(whatsappUrl, { debugLabel: 'checkout_manual' });
 
     setWasEmbeddedContext(result.embedded);
     setWhatsAppOpenMethod(result.method);
