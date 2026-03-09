@@ -28,6 +28,7 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
     if (info.address) {
       lines.push(`Direccion: ${info.address}`);
     }
+    // Always include barrio + domicilio for delivery (even $0 must be confirmed).
     lines.push(`Barrio: ${info.deliveryZone ?? 'No especificado'}`);
     lines.push(`Domicilio: ${formatPrice(info.deliveryFeeCents ?? 0)}`);
   }
@@ -47,8 +48,9 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
 
   lines.push('');
   lines.push(`Subtotal: ${formatPrice(subtotal)}`);
-  if (info.orderType === 'delivery' && (info.deliveryFeeCents ?? 0) > 0) {
-    lines.push(`Domicilio: ${formatPrice(info.deliveryFeeCents!)}`);
+  // Always show delivery line in delivery orders (even when $0, so operator can verify barrio fee).
+  if (info.orderType === 'delivery') {
+    lines.push(`Domicilio: ${formatPrice(info.deliveryFeeCents ?? 0)}`);
   }
   lines.push(`Total: ${formatPrice(total)}`);
   if (info.notes) lines.push('', `Notas: ${info.notes}`);
@@ -63,11 +65,13 @@ function normalizeWhatsAppPhone(phone: string): string {
 export function buildWhatsAppUrl(phone: string, message: string): string {
   const sanitizedPhone = normalizeWhatsAppPhone(phone);
   const encodedMessage = encodeURIComponent(message);
-  // IMPORTANT: use only wa.me (WhatsApp may still redirect internally depending on platform).
+  // Only use wa.me — never api.whatsapp.com.
   return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
 }
 
-export type WhatsAppHandoffMethod = 'top_location' | 'popup';
+// ─── Embed detection ─────────────────────────────────────────────────────────
+
+export type WhatsAppHandoffMethod = 'popup' | 'top_escape';
 
 export interface WhatsAppEmbedContext {
   isIframe: boolean;
@@ -86,7 +90,6 @@ export interface WhatsAppHandoffResult {
 
 function detectWebView(): boolean {
   const ua = navigator.userAgent || '';
-  // Heuristic: common Android WebView token + iOS webview (no Safari) + social in-app browsers.
   const isAndroidWebView = /\bwv\b/.test(ua) || /Android.*Version\/[\d.]+.*Chrome\/[\d.]+/i.test(ua);
   const isIosWebView = /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(ua);
   const isInApp = /(FBAN|FBAV|Instagram|Line|Twitter|Snapchat|TikTok|WhatsApp)/i.test(ua);
@@ -96,38 +99,43 @@ function detectWebView(): boolean {
 export function getWhatsAppEmbedContext(): WhatsAppEmbedContext {
   let isIframe = false;
   try {
+    // Throws on cross-origin parent — treat as embedded.
     isIframe = window.self !== window.top;
   } catch {
-    // Accessing window.top can throw in cross-origin iframes; treat as embedded.
     isIframe = true;
   }
-
   const isWebView = detectWebView();
-  return {
-    isIframe,
-    isWebView,
-    isEmbedded: isIframe || isWebView,
-  };
+  return { isIframe, isWebView, isEmbedded: isIframe || isWebView };
 }
+
+// ─── Dev logging ─────────────────────────────────────────────────────────────
 
 function devLog(...args: unknown[]) {
   if (import.meta.env.DEV) console.log(...args);
 }
 
+// ─── Robust handoff ──────────────────────────────────────────────────────────
+
 /**
- * Robust WhatsApp handoff:
- * - Never navigates inside an iframe (prevents ERR_BLOCKED_BY_RESPONSE / X-Frame-Options issues).
- * - Prefers top-level navigation; falls back to popup.
+ * Robust WhatsApp handoff strategy:
+ *
+ * NORMAL TAB (not embedded):
+ *   → window.open(_blank, noopener) — keeps the current page (success screen stays visible)
+ *   → if popup blocked → result.ok = false → UI shows fallback panel
+ *
+ * EMBEDDED / IFRAME (cross-origin parent, webview):
+ *   → attempt window.top.location.href to ESCAPE the iframe and navigate the top frame
+ *   → on cross-origin SecurityError → fall through to window.open
+ *   → if window.open also blocked → result.ok = false → UI shows fallback panel
+ *
+ * This deliberately NEVER navigates window.self inside an iframe, which is what
+ * caused ERR_BLOCKED_BY_RESPONSE (WhatsApp/wa.me refuses X-Frame-Options embed).
  */
 export function openWhatsAppHandoff(
   whatsappUrl: string,
-  options?: {
-    preferTopNavigation?: boolean;
-    debugLabel?: string;
-  },
+  options?: { debugLabel?: string },
 ): WhatsAppHandoffResult {
   const ctx = getWhatsAppEmbedContext();
-  const preferTopNavigation = options?.preferTopNavigation ?? true;
 
   devLog('[whatsapp][handoff] context', {
     label: options?.debugLabel,
@@ -137,34 +145,29 @@ export function openWhatsAppHandoff(
   });
   devLog('[whatsapp][handoff] url', whatsappUrl);
 
-  // 1) Prefer top-level navigation whenever possible.
-  if (preferTopNavigation) {
+  // ── EMBEDDED: try to escape to the parent frame ───────────────────────────
+  if (ctx.isEmbedded) {
     try {
-      devLog('[whatsapp][handoff] method', 'top_location');
-      // This navigates the whole page (or the parent page if embedded).
+      devLog('[whatsapp][handoff] method=top_escape (embedded)');
       window.top!.location.href = whatsappUrl;
-      return {
-        ok: true,
-        url: whatsappUrl,
-        embedded: ctx.isEmbedded,
-        method: 'top_location',
-      };
+      return { ok: true, url: whatsappUrl, embedded: true, method: 'top_escape' };
     } catch (err) {
-      devLog('[whatsapp][handoff] top_location failed', err);
-      // continue to popup fallback
+      // Cross-origin parent blocked top-frame navigation.
+      devLog('[whatsapp][handoff] top_escape failed (cross-origin):', err);
+      // Fall through to popup attempt below.
     }
   }
 
-  // 2) Fallback: open a new tab/window (noopener+noreferrer).
+  // ── NORMAL TAB or embed fallback: open in a new tab ──────────────────────
+  // We deliberately do NOT use window.top.location.href here because it would
+  // navigate the current page away, preventing the user from seeing the order
+  // reference on the success screen.
   try {
-    devLog('[whatsapp][handoff] method', 'popup');
+    devLog('[whatsapp][handoff] method=popup');
     const win = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     const ok = Boolean(win);
-    devLog('[whatsapp][handoff] popup opened', ok);
-
-    // Defense-in-depth.
+    devLog('[whatsapp][handoff] popup opened:', ok);
     if (win) win.opener = null;
-
     return {
       ok,
       url: whatsappUrl,
@@ -174,7 +177,7 @@ export function openWhatsAppHandoff(
       error: ok ? undefined : 'popup_blocked',
     };
   } catch (err) {
-    devLog('[whatsapp][handoff] popup failed', err);
+    devLog('[whatsapp][handoff] popup failed:', err);
     return {
       ok: false,
       url: whatsappUrl,
@@ -185,10 +188,7 @@ export function openWhatsAppHandoff(
   }
 }
 
-/**
- * Back-compat helper.
- * NOTE: uses robust handoff instead of same-frame navigation.
- */
+/** Back-compat: uses robust handoff. */
 export function navigateToWhatsApp(url: string): void {
-  openWhatsAppHandoff(url, { preferTopNavigation: true, debugLabel: 'navigateToWhatsApp' });
+  openWhatsAppHandoff(url, { debugLabel: 'navigateToWhatsApp' });
 }

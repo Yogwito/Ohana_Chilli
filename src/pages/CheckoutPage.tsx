@@ -163,14 +163,11 @@ export default function CheckoutPage() {
     updateField('deliveryFeeCents', 0);
   };
 
-  const attemptOpenWhatsApp = (mode: 'auto' | 'popup') => {
+  const attemptOpenWhatsApp = () => {
     if (!whatsappUrl) return;
 
     setWhatsAppOpenStatus('opening');
-    const result = openWhatsAppHandoff(whatsappUrl, {
-      preferTopNavigation: mode === 'auto',
-      debugLabel: mode === 'auto' ? 'checkout_auto' : 'checkout_popup',
-    });
+    const result = openWhatsAppHandoff(whatsappUrl, { debugLabel: 'checkout_manual' });
 
     setWasEmbeddedContext(result.embedded);
     setWhatsAppOpenMethod(result.method);
@@ -306,15 +303,17 @@ export default function CheckoutPage() {
       setOrderStatus('created');
       toast.success('Pedido creado.');
 
-      // Attempt robust handoff AFTER order creation (no popup-blocker dependency on user gesture).
+      // Attempt robust handoff AFTER order creation.
+      // NOTE: this call is async-context — browsers may block popups here.
+      // The result determines whether we show the alert fallback panel.
       setWhatsAppOpenStatus('opening');
-      const handoff = openWhatsAppHandoff(url, { preferTopNavigation: true, debugLabel: 'checkout_auto' });
+      const handoff = openWhatsAppHandoff(url, { debugLabel: 'checkout_auto' });
       setWasEmbeddedContext(handoff.embedded);
       setWhatsAppOpenMethod(handoff.method);
       setWhatsAppOpenStatus(handoff.ok ? 'opened' : 'failed');
 
       if (!handoff.ok) {
-        toast.error('Pedido creado, pero no se pudo abrir WhatsApp automáticamente');
+        toast.error('Pedido creado — usa los botones para abrir WhatsApp');
       }
     } catch (err) {
       console.error('Unexpected error:', err);
@@ -398,11 +397,11 @@ export default function CheckoutPage() {
               </span>
             </div>
 
-            <Button type="button" onClick={() => attemptOpenWhatsApp('auto')} className="w-full btn-ohana">
+            <Button type="button" onClick={attemptOpenWhatsApp} className="w-full btn-ohana">
               <MessageCircle className="w-4 h-4 mr-2" /> Abrir WhatsApp
             </Button>
 
-            <Button type="button" onClick={() => attemptOpenWhatsApp('popup')} variant="outline" className="w-full">
+            <Button type="button" onClick={attemptOpenWhatsApp} variant="outline" className="w-full">
               <ExternalLink className="w-4 h-4 mr-2" /> Enlace directo
             </Button>
 
