@@ -397,11 +397,11 @@ export default function CheckoutPage() {
               </span>
             </div>
 
-            <Button type="button" onClick={() => attemptOpenWhatsApp('auto')} className="w-full btn-ohana">
+            <Button type="button" onClick={attemptOpenWhatsApp} className="w-full btn-ohana">
               <MessageCircle className="w-4 h-4 mr-2" /> Abrir WhatsApp
             </Button>
 
-            <Button type="button" onClick={() => attemptOpenWhatsApp('popup')} variant="outline" className="w-full">
+            <Button type="button" onClick={attemptOpenWhatsApp} variant="outline" className="w-full">
               <ExternalLink className="w-4 h-4 mr-2" /> Enlace directo
             </Button>
 
