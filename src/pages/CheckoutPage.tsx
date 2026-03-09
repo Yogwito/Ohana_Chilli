@@ -314,7 +314,7 @@ export default function CheckoutPage() {
       setWhatsAppOpenStatus(handoff.ok ? 'opened' : 'failed');
 
       if (!handoff.ok) {
-        toast.error('Pedido creado, pero no se pudo abrir WhatsApp automaticamente');
+        toast.error('Pedido creado, pero no se pudo abrir WhatsApp automáticamente');
       }
     } catch (err) {
       console.error('Unexpected error:', err);
