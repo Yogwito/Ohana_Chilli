@@ -370,22 +370,22 @@ export default function CheckoutPage() {
             )}
 
             {whatsAppOpenStatus === 'opened' && (
-              <p className="text-muted-foreground">WhatsApp se abrio (si no lo ves, usa los botones abajo).</p>
+              <p className="text-muted-foreground">WhatsApp se abrió (si no lo ves, usa los botones abajo).</p>
             )}
 
             {whatsAppOpenStatus === 'failed' && (
-              <p className="text-muted-foreground">Pedido creado, pero no se pudo abrir WhatsApp automaticamente.</p>
+              <p className="text-muted-foreground">Pedido creado, pero no se pudo abrir WhatsApp automáticamente.</p>
             )}
           </div>
 
           {showFallback && (
             <Alert className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Pedido creado, pero no se pudo abrir WhatsApp automaticamente</AlertTitle>
+              <AlertTitle>Pedido creado, pero no se pudo abrir WhatsApp automáticamente</AlertTitle>
               <AlertDescription>
                 {wasEmbeddedContext
-                  ? 'Parece que estas en un contexto embebido (preview/iframe/webview). WhatsApp bloquea abrirse dentro de iframes.'
-                  : 'Tu navegador bloqueo la apertura automatica.'}
+                  ? 'Parece que estás en un contexto embebido (preview/iframe/webview). WhatsApp bloquea abrirse dentro de iframes.'
+                  : 'Tu navegador bloqueó la apertura automática.'}
               </AlertDescription>
             </Alert>
           )}
