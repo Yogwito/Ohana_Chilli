@@ -301,20 +301,11 @@ export default function CheckoutPage() {
       });
 
       setOrderStatus('created');
-      toast.success('Pedido creado.');
-
-      // Attempt robust handoff AFTER order creation.
-      // NOTE: this call is async-context — browsers may block popups here.
-      // The result determines whether we show the alert fallback panel.
-      setWhatsAppOpenStatus('opening');
-      const handoff = openWhatsAppHandoff(url, { debugLabel: 'checkout_auto' });
-      setWasEmbeddedContext(handoff.embedded);
-      setWhatsAppOpenMethod(handoff.method);
-      setWhatsAppOpenStatus(handoff.ok ? 'opened' : 'failed');
-
-      if (!handoff.ok) {
-        toast.error('Pedido creado — usa los botones para abrir WhatsApp');
-      }
+      // Do NOT auto-open WhatsApp here — window.open after await is blocked
+      // as an unsolicited popup by all modern browsers. The user must click
+      // the "Abrir WhatsApp" button themselves (user gesture = never blocked).
+      setWhatsAppOpenStatus('idle');
+      toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
     } catch (err) {
       console.error('Unexpected error:', err);
       setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
