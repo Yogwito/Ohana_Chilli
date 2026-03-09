@@ -348,7 +348,7 @@ export default function CheckoutPage() {
 
   if (orderStatus === 'created') {
     const phone = whatsappNumber || '573215667170';
-    const showFallback = whatsAppOpenStatus !== 'opened';
+    const showFallback = whatsAppOpenStatus === 'failed';
 
     return (
       <div className="min-h-screen flex items-center justify-center py-12">
