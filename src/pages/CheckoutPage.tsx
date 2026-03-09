@@ -20,7 +20,6 @@ import {
   Plus,
   Trash2,
   Copy,
-  RotateCcw,
   Phone,
   AlertCircle,
   ExternalLink,
