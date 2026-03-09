@@ -301,20 +301,11 @@ export default function CheckoutPage() {
       });
 
       setOrderStatus('created');
-      toast.success('Pedido creado.');
-
-      // Attempt robust handoff AFTER order creation.
-      // NOTE: this call is async-context — browsers may block popups here.
-      // The result determines whether we show the alert fallback panel.
-      setWhatsAppOpenStatus('opening');
-      const handoff = openWhatsAppHandoff(url, { debugLabel: 'checkout_auto' });
-      setWasEmbeddedContext(handoff.embedded);
-      setWhatsAppOpenMethod(handoff.method);
-      setWhatsAppOpenStatus(handoff.ok ? 'opened' : 'failed');
-
-      if (!handoff.ok) {
-        toast.error('Pedido creado — usa los botones para abrir WhatsApp');
-      }
+      // Do NOT auto-open WhatsApp here — window.open after await is blocked
+      // as an unsolicited popup by all modern browsers. The user must click
+      // the "Abrir WhatsApp" button themselves (user gesture = never blocked).
+      setWhatsAppOpenStatus('idle');
+      toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
     } catch (err) {
       console.error('Unexpected error:', err);
       setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
@@ -364,27 +355,31 @@ export default function CheckoutPage() {
               </p>
             )}
 
+            {whatsAppOpenStatus === 'idle' && (
+              <p className="text-muted-foreground">Toca el botón para enviar tu pedido por WhatsApp.</p>
+            )}
+
             {whatsAppOpenStatus === 'opening' && (
-              <p className="text-muted-foreground">Intentando abrir WhatsApp...</p>
+              <p className="text-muted-foreground">Abriendo WhatsApp...</p>
             )}
 
             {whatsAppOpenStatus === 'opened' && (
-              <p className="text-muted-foreground">WhatsApp se abrió (si no lo ves, usa los botones abajo).</p>
+              <p className="text-muted-foreground">WhatsApp se abrió en otra pestaña.</p>
             )}
 
             {whatsAppOpenStatus === 'failed' && (
-              <p className="text-muted-foreground">Pedido creado, pero no se pudo abrir WhatsApp automáticamente.</p>
+              <p className="text-destructive text-sm">No se pudo abrir WhatsApp. Usa el enlace directo o copia el mensaje.</p>
             )}
           </div>
 
           {showFallback && (
             <Alert className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Pedido creado, pero no se pudo abrir WhatsApp automáticamente</AlertTitle>
+              <AlertTitle>No se pudo abrir WhatsApp automáticamente</AlertTitle>
               <AlertDescription>
                 {wasEmbeddedContext
-                  ? 'Parece que estás en un contexto embebido (preview/iframe/webview). WhatsApp bloquea abrirse dentro de iframes.'
-                  : 'Tu navegador bloqueó la apertura automática.'}
+                  ? 'Estás en un contexto embebido (preview/iframe). Usa "Enlace directo" o copia el mensaje.'
+                  : 'Tu navegador bloqueó la apertura. Usa "Enlace directo" o copia el mensaje manualmente.'}
               </AlertDescription>
             </Alert>
           )}
@@ -397,12 +392,16 @@ export default function CheckoutPage() {
               </span>
             </div>
 
+            {/* Primary CTA: window.open on user click — never blocked because it's a direct gesture */}
             <Button type="button" onClick={attemptOpenWhatsApp} className="w-full btn-ohana">
               <MessageCircle className="w-4 h-4 mr-2" /> Abrir WhatsApp
             </Button>
 
-            <Button type="button" onClick={attemptOpenWhatsApp} variant="outline" className="w-full">
-              <ExternalLink className="w-4 h-4 mr-2" /> Enlace directo
+            {/* Anchor fallback: anchor clicks are NEVER treated as popups by browsers */}
+            <Button variant="outline" className="w-full" asChild>
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-2" /> Enlace directo
+              </a>
             </Button>
 
             <Button type="button" onClick={handleCopyMessage} variant="outline" className="w-full">
