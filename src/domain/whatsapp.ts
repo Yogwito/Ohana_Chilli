@@ -63,7 +63,7 @@ function normalizeWhatsAppPhone(phone: string): string {
 export function buildWhatsAppUrl(phone: string, message: string): string {
   const sanitizedPhone = normalizeWhatsAppPhone(phone);
   const encodedMessage = encodeURIComponent(message);
-  // IMPORTANT: do not use api.whatsapp.com (it may appear as a redirect target from wa.me).
+  // IMPORTANT: use only wa.me (WhatsApp may still redirect internally depending on platform).
   return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
 }
 
