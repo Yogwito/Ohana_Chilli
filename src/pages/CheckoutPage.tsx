@@ -180,7 +180,7 @@ export default function CheckoutPage() {
       toast.success('Abriendo WhatsApp...');
     } else {
       setWhatsAppOpenStatus('failed');
-      toast.error('Pedido creado, pero no se pudo abrir WhatsApp automaticamente');
+      toast.error('Pedido creado, pero no se pudo abrir WhatsApp automáticamente');
     }
   };
 
