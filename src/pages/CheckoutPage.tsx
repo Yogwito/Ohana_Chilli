@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
 import { useActiveDeliveryZones, useWhatsAppNumber } from '@/hooks/use-catalog';
@@ -9,15 +9,28 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  ArrowLeft, CheckCircle, Leaf, Flame, MapPin, Store, MessageCircle,
-  Minus, Plus, Trash2, Copy, RotateCcw, Phone, AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  Leaf,
+  Flame,
+  MapPin,
+  Store,
+  MessageCircle,
+  Minus,
+  Plus,
+  Trash2,
+  Copy,
+  RotateCcw,
+  Phone,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
-import { generateWhatsAppMessage, buildWhatsAppUrl, navigateToWhatsApp } from '@/domain/whatsapp';
+import { buildWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 
 const checkoutSchema = z.object({
@@ -31,12 +44,14 @@ const checkoutSchema = z.object({
 });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
+
 type OrderStatus = 'idle' | 'submitting' | 'created';
+
+type WhatsAppOpenStatus = 'idle' | 'opening' | 'opened' | 'failed';
 
 function normalizeZoneName(value: string) {
   return value.trim().replace(/\s+/g, ' ');
 }
-
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -56,6 +71,10 @@ export default function CheckoutPage() {
   const [zoneInput, setZoneInput] = useState('');
   const [manualZoneFallbackEnabled, setManualZoneFallbackEnabled] = useState(false);
 
+  const [whatsAppOpenStatus, setWhatsAppOpenStatus] = useState<WhatsAppOpenStatus>('idle');
+  const [whatsAppOpenMethod, setWhatsAppOpenMethod] = useState<string>('');
+  const [wasEmbeddedContext, setWasEmbeddedContext] = useState<boolean>(false);
+
   const [form, setForm] = useState<CheckoutForm>({
     name: '',
     phone: '',
@@ -67,7 +86,6 @@ export default function CheckoutPage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
-
   const isDeliveryZoneQueryError = Boolean(deliveryZonesError);
   const hasSelectedDeliveryZone = Boolean(form.deliveryZone && form.deliveryZone.trim().length > 0);
   const deliveryFeeCents = form.orderType === 'delivery' ? form.deliveryFeeCents ?? 0 : 0;
@@ -78,6 +96,11 @@ export default function CheckoutPage() {
     form.orderType === 'delivery' && isDeliveryZoneQueryError && !manualZoneFallbackEnabled;
   const submitBlockedByZone =
     form.orderType === 'delivery' && (!hasSelectedDeliveryZone || mustExplicitlyEnableFallback);
+
+  const formattedOrderRef = useMemo(() => {
+    if (!orderId) return null;
+    return orderId.slice(0, 8).toUpperCase();
+  }, [orderId]);
 
   const updateField = <K extends keyof CheckoutForm>(field: K, value: CheckoutForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -139,6 +162,27 @@ export default function CheckoutPage() {
     const normalizedName = normalizeZoneName(zoneInput);
     updateField('deliveryZone', normalizedName);
     updateField('deliveryFeeCents', 0);
+  };
+
+  const attemptOpenWhatsApp = (mode: 'auto' | 'popup') => {
+    if (!whatsappUrl) return;
+
+    setWhatsAppOpenStatus('opening');
+    const result = openWhatsAppHandoff(whatsappUrl, {
+      preferTopNavigation: mode === 'auto',
+      debugLabel: mode === 'auto' ? 'checkout_auto' : 'checkout_popup',
+    });
+
+    setWasEmbeddedContext(result.embedded);
+    setWhatsAppOpenMethod(result.method);
+
+    if (result.ok) {
+      setWhatsAppOpenStatus('opened');
+      toast.success('Abriendo WhatsApp...');
+    } else {
+      setWhatsAppOpenStatus('failed');
+      toast.error('Pedido creado, pero no se pudo abrir WhatsApp automaticamente');
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -216,16 +260,17 @@ export default function CheckoutPage() {
         name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
         quantity: item.quantity,
         unit_price_cents: item.unitPrice,
-        details: item.type === 'custom-bowl' && item.customBowl
-          ? {
-            size: item.customBowl.size.name,
-            bases: item.customBowl.bases.map((b) => b.name),
-            proteins: item.customBowl.proteins.map((p) => p.name),
-            acompanantes: item.customBowl.acompanantes.map((a) => a.name),
-            sauces: item.customBowl.sauces?.map((s) => s.name),
-            notes: item.notes,
-          }
-          : { product_id: item.product?.id, notes: item.notes },
+        details:
+          item.type === 'custom-bowl' && item.customBowl
+            ? {
+                size: item.customBowl.size.name,
+                bases: item.customBowl.bases.map((b) => b.name),
+                proteins: item.customBowl.proteins.map((p) => p.name),
+                acompanantes: item.customBowl.acompanantes.map((a) => a.name),
+                sauces: item.customBowl.sauces?.map((s) => s.name),
+                notes: item.notes,
+              }
+            : { product_id: item.product?.id, notes: item.notes },
       }));
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
@@ -251,10 +296,27 @@ export default function CheckoutPage() {
       setWhatsappUrl(url);
       clearCart();
 
-      trackEvent({ type: 'checkout_complete', orderId: generatedOrderId, totalCents: orderTotal, orderType: form.orderType, itemCount: cart.items.length });
+      trackEvent({
+        type: 'checkout_complete',
+        orderId: generatedOrderId,
+        totalCents: orderTotal,
+        orderType: form.orderType,
+        itemCount: cart.items.length,
+      });
 
       setOrderStatus('created');
-      toast.success('Pedido creado. Abre WhatsApp para confirmar el envío.');
+      toast.success('Pedido creado.');
+
+      // Attempt robust handoff AFTER order creation (no popup-blocker dependency on user gesture).
+      setWhatsAppOpenStatus('opening');
+      const handoff = openWhatsAppHandoff(url, { preferTopNavigation: true, debugLabel: 'checkout_auto' });
+      setWasEmbeddedContext(handoff.embedded);
+      setWhatsAppOpenMethod(handoff.method);
+      setWhatsAppOpenStatus(handoff.ok ? 'opened' : 'failed');
+
+      if (!handoff.ok) {
+        toast.error('Pedido creado, pero no se pudo abrir WhatsApp automaticamente');
+      }
     } catch (err) {
       console.error('Unexpected error:', err);
       setSubmitError('Ocurrio un error inesperado al crear tu pedido.');
@@ -272,16 +334,6 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleRetryWhatsApp = () => {
-    // Use anchor-based navigation handled by the <a> tag in the UI
-    // This function is kept as a fallback for the "Ir a WhatsApp" button
-    navigateToWhatsApp(whatsappUrl);
-  };
-
-  const handleDirectLink = () => {
-    navigateToWhatsApp(whatsappUrl);
-  };
-
   if (cart.items.length === 0 && orderStatus === 'idle') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -297,6 +349,8 @@ export default function CheckoutPage() {
 
   if (orderStatus === 'created') {
     const phone = whatsappNumber || '573215667170';
+    const showFallback = whatsAppOpenStatus !== 'opened';
+
     return (
       <div className="min-h-screen flex items-center justify-center py-12">
         <div className="max-w-lg mx-auto px-4 animate-scale-in">
@@ -305,56 +359,80 @@ export default function CheckoutPage() {
               <CheckCircle className="w-10 h-10 text-accent" />
             </div>
             <h2 className="text-2xl font-bold mb-2">Pedido creado</h2>
-            {orderId && (
+            {formattedOrderRef && (
               <p className="text-sm text-muted-foreground mb-2">
-                Referencia: <span className="font-mono font-bold text-foreground">{orderId.slice(0, 8).toUpperCase()}</span>
+                Referencia:{' '}
+                <span className="font-mono font-bold text-foreground">{formattedOrderRef}</span>
               </p>
             )}
-            <p className="text-muted-foreground">
-              Abre WhatsApp para confirmar el envío de tu pedido.
-            </p>
+
+            {whatsAppOpenStatus === 'opening' && (
+              <p className="text-muted-foreground">Intentando abrir WhatsApp...</p>
+            )}
+
+            {whatsAppOpenStatus === 'opened' && (
+              <p className="text-muted-foreground">WhatsApp se abrio (si no lo ves, usa los botones abajo).</p>
+            )}
+
+            {whatsAppOpenStatus === 'failed' && (
+              <p className="text-muted-foreground">Pedido creado, pero no se pudo abrir WhatsApp automaticamente.</p>
+            )}
           </div>
+
+          {showFallback && (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Pedido creado, pero no se pudo abrir WhatsApp automaticamente</AlertTitle>
+              <AlertDescription>
+                {wasEmbeddedContext
+                  ? 'Parece que estas en un contexto embebido (preview/iframe/webview). WhatsApp bloquea abrirse dentro de iframes.'
+                  : 'Tu navegador bloqueo la apertura automatica.'}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="bg-card border rounded-xl p-6 space-y-4 mb-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Phone className="w-4 h-4" />
-              <span>Numero: <strong className="text-foreground">{phone}</strong></span>
+              <span>
+                Numero: <strong className="text-foreground">{phone}</strong>
+              </span>
             </div>
 
-            {/* Primary: anchor link to WhatsApp — works in all contexts */}
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 w-full rounded-md text-sm font-medium h-11 px-4 py-2 btn-ohana"
-            >
-              <MessageCircle className="w-4 h-4" /> Abrir WhatsApp
-            </a>
+            <Button type="button" onClick={() => attemptOpenWhatsApp('auto')} className="w-full btn-ohana">
+              <MessageCircle className="w-4 h-4 mr-2" /> Abrir WhatsApp
+            </Button>
 
-            {/* Fallback: navigate current tab */}
-            <Button type="button" onClick={handleDirectLink} variant="outline" className="w-full">
-              <RotateCcw className="w-4 h-4 mr-2" /> Enlace directo (si no abre)
+            <Button type="button" onClick={() => attemptOpenWhatsApp('popup')} variant="outline" className="w-full">
+              <ExternalLink className="w-4 h-4 mr-2" /> Enlace directo
             </Button>
 
             <Button type="button" onClick={handleCopyMessage} variant="outline" className="w-full">
               <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
             </Button>
 
-            <details className="text-sm" open>
-              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                Ver mensaje completo
-              </summary>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp-message">Mensaje completo</Label>
+              <Textarea
+                id="whatsapp-message"
                 readOnly
                 value={whatsappMessage}
                 rows={10}
-                className="w-full mt-2 p-3 bg-muted rounded-lg text-xs font-mono resize-none border-0 focus:ring-0"
+                className="text-xs font-mono"
                 onFocus={(e) => e.currentTarget.select()}
               />
-            </details>
+              {formattedOrderRef && (
+                <p className="text-xs text-muted-foreground">
+                  Referencia: <span className="font-mono font-semibold">{formattedOrderRef}</span>
+                  {whatsAppOpenMethod ? <span> · Metodo: {whatsAppOpenMethod}</span> : null}
+                </p>
+              )}
+            </div>
           </div>
 
-          <Button type="button" onClick={() => navigate('/')} className="w-full btn-ohana">Volver al inicio</Button>
+          <Button type="button" onClick={() => navigate('/')} className="w-full btn-ohana">
+            Volver al inicio
+          </Button>
         </div>
       </div>
     );
