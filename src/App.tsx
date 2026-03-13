@@ -18,6 +18,7 @@ const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const CartaPage = lazy(() => import("./pages/CartaPage"));
 const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 
@@ -52,6 +53,7 @@ const App = () => (
                 <Route path="/nosotros" element={<Layout><AboutPage /></Layout>} />
                 <Route path="/contacto" element={<Layout><ContactPage /></Layout>} />
                 <Route path="/pedidos" element={<Layout><OrdersPage /></Layout>} />
+                <Route path="/carta" element={<Layout><CartaPage /></Layout>} />
                 <Route path="*" element={<Layout><NotFound /></Layout>} />
               </Routes>
             </Suspense>
