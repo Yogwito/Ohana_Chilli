@@ -260,25 +260,37 @@ export default function CheckoutPage() {
             : { product_id: item.product?.id, notes: item.notes },
       }));
 
-      const { data: createdOrderId, error: createOrderError } = await supabase.rpc('create_order_with_items', {
-        p_customer_name: form.name,
-        p_phone: form.phone,
-        p_order_type: form.orderType,
-        p_address: form.address || null,
-        p_delivery_zone: form.orderType === 'delivery' ? resolvedDeliveryZone || null : null,
-        p_delivery_fee_cents: resolvedDeliveryFeeCents,
-        p_notes: form.notes || null,
-        p_total_cents: finalOrderTotal,
-        p_items: orderItems,
+      const newOrderId = crypto.randomUUID();
+
+      const { error: orderError } = await supabase.from('orders').insert({
+        id: newOrderId,
+        customer_name: form.name,
+        phone: form.phone,
+        order_type: form.orderType,
+        address: form.address || null,
+        delivery_zone: form.orderType === 'delivery' ? resolvedDeliveryZone || null : null,
+        delivery_fee_cents: resolvedDeliveryFeeCents,
+        notes: form.notes || null,
+        total_cents: finalOrderTotal,
       });
 
-      if (createOrderError || !createdOrderId) {
-        console.error('Error creating order transaction:', createOrderError);
+      if (orderError) {
+        console.error('Error creating order:', orderError);
         setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
         toast.error('Error al crear el pedido. Intenta de nuevo.');
         setOrderStatus('idle');
         return;
       }
+
+      const { error: itemsError } = await supabase.from('order_items').insert(
+        orderItems.map((item) => ({ ...item, order_id: newOrderId }))
+      );
+
+      if (itemsError) {
+        console.error('Error creating order items:', itemsError);
+      }
+
+      const createdOrderId = newOrderId;
 
       const phone = whatsappNumber || '573215667170';
       const message = generateWhatsAppMessage(cart.items, finalOrderTotal, {
