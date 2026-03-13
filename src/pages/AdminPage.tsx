@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deliveryZones';
 import { formatPrice } from '@/domain/formatPrice';
 import {
   LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
@@ -215,7 +216,7 @@ function ProductsAdmin() {
           {editing === p.id ? (
             <div className="space-y-3">
               <Input value={editForm.name ?? ''} onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} placeholder="Nombre" />
-              <Input type="number" value={editForm.price_cents ?? 0} onChange={e => setEditForm(prev => ({ ...prev, price_cents: Number(e.target.value) }))} placeholder="Precio (centavos)" />
+              <Input type="number" value={editForm.price_cents ?? 0} onChange={e => setEditForm(prev => ({ ...prev, price_cents: Number(e.target.value) }))} placeholder="Precio (pesos)" />
               <Input value={editForm.description ?? ''} onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Descripción" />
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => saveEdit(p.id)}><Save className="w-3 h-3 mr-1" />Guardar</Button>
@@ -364,17 +365,17 @@ function BowlRulesAdmin() {
 
 // ─── Settings Admin ──────────────────────────────────────
 function normalizeZoneName(value: string) {
-  return value.trim().replace(/\s+/g, ' ');
+  return formatDeliveryZoneName(value);
 }
 
 function normalizeZoneKey(value: string) {
-  return normalizeZoneName(value).toLowerCase();
+  return normalizeDeliveryZoneName(value);
 }
 
 function parseFeeToCents(raw: string) {
   const digits = raw.replace(/[^\d]/g, '');
   if (!digits) return null;
-  return Number(digits) * 100;
+  return Number(digits);
 }
 
 function parseCsvLine(line: string) {
@@ -431,7 +432,7 @@ function DeliveryZonesAdmin() {
     setZones(list);
     setDrafts(
       list.reduce<Record<string, { name: string; feeInput: string; is_active: boolean }>>((acc, zone) => {
-        acc[zone.id] = { name: zone.name, feeInput: String(Math.round(zone.fee_cents / 100)), is_active: zone.is_active };
+        acc[zone.id] = { name: zone.name, feeInput: String(zone.fee_cents), is_active: zone.is_active };
         return acc;
       }, {}),
     );
@@ -483,17 +484,19 @@ function DeliveryZonesAdmin() {
       .map((line) => line.trim())
       .filter(Boolean);
 
-    if (lines.length < 2) {
-      toast.error('El CSV debe incluir encabezado y al menos una fila');
+    if (lines.length === 0) {
+      toast.error('El CSV debe incluir al menos una fila');
       return;
     }
 
-    const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase());
-    const nameIndex = headers.indexOf('name');
-    const feeIndex = headers.indexOf('fee');
+    const firstRow = parseCsvLine(lines[0]).map((value) => value.toLowerCase());
+    const hasHeader = firstRow.includes('name') || firstRow.includes('fee');
+    const nameIndex = hasHeader ? firstRow.indexOf('name') : 0;
+    const feeIndex = hasHeader ? firstRow.indexOf('fee') : 1;
+    const startIndex = hasHeader ? 1 : 0;
 
     if (nameIndex === -1 || feeIndex === -1) {
-      toast.error('Encabezados requeridos: name,fee');
+      toast.error('Formato invalido. Usa columnas name,fee o dos columnas sin encabezado.');
       return;
     }
 
@@ -511,8 +514,8 @@ function DeliveryZonesAdmin() {
     const upsertByKey = new Map<string, { name: string; fee_cents: number; existed: boolean }>();
     const errors: string[] = [];
 
-    lines.slice(1).forEach((line, index) => {
-      const lineNumber = index + 2;
+    lines.slice(startIndex).forEach((line, index) => {
+      const lineNumber = index + startIndex + 1;
       const columns = parseCsvLine(line);
       const rawName = columns[nameIndex] ?? '';
       const rawFee = columns[feeIndex] ?? '';
@@ -540,6 +543,7 @@ function DeliveryZonesAdmin() {
     const payload = Array.from(upsertByKey.values()).map((item) => ({
       name: item.name,
       fee_cents: item.fee_cents,
+      is_active: true,
     }));
 
     if (payload.length > 0) {
@@ -614,7 +618,7 @@ function DeliveryZonesAdmin() {
                 </td>
                 <td className="p-3">
                   <Input
-                    value={drafts[zone.id]?.feeInput ?? String(Math.round(zone.fee_cents / 100))}
+                    value={drafts[zone.id]?.feeInput ?? String(zone.fee_cents)}
                     onChange={(e) => setDrafts((prev) => ({ ...prev, [zone.id]: { ...prev[zone.id], feeInput: e.target.value } }))}
                   />
                 </td>
@@ -641,7 +645,7 @@ function DeliveryZonesAdmin() {
           <DialogHeader>
             <DialogTitle>Importar domicilios desde CSV</DialogTitle>
             <DialogDescription>
-              Pega el CSV manualmente con encabezados <code>name,fee</code>. No se usa OCR.
+              Pega el CSV manualmente con encabezados <code>name,fee</code> o en dos columnas sin encabezado.
             </DialogDescription>
           </DialogHeader>
 

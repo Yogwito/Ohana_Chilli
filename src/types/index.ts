@@ -36,6 +36,8 @@ export interface BowlSizeRule {
   maxBases: number;
   maxProteins: number;
   maxAcompanantes: number;
+  maxSauces: number;
+  maxComplementos: number;
 }
 
 // Product Types
@@ -70,6 +72,7 @@ export interface CustomBowl {
   proteins: Ingredient[];
   acompanantes: Ingredient[];
   sauces?: Ingredient[];
+  complementos?: Ingredient[];
   notes?: string;
 }
 
@@ -116,4 +119,4 @@ export interface Order {
 }
 
 // Bowl Builder Step
-export type BowlBuilderStep = 'size' | 'bases' | 'proteins' | 'acompanantes' | 'salsas' | 'summary';
+export type BowlBuilderStep = 'size' | 'bases' | 'proteins' | 'acompanantes' | 'salsas' | 'complementos' | 'summary';

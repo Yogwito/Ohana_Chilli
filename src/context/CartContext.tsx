@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { CartItem, CartState, Product, CustomBowl, Brand } from '@/types';
 import { calculateBowlPrice } from '@/domain/bowlPricing';
@@ -5,7 +6,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 
 // ─── Cart validation schema (versioned) ─────────────────
-const CART_VERSION = 'cart:v1';
+const CART_VERSION = 'cart:v2';
 const CART_STORAGE_KEY = 'ohana-chilli-cart';
 
 const cartItemSchema = z.object({

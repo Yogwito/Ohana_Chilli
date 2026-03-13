@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
 import { useActiveDeliveryZones, useWhatsAppNumber } from '@/hooks/use-catalog';
@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
+import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
 import { buildWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 
@@ -38,7 +39,6 @@ const checkoutSchema = z.object({
   orderType: z.enum(['pickup', 'delivery']),
   address: z.string().optional(),
   deliveryZone: z.string().optional(),
-  deliveryFeeCents: z.number().int().min(0).optional(),
   notes: z.string().max(500).optional(),
 });
 
@@ -47,10 +47,6 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 type OrderStatus = 'idle' | 'submitting' | 'created';
 
 type WhatsAppOpenStatus = 'idle' | 'opening' | 'opened' | 'failed';
-
-function normalizeZoneName(value: string) {
-  return value.trim().replace(/\s+/g, ' ');
-}
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -67,8 +63,7 @@ export default function CheckoutPage() {
   const [whatsappMessage, setWhatsappMessage] = useState<string>('');
   const [whatsappUrl, setWhatsappUrl] = useState<string>('');
   const [submitError, setSubmitError] = useState<string>('');
-  const [zoneInput, setZoneInput] = useState('');
-  const [manualZoneFallbackEnabled, setManualZoneFallbackEnabled] = useState(false);
+  const [selectedZoneId, setSelectedZoneId] = useState('');
 
   const [whatsAppOpenStatus, setWhatsAppOpenStatus] = useState<WhatsAppOpenStatus>('idle');
   const [whatsAppOpenMethod, setWhatsAppOpenMethod] = useState<string>('');
@@ -80,21 +75,23 @@ export default function CheckoutPage() {
     orderType: 'pickup',
     address: '',
     deliveryZone: '',
-    deliveryFeeCents: 0,
     notes: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
   const isDeliveryZoneQueryError = Boolean(deliveryZonesError);
-  const hasSelectedDeliveryZone = Boolean(form.deliveryZone && form.deliveryZone.trim().length > 0);
-  const deliveryFeeCents = form.orderType === 'delivery' ? form.deliveryFeeCents ?? 0 : 0;
+  const selectedDeliveryZone = useMemo(
+    () => findDeliveryZoneByIdOrName(deliveryZones, selectedZoneId),
+    [deliveryZones, selectedZoneId],
+  );
+  const hasSelectedDeliveryZone = Boolean(selectedDeliveryZone);
+  const deliveryFeeCents = form.orderType === 'delivery' ? selectedDeliveryZone?.feeCents ?? 0 : 0;
   const orderSubtotal = cart.subtotal;
   const orderTotal = orderSubtotal + deliveryFeeCents;
+  const manualZoneFallbackEnabled = false;
 
-  const mustExplicitlyEnableFallback =
-    form.orderType === 'delivery' && isDeliveryZoneQueryError && !manualZoneFallbackEnabled;
-  const submitBlockedByZone =
-    form.orderType === 'delivery' && (!hasSelectedDeliveryZone || mustExplicitlyEnableFallback);
+  const submitBlockedByZone = form.orderType === 'delivery'
+    && (loadingDeliveryZones || isDeliveryZoneQueryError || !hasSelectedDeliveryZone);
 
   const formattedOrderRef = useMemo(() => {
     if (!orderId) return null;
@@ -107,17 +104,24 @@ export default function CheckoutPage() {
     if (submitError) setSubmitError('');
   };
 
+  useEffect(() => {
+    const canonicalZoneName = selectedDeliveryZone?.name ?? '';
+    setForm((prev) => (
+      prev.deliveryZone === canonicalZoneName
+        ? prev
+        : { ...prev, deliveryZone: canonicalZoneName }
+    ));
+  }, [selectedDeliveryZone]);
+
   const handleOrderTypeChange = (nextType: 'pickup' | 'delivery') => {
     setForm((prev) => ({
       ...prev,
       orderType: nextType,
       deliveryZone: nextType === 'delivery' ? prev.deliveryZone : '',
-      deliveryFeeCents: nextType === 'delivery' ? prev.deliveryFeeCents : 0,
     }));
 
     if (nextType === 'pickup') {
-      setZoneInput('');
-      setManualZoneFallbackEnabled(false);
+      setSelectedZoneId('');
     }
 
     setSubmitError('');
@@ -130,37 +134,9 @@ export default function CheckoutPage() {
   };
 
   const handleDeliveryZoneChange = (selectedZoneId: string) => {
-    if (!selectedZoneId) {
-      setZoneInput('');
-      updateField('deliveryZone', '');
-      updateField('deliveryFeeCents', 0);
-      return;
-    }
-
-    if (isDeliveryZoneQueryError && manualZoneFallbackEnabled) {
-      setZoneInput(selectedZoneId);
-      updateField('deliveryZone', selectedZoneId);
-      updateField('deliveryFeeCents', 0);
-      return;
-    }
-
-    const zone = deliveryZones.find((z) => z.id === selectedZoneId);
-    if (zone) {
-      setZoneInput(zone.id);
-      updateField('deliveryZone', zone.name);
-      updateField('deliveryFeeCents', zone.feeCents);
-    } else {
-      setZoneInput('');
-      updateField('deliveryZone', '');
-      updateField('deliveryFeeCents', 0);
-    }
-  };
-
-  const enableManualZoneFallback = () => {
-    setManualZoneFallbackEnabled(true);
-    const normalizedName = normalizeZoneName(zoneInput);
-    updateField('deliveryZone', normalizedName);
-    updateField('deliveryFeeCents', 0);
+    setSelectedZoneId(selectedZoneId);
+    const zone = deliveryZones.find((item) => item.id === selectedZoneId);
+    updateField('deliveryZone', zone?.name ?? '');
   };
 
   const attemptOpenWhatsApp = () => {
@@ -214,8 +190,15 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (mustExplicitlyEnableFallback) {
-      const message = 'No se pudieron cargar las zonas activas. Activa el modo manual para continuar.';
+    if (form.orderType === 'delivery' && loadingDeliveryZones) {
+      const message = 'Estamos cargando las zonas activas. Espera un momento e intenta de nuevo.';
+      setSubmitError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (form.orderType === 'delivery' && isDeliveryZoneQueryError) {
+      const message = 'No se pudieron cargar las zonas activas. Intenta nuevamente.';
       setSubmitError(message);
       toast.error(message);
       return;
@@ -225,33 +208,40 @@ export default function CheckoutPage() {
     trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
     try {
-      const generatedOrderId = crypto.randomUUID();
+      let resolvedDeliveryZone = form.orderType === 'delivery' ? form.deliveryZone ?? '' : '';
+      let resolvedDeliveryFeeCents = deliveryFeeCents;
 
-      const { error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          id: generatedOrderId,
-          customer_name: form.name,
-          phone: form.phone,
-          order_type: form.orderType,
-          address: form.address || null,
-          delivery_zone: form.orderType === 'delivery' ? form.deliveryZone || null : null,
-          delivery_fee_cents: deliveryFeeCents,
-          notes: form.notes || null,
-          total_cents: orderTotal,
-          status: 'pending',
-        });
+      if (form.orderType === 'delivery') {
+        if (!selectedZoneId) {
+          setSubmitError('Selecciona un barrio o zona activa para calcular el domicilio.');
+          toast.error('Selecciona un barrio o zona activa.');
+          setOrderStatus('idle');
+          return;
+        }
 
-      if (orderError) {
-        console.error('Error saving order:', orderError);
-        setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
-        toast.error('Error al crear el pedido. Intenta de nuevo.');
-        setOrderStatus('idle');
-        return;
+        const { data: canonicalZone, error: canonicalZoneError } = await supabase
+          .from('delivery_zones')
+          .select('id,name,fee_cents')
+          .eq('id', selectedZoneId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (canonicalZoneError || !canonicalZone) {
+          console.error('Error validating delivery zone:', canonicalZoneError);
+          setSubmitError('La zona seleccionada ya no esta activa o cambio de tarifa. Seleccionala de nuevo.');
+          toast.error('Actualiza la zona de domicilio antes de continuar.');
+          setSelectedZoneId('');
+          updateField('deliveryZone', '');
+          setOrderStatus('idle');
+          return;
+        }
+
+        resolvedDeliveryZone = canonicalZone.name;
+        resolvedDeliveryFeeCents = canonicalZone.fee_cents;
       }
 
+      const finalOrderTotal = orderSubtotal + resolvedDeliveryFeeCents;
       const orderItems = cart.items.map((item) => ({
-        order_id: generatedOrderId,
         brand_id: item.brand,
         name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
         quantity: item.quantity,
@@ -264,38 +254,54 @@ export default function CheckoutPage() {
                 proteins: item.customBowl.proteins.map((p) => p.name),
                 acompanantes: item.customBowl.acompanantes.map((a) => a.name),
                 sauces: item.customBowl.sauces?.map((s) => s.name),
+                complementos: item.customBowl.complementos?.map((c) => c.name),
                 notes: item.notes,
               }
             : { product_id: item.product?.id, notes: item.notes },
       }));
 
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-      if (itemsError) {
-        console.error('Error saving order items:', itemsError);
+      const { data: createdOrderId, error: createOrderError } = await supabase.rpc('create_order_with_items', {
+        p_customer_name: form.name,
+        p_phone: form.phone,
+        p_order_type: form.orderType,
+        p_address: form.address || null,
+        p_delivery_zone: form.orderType === 'delivery' ? resolvedDeliveryZone || null : null,
+        p_delivery_fee_cents: resolvedDeliveryFeeCents,
+        p_notes: form.notes || null,
+        p_total_cents: finalOrderTotal,
+        p_items: orderItems,
+      });
+
+      if (createOrderError || !createdOrderId) {
+        console.error('Error creating order transaction:', createOrderError);
+        setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
+        toast.error('Error al crear el pedido. Intenta de nuevo.');
+        setOrderStatus('idle');
+        return;
       }
 
       const phone = whatsappNumber || '573215667170';
-      const message = generateWhatsAppMessage(cart.items, orderTotal, {
+      const message = generateWhatsAppMessage(cart.items, finalOrderTotal, {
         name: form.name,
         phone: form.phone,
         orderType: form.orderType,
         address: form.address,
-        deliveryZone: form.deliveryZone,
-        deliveryFeeCents,
+        deliveryZone: resolvedDeliveryZone,
+        deliveryFeeCents: resolvedDeliveryFeeCents,
         notes: form.notes,
-        orderId: generatedOrderId,
+        orderId: createdOrderId,
       });
       const url = buildWhatsAppUrl(phone, message);
 
-      setOrderId(generatedOrderId);
+      setOrderId(createdOrderId);
       setWhatsappMessage(message);
       setWhatsappUrl(url);
       clearCart();
 
       trackEvent({
         type: 'checkout_complete',
-        orderId: generatedOrderId,
-        totalCents: orderTotal,
+        orderId: createdOrderId,
+        totalCents: finalOrderTotal,
         orderType: form.orderType,
         itemCount: cart.items.length,
       });
@@ -536,25 +542,21 @@ export default function CheckoutPage() {
                     <div>
                       <Label htmlFor="delivery-zone">Barrio/Zona *</Label>
 
-                      {isDeliveryZoneQueryError && !manualZoneFallbackEnabled ? (
+                      {isDeliveryZoneQueryError ? (
                         <div className="mt-2 space-y-2">
                           <p className="text-sm text-destructive">
-                            No se pudieron cargar las zonas de domicilio.
+                            No se pudieron cargar las zonas activas de domicilio. No es posible continuar hasta recargar los precios reales.
                           </p>
-                          <Button type="button" variant="outline" size="sm" onClick={enableManualZoneFallback}>
-                            Usar barrio manual (domicilio $0)
-                          </Button>
                         </div>
                       ) : isDeliveryZoneQueryError && manualZoneFallbackEnabled ? (
                         <>
                           <Input
                             id="delivery-zone"
-                            value={zoneInput}
+                            value={selectedZoneId}
                             onChange={(e) => {
-                              setZoneInput(e.target.value);
-                              const val = normalizeZoneName(e.target.value);
+                              setSelectedZoneId(e.target.value);
+                              const val = e.target.value;
                               updateField('deliveryZone', val);
-                              updateField('deliveryFeeCents', 0);
                             }}
                             placeholder="Escribe tu barrio/zona"
                             className={errors.deliveryZone ? 'border-destructive' : ''}
@@ -568,7 +570,7 @@ export default function CheckoutPage() {
                         <>
                           <select
                             id="delivery-zone"
-                            value={zoneInput}
+                            value={selectedZoneId}
                             onChange={(e) => handleDeliveryZoneChange(e.target.value)}
                             disabled={loadingDeliveryZones}
                             className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm ${
@@ -585,7 +587,7 @@ export default function CheckoutPage() {
                             ))}
                           </select>
 
-                          {hasSelectedDeliveryZone && (
+                          {selectedDeliveryZone && (
                             <p className="text-sm text-ohana mt-1">Domicilio: {formatPrice(deliveryFeeCents)}</p>
                           )}
                         </>
@@ -620,9 +622,11 @@ export default function CheckoutPage() {
 
                 {submitBlockedByZone && (
                   <p className="text-sm text-foreground bg-muted border border-border rounded-md px-3 py-2">
-                    {mustExplicitlyEnableFallback
-                      ? 'No hay zonas disponibles ahora. Activa el modo manual para continuar.'
-                      : 'Debes seleccionar un barrio/zona para calcular el domicilio y habilitar el envio.'}
+                    {loadingDeliveryZones
+                      ? 'Estamos cargando las zonas activas.'
+                      : isDeliveryZoneQueryError
+                        ? 'No se pudieron cargar las tarifas reales de domicilio.'
+                        : 'Debes seleccionar un barrio o zona activa para calcular el domicilio.'}
                   </p>
                 )}
               </div>
@@ -713,4 +717,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-

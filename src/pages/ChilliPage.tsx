@@ -1,69 +1,104 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Flame } from 'lucide-react';
+import PageHero from '@/components/layout/PageHero';
+import SEOHead from '@/components/SEOHead';
 import ProductCard from '@/components/products/ProductCard';
 import CategoryFilter from '@/components/products/CategoryFilter';
-import PageHero from '@/components/layout/PageHero';
+import MenuBrandNav from '@/components/menu/MenuBrandNav';
+import MenuContactSection from '@/components/menu/MenuContactSection';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useProducts, useCategories } from '@/hooks/use-catalog';
-import { Flame } from 'lucide-react';
-import SEOHead from '@/components/SEOHead';
+import { useCategories, useProducts } from '@/hooks/use-catalog';
+
+function SectionHeader({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="mb-5">
+      <h2 className="text-2xl font-bold sm:text-3xl">{title}</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">{description}</p>
+    </div>
+  );
+}
 
 export default function ChilliPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { data: chilliCategories = [] } = useCategories('chilli');
   const { data: chilliProducts = [], isLoading, error } = useProducts({ brandId: 'chilli' });
-  const categoryNameById = useMemo(
-    () => Object.fromEntries(chilliCategories.map((category) => [category.id, category.name])),
-    [chilliCategories],
-  );
 
-  const filteredProducts = useMemo(() => {
-    if (!selectedCategory) return chilliProducts;
-    return chilliProducts.filter(p => p.categoryId === selectedCategory);
-  }, [selectedCategory, chilliProducts]);
+  const groupedProducts = useMemo(
+    () =>
+      chilliCategories
+        .filter((category) => !selectedCategory || category.id === selectedCategory)
+        .map((category) => ({
+          category,
+          products: chilliProducts.filter((product) => product.categoryId === category.id),
+        }))
+        .filter((group) => group.products.length > 0),
+    [chilliCategories, chilliProducts, selectedCategory],
+  );
 
   return (
     <div className="min-h-screen">
-      <SEOHead title="Chilli Tex-Mex" description="Hamburguesas, salchipapas, mazorcadas, nachos y combo, nachos y combos con sabor Tex-Mex en Manizales. Pide tu favorito a domicilio o para recoger." path="/chilli" />
+      <SEOHead
+        title="Chilli"
+        description="Carta definitiva de Chilli con burgers, fries, hot dogs, corn bowls, nachos, combos, adicionales y bebidas."
+        path="/chilli"
+      />
+
       <PageHero
         icon={Flame}
         title="Chilli"
-        subtitle="Comida rápida irresistible"
-        description="Los sabores que te encantan, preparados con los mejores ingredientessalchipapas, mazorcads, hot dogs, papas y más."
+        subtitle="Carta definitiva"
+        description="La pagina actual de Chilli ahora muestra la carta definitiva completa, organizada por categorias y optimizada para lectura rapida en mobile."
         brand="chilli"
       />
 
-      <section className="py-8 sm:py-12">
-        <div className="container">
-          <div className="mb-8">
+      <section className="py-8 sm:py-10">
+        <div className="container space-y-10">
+          <MenuBrandNav />
+
+          <section className="rounded-[2rem] border bg-card p-6 sm:p-8">
+            <SectionHeader
+              title="Explora por categoria"
+              description="Se reutilizo el filtro existente para navegar entre burgers, fries, hot dogs, corn bowls, nachos, combos, adicionales y bebidas."
+            />
             <CategoryFilter
               categories={chilliCategories}
               selectedCategory={selectedCategory}
               onSelectCategory={setSelectedCategory}
               brand="chilli"
             />
-          </div>
+          </section>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-72 rounded-2xl" />)}
-            </div>
-          ) : error ? (
-            <div className="text-center py-12 text-destructive">
-              <p>Error al cargar los productos. Intenta de nuevo.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} categoryName={categoryNameById[product.categoryId]} />
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((item) => (
+                <Skeleton key={item} className="h-72 rounded-2xl" />
               ))}
             </div>
+          ) : error ? (
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+              No fue posible cargar la carta de Chilli.
+            </div>
+          ) : groupedProducts.length === 0 ? (
+            <div className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">
+              No hay productos para la categoria seleccionada.
+            </div>
+          ) : (
+            groupedProducts.map(({ category, products }) => (
+              <section key={category.id} id={category.slug} className="rounded-[2rem] border bg-card p-6 sm:p-8">
+                <SectionHeader
+                  title={category.name}
+                  description={`Categoria ${category.name.toLowerCase()} actualizada con la carta definitiva.`}
+                />
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                  {products.map((product) => (
+                    <ProductCard key={product.id} product={product} categoryName={category.name} />
+                  ))}
+                </div>
+              </section>
+            ))
           )}
 
-          {!isLoading && filteredProducts.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No se encontraron productos en esta categoría</p>
-            </div>
-          )}
+          <MenuContactSection />
         </div>
       </section>
     </div>

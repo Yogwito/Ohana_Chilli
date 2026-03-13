@@ -1,92 +1,140 @@
-import { useState, lazy, Suspense } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import ProductCard from '@/components/products/ProductCard';
+import { Suspense, lazy } from 'react';
+import { Leaf } from 'lucide-react';
 import PageHero from '@/components/layout/PageHero';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useProducts } from '@/hooks/use-catalog';
-import { Leaf, Sparkles, ChefHat } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
+import ProductCard from '@/components/products/ProductCard';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useBowlRules, useProducts } from '@/hooks/use-catalog';
+import MenuBrandNav from '@/components/menu/MenuBrandNav';
+import MenuContactSection from '@/components/menu/MenuContactSection';
+import { formatPrice } from '@/domain/formatPrice';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 
+function SectionHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return (
+    <div className="mb-6">
+      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-ohana">{eyebrow}</p>
+      <h2 className="mt-2 text-2xl font-bold sm:text-3xl">{title}</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">{description}</p>
+    </div>
+  );
+}
+
 export default function OhanaPage() {
-  const [activeTab, setActiveTab] = useState('premade');
-  const { data: ohanaProducts = [], isLoading, error } = useProducts({ brandId: 'ohana', categoryId: 'ohana-premade' });
-
-  // Validation: ensure the 5 required bowls are present
-  const REQUIRED_BOWLS = ['Teriyaki', 'Chicago', 'Veggie', 'Paisa', 'Pulled Pork'];
-  const missingBowls = !isLoading && !error && ohanaProducts.length > 0
-    ? REQUIRED_BOWLS.filter(name => !ohanaProducts.some(p => p.name === name))
-    : [];
-
-  if (missingBowls.length > 0) {
-    console.error(`[OhanaPage] Missing required bowls: ${missingBowls.join(', ')}`);
-  }
+  const { data: suggestedBowls = [], isLoading: loadingBowls, error: bowlsError } = useProducts({
+    brandId: 'ohana',
+    categoryId: 'ohana-bowls-sugeridos',
+  });
+  const { data: beverages = [], isLoading: loadingBeverages, error: beveragesError } = useProducts({
+    brandId: 'ohana',
+    categoryId: 'ohana-bebidas',
+  });
+  const { data: bowlRules = [], isLoading: loadingRules } = useBowlRules();
 
   return (
     <div className="min-h-screen">
-      <SEOHead title="Ohana Bowls" description="Arma tu bowl personalizado con ingredientes frescos. Bowls saludables en Manizales con bases, proteínas y acompañamientos a tu gusto." path="/ohana" />
+      <SEOHead
+        title="Ohana Bowls"
+        description="Carta definitiva de Ohana Bowls con bowls sugeridos, arma tu bowl y bebidas."
+        path="/ohana"
+      />
+
       <PageHero
         icon={Leaf}
-        title="Ohana"
-        subtitle="Bowls frescos y saludables"
-        description="Ingredientes frescos, combinaciones deliciosas. Elige un bowl preparado o crea tu propia obra maestra."
+        title="Ohana Bowls"
+        subtitle="Carta definitiva"
+        description="Bowls frescos, personalizables y faciles de escanear. La pagina actual del menu ahora muestra la carta definitiva de Ohana."
         brand="ohana"
       />
 
-      <section className="py-8 sm:py-12">
-        <div className="container">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
-              <TabsTrigger value="premade" className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                Bowls sugeridos
-              </TabsTrigger>
-              <TabsTrigger value="custom" className="flex items-center gap-2">
-                <ChefHat className="w-4 h-4" />
-                Arma tu Bowl
-              </TabsTrigger>
-            </TabsList>
+      <section className="py-8 sm:py-10">
+        <div className="container space-y-10">
+          <MenuBrandNav />
 
-            <TabsContent value="premade" className="animate-fade-in">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold mb-2">Bowls sugeridos</h2>
-                <p className="text-muted-foreground">Combinaciones de la carta oficial listas para disfrutar</p>
-              </div>
+          <section id="ohana-arma-tu-bowl" className="rounded-[2rem] border bg-card p-6 sm:p-8">
+            <SectionHeader
+              eyebrow="Arma tu bowl"
+              title="Configura Ohana paso a paso"
+              description="La estructura del bowl quedo actualizada con bases, proteinas, acompanantes, salsas y complementos segun la carta definitiva."
+            />
 
-              {isLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-72 rounded-2xl" />)}
-                </div>
-              ) : error ? (
-                <div className="text-center py-12 text-destructive">
-                  <p>Error al cargar los productos. Intenta de nuevo.</p>
-                </div>
-              ) : ohanaProducts.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>No hay bowls disponibles en este momento.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {ohanaProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} categoryName="Bowls sugeridos" />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
+            <div className="mb-8">
+              <div className="grid gap-4 md:grid-cols-3">
+                {(loadingRules ? [] : bowlRules).map((size) => (
+                  <article key={size.size} className="rounded-2xl border bg-muted/30 p-4">
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">{size.name}</p>
+                    <p className="mt-2 text-2xl font-bold text-ohana-dark">{formatPrice(size.price)}</p>
+                    <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
+                      <li>1 base</li>
+                      <li>{size.maxProteins} proteinas</li>
+                      <li>{size.maxAcompanantes} acompanantes</li>
+                      <li>{size.maxSauces} salsas</li>
+                      <li>{size.maxComplementos} complementos</li>
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </div>
 
-            <TabsContent value="custom" className="animate-fade-in">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold mb-2">Arma tu Bowl</h2>
-                <p className="text-muted-foreground">Elige tus ingredientes favoritos paso a paso</p>
+            <Suspense fallback={<Skeleton className="h-[520px] rounded-[2rem]" />}>
+              <BowlBuilder />
+            </Suspense>
+          </section>
+
+          <section id="ohana-bowls-sugeridos">
+            <SectionHeader
+              eyebrow="Bowls sugeridos"
+              title="Combinaciones listas para pedir"
+              description="Los bowls sugeridos reemplazaron por completo el catalogo anterior y se muestran como productos editables desde la fuente de datos del menu."
+            />
+
+            {loadingBowls ? (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {[1, 2, 3].map((item) => (
+                  <Skeleton key={item} className="h-72 rounded-2xl" />
+                ))}
               </div>
-              <div className="max-w-3xl mx-auto">
-                <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
-                  <BowlBuilder />
-                </Suspense>
+            ) : bowlsError ? (
+              <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+                No fue posible cargar los bowls sugeridos.
               </div>
-            </TabsContent>
-          </Tabs>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {suggestedBowls.map((product) => (
+                  <ProductCard key={product.id} product={product} categoryName="Bowls sugeridos" />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section id="ohana-bebidas">
+            <SectionHeader
+              eyebrow="Bebidas"
+              title="Acompanamientos para Ohana"
+              description="Bebidas cargadas dentro de la misma pagina actual del menu, sin duplicar rutas ni crear una segunda version."
+            />
+
+            {loadingBeverages ? (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                {[1, 2, 3, 4].map((item) => (
+                  <Skeleton key={item} className="h-72 rounded-2xl" />
+                ))}
+              </div>
+            ) : beveragesError ? (
+              <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+                No fue posible cargar las bebidas de Ohana.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                {beverages.map((product) => (
+                  <ProductCard key={product.id} product={product} categoryName="Bebidas" />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <MenuContactSection />
         </div>
       </section>
     </div>

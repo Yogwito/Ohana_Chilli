@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { formatPrice } from '@/domain/formatPrice';
 
 interface ProductCardProps {
   product: Product;
@@ -34,9 +35,6 @@ function humanizeCategoryId(categoryId: string): string {
   if (tokens.length === 0) return 'Menú';
   return tokens.map((t) => CATEGORY_TOKEN_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
 }
-
-const formatPrice = (price: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price);
 
 export default function ProductCard({ product, variant = 'default', categoryName }: ProductCardProps) {
   const { addProduct } = useCart();

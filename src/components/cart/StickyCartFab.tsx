@@ -1,13 +1,11 @@
 import { ShoppingBag } from 'lucide-react';
 import { useCartCount, useCartState } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
+import { formatPrice } from '@/domain/formatPrice';
 
 interface StickyCartFabProps {
   onClick: () => void;
 }
-
-const formatPrice = (price: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price);
 
 export default function StickyCartFab({ onClick }: StickyCartFabProps) {
   const count = useCartCount();

@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ClipboardList, Package, Clock, CheckCircle, Truck, XCircle } from 'lucide-react';
+import { ClipboardList, Package, Clock, CheckCircle, Truck, XCircle, ShieldAlert } from 'lucide-react';
+import { formatPrice } from '@/domain/formatPrice';
 
 interface OrderRow {
   id: string;
@@ -16,40 +20,32 @@ interface OrderRow {
   created_at: string;
 }
 
-interface OrderItemRow {
-  id: string;
-  order_id: string;
-  brand_id: string | null;
-  name: string;
-  quantity: number;
-  unit_price_cents: number;
-  details: any;
-}
-
-const statusConfig: Record<string, { label: string; icon: React.ReactNode; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  pending:   { label: 'Pendiente',   icon: <Clock className="w-3 h-3" />,       variant: 'outline' },
-  confirmed: { label: 'Confirmado',  icon: <CheckCircle className="w-3 h-3" />, variant: 'default' },
-  preparing: { label: 'Preparando',  icon: <Package className="w-3 h-3" />,     variant: 'secondary' },
-  ready:     { label: 'Listo',       icon: <CheckCircle className="w-3 h-3" />, variant: 'default' },
-  delivered: { label: 'Entregado',   icon: <Truck className="w-3 h-3" />,       variant: 'default' },
-  cancelled: { label: 'Cancelado',   icon: <XCircle className="w-3 h-3" />,     variant: 'destructive' },
+const statusConfig: Record<string, { label: string; icon: ReactNode; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  pending: { label: 'Pendiente', icon: <Clock className="w-3 h-3" />, variant: 'outline' },
+  confirmed: { label: 'Confirmado', icon: <CheckCircle className="w-3 h-3" />, variant: 'default' },
+  preparing: { label: 'Preparando', icon: <Package className="w-3 h-3" />, variant: 'secondary' },
+  ready: { label: 'Listo', icon: <CheckCircle className="w-3 h-3" />, variant: 'default' },
+  delivered: { label: 'Entregado', icon: <Truck className="w-3 h-3" />, variant: 'default' },
+  cancelled: { label: 'Cancelado', icon: <XCircle className="w-3 h-3" />, variant: 'destructive' },
 };
-
-const formatPrice = (cents: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(cents);
 
 const formatDate = (date: string) =>
   new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(date));
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<(OrderRow & { items: OrderItemRow[] })[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, isAdmin, loading: authLoading } = useAdminAuth();
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (authLoading || !isAdmin) {
+      setLoading(false);
+      return;
+    }
+
     const fetchOrders = async () => {
-      // Orders table has no public SELECT policy so this will return empty for anon
-      // This page is a placeholder until admin auth is added in Phase 4
-      const { data: ordersData, error } = await supabase
+      setLoading(true);
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
@@ -60,12 +56,12 @@ export default function OrdersPage() {
         return;
       }
 
-      setOrders((ordersData ?? []).map(o => ({ ...o, items: [] })) as any);
+      setOrders((data ?? []) as OrderRow[]);
       setLoading(false);
     };
 
     fetchOrders();
-  }, []);
+  }, [authLoading, isAdmin]);
 
   return (
     <div className="min-h-screen py-8 sm:py-12">
@@ -74,20 +70,35 @@ export default function OrdersPage() {
           <ClipboardList className="w-8 h-8 text-primary" />
           <div>
             <h1 className="text-3xl font-bold">Pedidos</h1>
-            <p className="text-muted-foreground">Historial de pedidos (requiere acceso admin)</p>
+            <p className="text-muted-foreground">Historial de pedidos para administradores</p>
           </div>
         </div>
 
-        {loading ? (
+        {authLoading ? (
           <div className="space-y-4">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-36 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : !user || !isAdmin ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <ShieldAlert className="w-16 h-16 mx-auto mb-4 opacity-30" />
+            <p className="text-lg text-foreground">Unauthorized</p>
+            <p className="mt-2">Debes iniciar sesion como administrador para ver esta pagina.</p>
+            <Button asChild variant="outline" className="mt-6">
+              <Link to="/admin/login">Ir a login admin</Link>
+            </Button>
+          </div>
+        ) : loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-36 w-full rounded-xl" />
             ))}
           </div>
         ) : orders.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <ClipboardList className="w-16 h-16 mx-auto mb-4 opacity-30" />
-            <p className="text-lg">No hay pedidos visibles. Inicia sesión como admin para ver los pedidos.</p>
+            <p className="text-lg">No hay pedidos registrados.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -106,7 +117,7 @@ export default function OrdersPage() {
                         {status.label}
                       </Badge>
                       <Badge variant="outline">
-                        {order.order_type === 'pickup' ? '🏪 Recoger' : '🚚 Domicilio'}
+                        {order.order_type === 'pickup' ? 'Recoger' : 'Domicilio'}
                       </Badge>
                     </div>
                   </div>
@@ -116,8 +127,8 @@ export default function OrdersPage() {
                     <span className="font-bold text-primary">{formatPrice(order.total_cents)}</span>
                   </div>
 
-                  {order.address && <p className="text-xs text-muted-foreground">📍 {order.address}</p>}
-                  {order.notes && <p className="text-xs text-muted-foreground">📝 {order.notes}</p>}
+                  {order.address && <p className="text-xs text-muted-foreground">{order.address}</p>}
+                  {order.notes && <p className="text-xs text-muted-foreground">{order.notes}</p>}
                 </div>
               );
             })}
