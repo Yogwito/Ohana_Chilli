@@ -46,8 +46,8 @@ export default function ChilliPage() {
       <PageHero
         icon={Flame}
         title="Chilli"
-        subtitle="Carta definitiva"
-        description="La pagina actual de Chilli ahora muestra la carta definitiva completa, organizada por categorias y optimizada para lectura rapida en mobile."
+        subtitle="Sabor con actitud"
+        description="Burgers jugosas, fries crujientes, hot dogs y más. Todo lo que necesitas para un antojo que de verdad te llene."
         brand="chilli"
       />
 
@@ -57,8 +57,8 @@ export default function ChilliPage() {
 
           <section className="rounded-[2rem] border bg-card p-6 sm:p-8">
             <SectionHeader
-              title="Explora por categoria"
-              description="Se reutilizo el filtro existente para navegar entre burgers, fries, hot dogs, corn bowls, nachos, combos, adicionales y bebidas."
+              title="Explora por categoría"
+              description="Filtra por lo que se te antoje: burgers, fries, hot dogs, corn bowls, nachos, combos y más."
             />
             <CategoryFilter
               categories={chilliCategories}
@@ -80,14 +80,14 @@ export default function ChilliPage() {
             </div>
           ) : groupedProducts.length === 0 ? (
             <div className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">
-              No hay productos para la categoria seleccionada.
+              No hay productos para la categoría seleccionada.
             </div>
           ) : (
             groupedProducts.map(({ category, products }) => (
               <section key={category.id} id={category.slug} className="rounded-[2rem] border bg-card p-6 sm:p-8">
                 <SectionHeader
                   title={category.name}
-                  description={`Categoria ${category.name.toLowerCase()} actualizada con la carta definitiva.`}
+                  description={`Todo lo que Chilli tiene en ${category.name.toLowerCase()}, preparado al momento.`}
                 />
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {products.map((product) => (

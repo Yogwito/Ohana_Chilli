@@ -79,7 +79,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                             {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
                           </h4>
                           {item.type === 'custom-bowl' && item.customBowl && (
-                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                            <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
                               {formatBowlSummary(item.customBowl)}
                             </p>
                           )}

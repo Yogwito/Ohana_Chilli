@@ -168,7 +168,7 @@ export function useBeverages() {
   });
 }
 
-export function useIngredients(type?: Ingredient['type']) {
+export function useIngredients(type?: Ingredient['type'], options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['ingredients', type],
     queryFn: async () => {
@@ -179,6 +179,7 @@ export function useIngredients(type?: Ingredient['type']) {
       return (data ?? []).map((ingredient) => mapIngredient(ingredient as IngredientQueryRow));
     },
     staleTime: 1000 * 60 * 30,
+    enabled: options?.enabled,
   });
 }
 

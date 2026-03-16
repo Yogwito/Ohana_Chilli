@@ -1,41 +1,52 @@
 import { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Ingredient, BowlBuilderStep, BowlSizeRule, CustomBowl } from '@/types';
-import { useBowlRules, useIngredients } from '@/hooks/use-catalog';
-import { useCart } from '@/context/CartContext';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { getOfficialBowlSizes, getOfficialIngredients } from '@/config/bowlIngredients';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { useCart } from '@/context/CartContext';
+import { calculateBowlExtraCharges, calculateBowlPrice, getBowlChargeableIngredients } from '@/domain/bowlPricing';
 import { formatPrice } from '@/domain/formatPrice';
+import { cn } from '@/lib/utils';
+import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient } from '@/types';
 
 const steps: { id: BowlBuilderStep; label: string }[] = [
-  { id: 'size', label: 'Tamano' },
+  { id: 'size', label: 'Tamaño' },
   { id: 'bases', label: 'Bases' },
-  { id: 'proteins', label: 'Proteinas' },
-  { id: 'acompanantes', label: 'Acompanantes' },
+  { id: 'proteins', label: 'Proteínas' },
+  { id: 'acompanantes', label: 'Acompañantes' },
   { id: 'salsas', label: 'Salsas' },
   { id: 'complementos', label: 'Complementos' },
   { id: 'summary', label: 'Resumen' },
 ];
 
+const bowlSizes = getOfficialBowlSizes();
+const baseOptions = getOfficialIngredients('base');
+const proteinOptions = getOfficialIngredients('protein');
+const acompananteOptions = getOfficialIngredients('acompanante');
+const sauceOptions = getOfficialIngredients('sauce');
+const complementoOptions = getOfficialIngredients('topping');
+
 interface BowlBuilderProps {
   onComplete?: () => void;
 }
 
+function getSizeStructure(size: BowlSizeRule) {
+  return [
+    `${size.maxBases} base${size.maxBases !== 1 ? 's' : ''}`,
+    `${size.maxProteins} proteína${size.maxProteins !== 1 ? 's' : ''}`,
+    `${size.maxAcompanantes} acompañante${size.maxAcompanantes !== 1 ? 's' : ''}`,
+    `${size.maxSauces} salsa${size.maxSauces !== 1 ? 's' : ''}`,
+    `${size.maxComplementos} complemento${size.maxComplementos !== 1 ? 's' : ''}`,
+  ];
+}
+
+function getSelectionLabel(items: Ingredient[]) {
+  return items.length > 0 ? items.map((item) => item.name).join(', ') : 'Sin seleccionar';
+}
+
 export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const { addCustomBowl } = useCart();
-  const { data: bowlSizeRules = [], isLoading: loadingRules } = useBowlRules();
-  const { data: bases = [], isLoading: loadingBases } = useIngredients('base');
-  const { data: proteins = [], isLoading: loadingProteins } = useIngredients('protein');
-  const { data: acompanantes = [], isLoading: loadingAcompanantes } = useIngredients('acompanante');
-  const { data: sauces = [], isLoading: loadingSauces } = useIngredients('sauce');
-  const { data: complementos = [], isLoading: loadingComplementos } = useIngredients('topping');
-
-  const isLoadingData =
-    loadingRules || loadingBases || loadingProteins || loadingAcompanantes || loadingSauces || loadingComplementos;
 
   const [currentStep, setCurrentStep] = useState<BowlBuilderStep>('size');
   const [selectedSize, setSelectedSize] = useState<BowlSizeRule | null>(null);
@@ -45,26 +56,62 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const [selectedSauces, setSelectedSauces] = useState<Ingredient[]>([]);
   const [selectedComplementos, setSelectedComplementos] = useState<Ingredient[]>([]);
   const [notes, setNotes] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
 
-  const totalPrice = useMemo(() => {
-    if (!selectedSize) return 0;
-    return [
-      ...selectedBases,
-      ...selectedProteins,
-      ...selectedAcompanantes,
-      ...selectedSauces,
-      ...selectedComplementos,
-    ].reduce((sum, item) => sum + (item.price ?? 0), selectedSize.price);
-  }, [selectedAcompanantes, selectedBases, selectedComplementos, selectedProteins, selectedSauces, selectedSize]);
+  const previewBowl = useMemo<CustomBowl | null>(() => {
+    if (!selectedSize) return null;
+    return {
+      size: selectedSize,
+      bases: selectedBases,
+      proteins: selectedProteins,
+      acompanantes: selectedAcompanantes,
+      sauces: selectedSauces,
+      complementos: selectedComplementos,
+      notes: notes || undefined,
+    };
+  }, [
+    notes,
+    selectedAcompanantes,
+    selectedBases,
+    selectedComplementos,
+    selectedProteins,
+    selectedSauces,
+    selectedSize,
+  ]);
 
-  const filterBySearch = (items: Ingredient[]) => {
-    if (!searchQuery.trim()) return items;
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    return items.filter((item) => item.name.toLowerCase().includes(normalizedQuery));
-  };
+  const totalPrice = useMemo(() => {
+    if (!previewBowl) return 0;
+    return calculateBowlPrice(previewBowl);
+  }, [previewBowl]);
+
+  const extraChargeItems = useMemo(() => {
+    if (!previewBowl) return [];
+    return getBowlChargeableIngredients(previewBowl);
+  }, [previewBowl]);
+
+  const extraChargeTotal = useMemo(() => {
+    if (!previewBowl) return 0;
+    return calculateBowlExtraCharges(previewBowl);
+  }, [previewBowl]);
+
+  const summaryRows = useMemo(() => {
+    if (!previewBowl) return [];
+
+    return [
+      { label: 'Base', value: getSelectionLabel(previewBowl.bases) },
+      { label: 'Proteínas', value: getSelectionLabel(previewBowl.proteins) },
+      { label: 'Acompañantes', value: getSelectionLabel(previewBowl.acompanantes) },
+      { label: 'Salsas', value: getSelectionLabel(previewBowl.sauces ?? []) },
+      { label: 'Complementos', value: getSelectionLabel(previewBowl.complementos ?? []) },
+      {
+        label: 'Cargos extra',
+        value: extraChargeItems.length > 0
+          ? extraChargeItems.map((item) => `${item.name} (+${formatPrice(item.price ?? 0)})`).join(', ')
+          : 'Sin cargos extra',
+      },
+    ];
+  }, [extraChargeItems, previewBowl]);
 
   const resetBuilder = () => {
     setSelectedSize(null);
@@ -74,8 +121,16 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedSauces([]);
     setSelectedComplementos([]);
     setNotes('');
-    setSearchQuery('');
     setCurrentStep('size');
+  };
+
+  const resetSelectionsForSizeChange = () => {
+    setSelectedBases([]);
+    setSelectedProteins([]);
+    setSelectedAcompanantes([]);
+    setSelectedSauces([]);
+    setSelectedComplementos([]);
+    setNotes('');
   };
 
   const toggleIngredient = (
@@ -85,6 +140,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     max: number,
   ) => {
     const isSelected = selectedItems.some((item) => item.id === ingredient.id);
+
     if (isSelected) {
       setSelectedItems(selectedItems.filter((item) => item.id !== ingredient.id));
       return;
@@ -124,7 +180,6 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     const previousStep = steps[currentStepIndex - 1];
     if (!previousStep) return;
     setCurrentStep(previousStep.id);
-    setSearchQuery('');
   };
 
   const goNext = () => {
@@ -132,42 +187,43 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     const nextStep = steps[currentStepIndex + 1];
     if (!nextStep) return;
     setCurrentStep(nextStep.id);
-    setSearchQuery('');
+  };
+
+  const handleSizeSelect = (size: BowlSizeRule) => {
+    const hasChanged = selectedSize?.size !== size.size;
+    setSelectedSize(size);
+    if (hasChanged) {
+      resetSelectionsForSizeChange();
+    }
+    setCurrentStep('bases');
   };
 
   const handleSubmit = () => {
-    if (!selectedSize) return;
+    if (!previewBowl) return;
 
-    const customBowl: CustomBowl = {
-      size: selectedSize,
-      bases: selectedBases,
-      proteins: selectedProteins,
-      acompanantes: selectedAcompanantes,
-      sauces: selectedSauces,
-      complementos: selectedComplementos,
-      notes: notes || undefined,
-    };
-
-    addCustomBowl(customBowl, notes || undefined);
+    addCustomBowl(previewBowl, notes || undefined);
     toast.success('Bowl personalizado agregado al carrito', {
-      description: `${selectedSize.name} - ${formatPrice(totalPrice)}`,
+      description: `${previewBowl.size.name} - ${formatPrice(totalPrice)}`,
     });
     resetBuilder();
     onComplete?.();
   };
 
-  const CounterBadge = ({ current, max, label }: { current: number; max: number; label: string }) => (
-    <div
-      className={cn(
-        'rounded-full px-3 py-1 text-xs font-semibold',
-        current === max ? 'bg-ohana text-ohana-foreground' : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {label} {current}/{max}
-    </div>
-  );
+  const CounterBadge = ({ current, max, label }: { current: number; max: number; label: string }) => {
+    const isFull = current === max;
+    return (
+      <div
+        className={cn(
+          'rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300',
+          isFull ? 'bg-ohana text-ohana-foreground scale-105' : 'bg-muted text-muted-foreground',
+        )}
+      >
+        {label} {current}/{max}
+      </div>
+    );
+  };
 
-  const IngredientChip = ({
+  const IngredientCard = ({
     ingredient,
     isSelected,
     isDisabled,
@@ -183,14 +239,31 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       onClick={onClick}
       disabled={isDisabled && !isSelected}
       className={cn(
-        'flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors',
-        isSelected ? 'border-ohana bg-ohana/10 text-ohana-dark' : 'border-border bg-card hover:bg-muted/50',
-        isDisabled && !isSelected && 'cursor-not-allowed opacity-50',
+        'group rounded-2xl border bg-card p-4 text-left shadow-sm transition-all duration-200',
+        isSelected
+          ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
+          : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
+        isDisabled && !isSelected && 'cursor-not-allowed opacity-40',
       )}
     >
-      <span>{ingredient.name}</span>
-      {ingredient.price ? <span className="text-xs text-muted-foreground">+{formatPrice(ingredient.price)}</span> : null}
-      {isSelected ? <Check className="h-4 w-4" /> : null}
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">{ingredient.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {ingredient.price ? `+${formatPrice(ingredient.price)}` : 'Incluido'}
+          </p>
+        </div>
+        <span
+          className={cn(
+            'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
+            isSelected
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border bg-muted/50 text-transparent group-hover:border-primary/30',
+          )}
+        >
+          <Check className="h-4 w-4" />
+        </span>
+      </div>
     </button>
   );
 
@@ -201,7 +274,6 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     selectedItems,
     setSelectedItems,
     max,
-    searchPlaceholder,
     label,
   }: {
     title: string;
@@ -210,11 +282,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     selectedItems: Ingredient[];
     setSelectedItems: Dispatch<SetStateAction<Ingredient[]>>;
     max: number;
-    searchPlaceholder: string;
     label: string;
   }) => (
-    <div className="animate-fade-in">
-      <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="animate-slide-in">
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h3 className="text-xl font-semibold">{title}</h3>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
@@ -222,19 +293,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         <CounterBadge current={selectedItems.length} max={max} label={label} />
       </div>
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={searchPlaceholder}
-          className="pl-10"
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        {filterBySearch(items).map((item) => (
-          <IngredientChip
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        {items.map((item) => (
+          <IngredientCard
             key={item.id}
             ingredient={item}
             isSelected={selectedItems.some((selectedItem) => selectedItem.id === item.id)}
@@ -246,228 +307,278 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     </div>
   );
 
-  if (isLoadingData) {
-    return (
-      <div className="space-y-4 rounded-2xl border bg-card p-6 shadow-lg">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-72" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[1, 2, 3].map((item) => (
-            <Skeleton key={item} className="h-40 rounded-xl" />
-          ))}
+  const SizeSelector = () => (
+    <section className="border-b bg-muted/20 px-6 py-6">
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Paso 1</p>
+          <h3 className="text-xl font-semibold">Elige el tamaño de tu bowl</h3>
+          <p className="text-sm text-muted-foreground">
+            Una sola selección. Estas tarjetas definen el tamaño, el precio base y los límites del bowl.
+          </p>
         </div>
+        {selectedSize ? (
+          <div className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
+            Seleccionado: {selectedSize.name}
+          </div>
+        ) : null}
       </div>
-    );
-  }
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {bowlSizes.map((size) => {
+          const isSelected = selectedSize?.size === size.size;
+
+          return (
+            <button
+              key={size.size}
+              type="button"
+              onClick={() => handleSizeSelect(size)}
+              aria-pressed={isSelected}
+              className={cn(
+                'rounded-2xl border bg-card p-5 text-left shadow-sm transition-all duration-200',
+                isSelected
+                  ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
+                  : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-foreground">{size.name}</p>
+                  <p className="mt-1 text-2xl font-bold text-ohana-dark">{formatPrice(size.price)}</p>
+                </div>
+                {isSelected ? (
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-4 w-4" />
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="my-4 h-px bg-border/70" />
+
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {getSizeStructure(size).map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+
+  const progressPercent = ((currentStepIndex + 1) / steps.length) * 100;
 
   return (
     <div className="overflow-hidden rounded-[2rem] border bg-card shadow-lg">
-      <div className="bg-ohana-light p-4">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {steps.map((step, index) => {
-            const available = index <= currentStepIndex || (index === currentStepIndex + 1 && canProceed);
-            return (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => available && setCurrentStep(step.id)}
-                disabled={!available}
-                className={cn(
-                  'flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                  currentStep === step.id ? 'bg-ohana text-ohana-foreground' : 'bg-white/70 text-foreground',
-                  !available && 'opacity-50',
-                )}
-              >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/70 text-xs">
-                  {isStepComplete(step.id) && step.id !== currentStep ? <Check className="h-3 w-3" /> : index + 1}
-                </span>
-                {step.label}
-              </button>
-            );
-          })}
+      <div className="h-0.5 bg-muted">
+        <div
+          className="h-full bg-ohana transition-all duration-500 ease-out"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      <div className="border-b px-4 pb-3 pt-3">
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-thin pb-1" role="tablist">
+            {steps.map((step, index) => {
+              const isCompleted = index < currentStepIndex;
+              const isCurrent = step.id === currentStep;
+              const isUpcoming = index > currentStepIndex;
+              const available = index <= currentStepIndex || (index === currentStepIndex + 1 && canProceed);
+
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isCurrent}
+                  onClick={() => available && setCurrentStep(step.id)}
+                  disabled={!available}
+                  className={cn(
+                    'flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200',
+                    isCurrent && 'bg-ohana text-white shadow-sm',
+                    isCompleted && !isCurrent && 'bg-ohana/10 text-ohana/70',
+                    isUpcoming && 'cursor-default opacity-40',
+                  )}
+                >
+                  {isCompleted && !isCurrent ? (
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-ohana/70" />
+                  ) : null}
+                  {step.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="ml-1 shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+            {currentStepIndex + 1}/{steps.length}
+          </span>
         </div>
       </div>
 
-      <div className="p-6">
-        {currentStep === 'size' && (
-          <div className="animate-fade-in">
-            <h3 className="mb-2 text-xl font-semibold">Elige el tamano de tu bowl</h3>
-            <p className="mb-6 text-sm text-muted-foreground">Cada tamano sigue la estructura oficial de la carta definitiva.</p>
-            <div className="grid gap-4 sm:grid-cols-3">
-              {bowlSizeRules.map((size) => (
-                <button
-                  key={size.size}
-                  type="button"
-                  onClick={() => setSelectedSize(size)}
-                  className={cn(
-                    'rounded-2xl border-2 p-5 text-left transition-colors',
-                    selectedSize?.size === size.size ? 'border-ohana bg-ohana/5' : 'border-border hover:border-ohana/40',
-                  )}
-                >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-lg font-bold">{size.name}</h4>
-                      <p className="text-sm text-muted-foreground">{formatPrice(size.price)}</p>
-                    </div>
-                    {selectedSize?.size === size.size ? <Check className="h-5 w-5 text-ohana" /> : null}
+      <SizeSelector />
+
+      <div className="p-6" role="tabpanel">
+        <div key={currentStep} className="animate-slide-in">
+          {currentStep === 'size' ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center">
+              <h3 className="text-xl font-semibold">Selecciona un tamaño arriba</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Las tarjetas superiores son el único selector de tamaño. Al tocar una, avanzas directo a Bases.
+              </p>
+            </div>
+          ) : null}
+
+          {currentStep === 'bases' && selectedSize ? (
+            <StepPicker
+              title="Elige tu base"
+              subtitle="Selecciona exactamente una base. Las opciones con recargo suman al total al instante."
+              items={baseOptions}
+              selectedItems={selectedBases}
+              setSelectedItems={setSelectedBases}
+              max={selectedSize.maxBases}
+              label="Bases"
+            />
+          ) : null}
+
+          {currentStep === 'proteins' && selectedSize ? (
+            <StepPicker
+              title="Elige tus proteínas"
+              subtitle="Respeta el límite de tu tamaño. La proteína adicional suma recargo automáticamente."
+              items={proteinOptions}
+              selectedItems={selectedProteins}
+              setSelectedItems={setSelectedProteins}
+              max={selectedSize.maxProteins}
+              label="Proteínas"
+            />
+          ) : null}
+
+          {currentStep === 'acompanantes' && selectedSize ? (
+            <StepPicker
+              title="Elige tus acompañantes"
+              subtitle="Completa exactamente la cantidad incluida por tu bowl. El acompañante adicional también suma recargo."
+              items={acompananteOptions}
+              selectedItems={selectedAcompanantes}
+              setSelectedItems={setSelectedAcompanantes}
+              max={selectedSize.maxAcompanantes}
+              label="Acomp."
+            />
+          ) : null}
+
+          {currentStep === 'salsas' && selectedSize ? (
+            <StepPicker
+              title="Elige tus salsas"
+              subtitle="Selecciona la cantidad exacta de salsas incluida para tu tamaño."
+              items={sauceOptions}
+              selectedItems={selectedSauces}
+              setSelectedItems={setSelectedSauces}
+              max={selectedSize.maxSauces}
+              label="Salsas"
+            />
+          ) : null}
+
+          {currentStep === 'complementos' && selectedSize ? (
+            <StepPicker
+              title="Elige tus complementos"
+              subtitle="Estos complementos siguen la carta oficial. Croqueta veggie y queso frito suman recargo."
+              items={complementoOptions}
+              selectedItems={selectedComplementos}
+              setSelectedItems={setSelectedComplementos}
+              max={selectedSize.maxComplementos}
+              label="Compl."
+            />
+          ) : null}
+
+          {currentStep === 'summary' && selectedSize ? (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xl font-semibold">Resumen de tu bowl</h3>
+                <p className="text-sm text-muted-foreground">
+                  Revisa toda la configuración antes de agregarla al carrito.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border bg-muted/20 p-5">
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Tamaño</p>
+                    <p className="mt-1 text-lg font-semibold">{selectedSize.name}</p>
                   </div>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li>{size.maxBases} base</li>
-                    <li>{size.maxProteins} proteinas</li>
-                    <li>{size.maxAcompanantes} acompanantes</li>
-                    <li>{size.maxSauces} salsas</li>
-                    <li>{size.maxComplementos} complementos</li>
-                  </ul>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+                  <p className="text-xl font-bold text-ohana-dark">{formatPrice(selectedSize.price)}</p>
+                </div>
 
-        {currentStep === 'bases' && selectedSize && (
-          <StepPicker
-            title="Elige tu base"
-            subtitle="Selecciona exactamente las bases incluidas por tu tamano."
-            items={bases}
-            selectedItems={selectedBases}
-            setSelectedItems={setSelectedBases}
-            max={selectedSize.maxBases}
-            searchPlaceholder="Buscar bases..."
-            label="Bases"
-          />
-        )}
-
-        {currentStep === 'proteins' && selectedSize && (
-          <StepPicker
-            title="Elige tus proteinas"
-            subtitle="Las proteinas o bases premium muestran su recargo directo en el selector."
-            items={proteins}
-            selectedItems={selectedProteins}
-            setSelectedItems={setSelectedProteins}
-            max={selectedSize.maxProteins}
-            searchPlaceholder="Buscar proteinas..."
-            label="Proteinas"
-          />
-        )}
-
-        {currentStep === 'acompanantes' && selectedSize && (
-          <StepPicker
-            title="Elige tus acompanantes"
-            subtitle="Organiza tu bowl con la cantidad exacta incluida en la carta."
-            items={acompanantes}
-            selectedItems={selectedAcompanantes}
-            setSelectedItems={setSelectedAcompanantes}
-            max={selectedSize.maxAcompanantes}
-            searchPlaceholder="Buscar acompanantes..."
-            label="Acompanantes"
-          />
-        )}
-
-        {currentStep === 'salsas' && selectedSize && (
-          <StepPicker
-            title="Elige tus salsas"
-            subtitle="Selecciona la cantidad exacta de salsas incluida para tu tamano."
-            items={sauces}
-            selectedItems={selectedSauces}
-            setSelectedItems={setSelectedSauces}
-            max={selectedSize.maxSauces}
-            searchPlaceholder="Buscar salsas..."
-            label="Salsas"
-          />
-        )}
-
-        {currentStep === 'complementos' && selectedSize && (
-          <StepPicker
-            title="Elige tus complementos"
-            subtitle="Incluye texturas, toppings y complementos premium si aplican."
-            items={complementos}
-            selectedItems={selectedComplementos}
-            setSelectedItems={setSelectedComplementos}
-            max={selectedSize.maxComplementos}
-            searchPlaceholder="Buscar complementos..."
-            label="Complementos"
-          />
-        )}
-
-        {currentStep === 'summary' && selectedSize && (
-          <div className="animate-fade-in space-y-6">
-            <div>
-              <h3 className="text-xl font-semibold">Resumen de tu bowl</h3>
-              <p className="text-sm text-muted-foreground">Revisa la configuracion antes de agregarla al carrito.</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-2xl border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Tamano</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {selectedSize.name} - {formatPrice(selectedSize.price)}
-                </p>
+                <div className="space-y-4 pt-4">
+                  {summaryRows.map((row) => (
+                    <div key={row.label}>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{row.label}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-foreground">{row.value}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="rounded-2xl border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Base</p>
-                <p className="mt-1 text-sm text-muted-foreground">{selectedBases.map((item) => item.name).join(', ')}</p>
+              <div>
+                <label className="mb-2 block text-sm font-semibold">Notas adicionales</label>
+                <Textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Ej: salsa aparte, sin maní..."
+                  rows={3}
+                />
               </div>
 
-              <div className="rounded-2xl border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Proteinas</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {selectedProteins.map((item) => `${item.name}${item.price ? ` (+${formatPrice(item.price)})` : ''}`).join(', ')}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Acompanantes</p>
-                <p className="mt-1 text-sm text-muted-foreground">{selectedAcompanantes.map((item) => item.name).join(', ')}</p>
-              </div>
-
-              <div className="rounded-2xl border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Salsas</p>
-                <p className="mt-1 text-sm text-muted-foreground">{selectedSauces.map((item) => item.name).join(', ')}</p>
-              </div>
-
-              <div className="rounded-2xl border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Complementos</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {selectedComplementos.map((item) => `${item.name}${item.price ? ` (+${formatPrice(item.price)})` : ''}`).join(', ')}
-                </p>
+              <div className="rounded-2xl border bg-primary/5 p-5">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Base del bowl</span>
+                  <span>{formatPrice(selectedSize.price)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Extras</span>
+                  <span>{extraChargeTotal > 0 ? formatPrice(extraChargeTotal) : formatPrice(0)}</span>
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-4">
+                  <span className="text-base font-semibold">Total</span>
+                  <span className="text-2xl font-bold text-ohana-dark">{formatPrice(totalPrice)}</span>
+                </div>
               </div>
             </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold">Notas adicionales</label>
-              <Textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Ej: salsa aparte, sin mani..."
-                rows={3}
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-2xl bg-ohana-light p-4">
-              <span className="text-lg font-semibold">Total</span>
-              <span className="text-2xl font-bold text-ohana">{formatPrice(totalPrice)}</span>
-            </div>
-          </div>
-        )}
+          ) : null}
+        </div>
       </div>
 
-      <div className="flex items-center justify-between border-t p-4">
-        <Button variant="outline" onClick={goBack} disabled={currentStepIndex === 0}>
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Anterior
+      <div className="flex items-center justify-between gap-4 border-t p-4">
+        <Button
+          variant="ghost"
+          onClick={goBack}
+          disabled={currentStepIndex === 0}
+          className="gap-1"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Anterior</span>
         </Button>
 
-        {currentStep === 'summary' ? (
-          <Button onClick={handleSubmit} className="btn-ohana">
-            Agregar al carrito
-          </Button>
-        ) : (
-          <Button onClick={goNext} disabled={!canProceed} className="btn-ohana">
-            Siguiente
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex flex-1 flex-col items-center gap-1.5">
+          {!canProceed && currentStep !== 'summary' ? (
+            <p className="animate-fade-in text-center text-xs text-muted-foreground">
+              Completa la selección exacta para continuar
+            </p>
+          ) : null}
+
+          {currentStep === 'summary' ? (
+            <Button onClick={handleSubmit} className="btn-ohana gap-2">
+              Agregar al carrito
+            </Button>
+          ) : (
+            <Button
+              onClick={goNext}
+              disabled={!canProceed}
+              className={cn('btn-ohana gap-2', !canProceed && 'opacity-50')}
+            >
+              Siguiente
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

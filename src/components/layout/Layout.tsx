@@ -2,6 +2,7 @@ import { ReactNode, useState, lazy, Suspense } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import StickyCartFab from '@/components/cart/StickyCartFab';
+import RestaurantSchema from '@/components/RestaurantSchema';
 
 const CartDrawer = lazy(() => import('@/components/cart/CartDrawer'));
 
@@ -14,6 +15,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <RestaurantSchema />
       <Navbar />
       <main className="flex-1 pb-20 lg:pb-0">{children}</main>
       <Footer />

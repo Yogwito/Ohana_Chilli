@@ -7,6 +7,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { CartProvider } from "@/context/CartContext";
 import { lazy, Suspense } from "react";
 import Layout from "@/components/layout/Layout";
+import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import HomePage from "./pages/HomePage";
 import NotFound from "./pages/NotFound";
 
@@ -22,7 +23,15 @@ const CartaPage = lazy(() => import("./pages/CartaPage"));
 const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,  // 5 minutes
+      gcTime: 1000 * 60 * 10,    // 10 minutes
+      retry: 2,
+    },
+  },
+});
 
 const PageFallback = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -38,25 +47,23 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Suspense fallback={<PageFallback />}>
-              <Routes>
-                {/* Admin routes without Layout */}
-                <Route path="/admin/login" element={<AdminLoginPage />} />
-                <Route path="/admin" element={<AdminPage />} />
+            <Routes>
+              {/* Admin routes without Layout */}
+              <Route path="/admin/login" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><AdminLoginPage /></Suspense></ErrorBoundary>} />
+              <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><AdminPage /></Suspense></ErrorBoundary>} />
 
-                {/* Public routes with Layout */}
-                <Route path="/" element={<Layout><HomePage /></Layout>} />
-                <Route path="/ohana" element={<Layout><OhanaPage /></Layout>} />
-                <Route path="/chilli" element={<Layout><ChilliPage /></Layout>} />
-                <Route path="/bebidas" element={<Layout><BeveragesPage /></Layout>} />
-                <Route path="/checkout" element={<Layout><CheckoutPage /></Layout>} />
-                <Route path="/nosotros" element={<Layout><AboutPage /></Layout>} />
-                <Route path="/contacto" element={<Layout><ContactPage /></Layout>} />
-                <Route path="/pedidos" element={<Layout><OrdersPage /></Layout>} />
-                <Route path="/carta" element={<Layout><CartaPage /></Layout>} />
-                <Route path="*" element={<Layout><NotFound /></Layout>} />
-              </Routes>
-            </Suspense>
+              {/* Public routes with Layout */}
+              <Route path="/" element={<Layout><HomePage /></Layout>} />
+              <Route path="/ohana" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OhanaPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/chilli" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><ChilliPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/bebidas" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><BeveragesPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/checkout" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><CheckoutPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/nosotros" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><AboutPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/contacto" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><ContactPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/pedidos" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OrdersPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/carta" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><CartaPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="*" element={<Layout><NotFound /></Layout>} />
+            </Routes>
           </BrowserRouter>
         </TooltipProvider>
       </CartProvider>

@@ -1,17 +1,24 @@
 import { Suspense, lazy } from 'react';
 import { Leaf } from 'lucide-react';
-import PageHero from '@/components/layout/PageHero';
 import SEOHead from '@/components/SEOHead';
-import ProductCard from '@/components/products/ProductCard';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useBowlRules, useProducts } from '@/hooks/use-catalog';
 import MenuBrandNav from '@/components/menu/MenuBrandNav';
 import MenuContactSection from '@/components/menu/MenuContactSection';
-import { formatPrice } from '@/domain/formatPrice';
+import PageHero from '@/components/layout/PageHero';
+import ProductCard from '@/components/products/ProductCard';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useProducts } from '@/hooks/use-catalog';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 
-function SectionHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
   return (
     <div className="mb-6">
       <p className="text-sm font-semibold uppercase tracking-[0.2em] text-ohana">{eyebrow}</p>
@@ -30,7 +37,6 @@ export default function OhanaPage() {
     brandId: 'ohana',
     categoryId: 'ohana-bebidas',
   });
-  const { data: bowlRules = [], isLoading: loadingRules } = useBowlRules();
 
   return (
     <div className="min-h-screen">
@@ -43,8 +49,8 @@ export default function OhanaPage() {
       <PageHero
         icon={Leaf}
         title="Ohana Bowls"
-        subtitle="Carta definitiva"
-        description="Bowls frescos, personalizables y faciles de escanear. La pagina actual del menu ahora muestra la carta definitiva de Ohana."
+        subtitle="Bowls frescos y naturales"
+        description="Elige tus ingredientes, arma tu bowl a tu gusto o escoge uno de nuestros combos favoritos. Comida real, sin complicaciones."
         brand="ohana"
       />
 
@@ -56,26 +62,8 @@ export default function OhanaPage() {
             <SectionHeader
               eyebrow="Arma tu bowl"
               title="Configura Ohana paso a paso"
-              description="La estructura del bowl quedo actualizada con bases, proteinas, acompanantes, salsas y complementos segun la carta definitiva."
+              description="Elige tu base, proteina, acompanantes, salsa y complementos. Cada bowl se arma exactamente como lo quieres."
             />
-
-            <div className="mb-8">
-              <div className="grid gap-4 md:grid-cols-3">
-                {(loadingRules ? [] : bowlRules).map((size) => (
-                  <article key={size.size} className="rounded-2xl border bg-muted/30 p-4">
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">{size.name}</p>
-                    <p className="mt-2 text-2xl font-bold text-ohana-dark">{formatPrice(size.price)}</p>
-                    <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
-                      <li>1 base</li>
-                      <li>{size.maxProteins} proteinas</li>
-                      <li>{size.maxAcompanantes} acompanantes</li>
-                      <li>{size.maxSauces} salsas</li>
-                      <li>{size.maxComplementos} complementos</li>
-                    </ul>
-                  </article>
-                ))}
-              </div>
-            </div>
 
             <Suspense fallback={<Skeleton className="h-[520px] rounded-[2rem]" />}>
               <BowlBuilder />
@@ -86,7 +74,7 @@ export default function OhanaPage() {
             <SectionHeader
               eyebrow="Bowls sugeridos"
               title="Combinaciones listas para pedir"
-              description="Los bowls sugeridos reemplazaron por completo el catalogo anterior y se muestran como productos editables desde la fuente de datos del menu."
+              description="Combinaciones disenadas por nosotros para que llegues, elijas y disfrutes sin pensar demasiado."
             />
 
             {loadingBowls ? (
@@ -112,7 +100,7 @@ export default function OhanaPage() {
             <SectionHeader
               eyebrow="Bebidas"
               title="Acompanamientos para Ohana"
-              description="Bebidas cargadas dentro de la misma pagina actual del menu, sin duplicar rutas ni crear una segunda version."
+              description="Jugos naturales, limonadas y mas para completar tu bowl de la mejor manera."
             />
 
             {loadingBeverages ? (

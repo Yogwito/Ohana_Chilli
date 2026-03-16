@@ -29,6 +29,8 @@ export default function SEOHead({
       <meta property="og:description" content={description} />
       <meta property="og:url" content={url} />
       <meta property="og:type" content={type} />
+      <meta property="og:image" content={`${BASE_URL}/og-image.jpg`} />
+      <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
     </Helmet>

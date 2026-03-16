@@ -1,34 +1,52 @@
 import type { CustomBowl } from '@/types';
+import { formatPrice } from './formatPrice';
+import { calculateBowlExtraCharges, calculateBowlPrice, getBowlChargeableIngredients } from './bowlPricing';
 
-export function formatBowlSummary(bowl: CustomBowl): string {
-  const parts = [
-    bowl.size.name,
-    bowl.bases.map((base) => base.name).join(', '),
-    bowl.proteins.map((protein) => protein.name).join(', '),
-    `${bowl.acompanantes.length} acompanantes`,
+interface BowlSummaryRow {
+  label: string;
+  value: string;
+}
+
+function joinNames(values: string[]) {
+  return values.length > 0 ? values.join(', ') : 'Sin seleccionar';
+}
+
+export function getBowlSummaryRows(bowl: CustomBowl): BowlSummaryRow[] {
+  const rows: BowlSummaryRow[] = [
+    { label: 'Base', value: joinNames(bowl.bases.map((item) => item.name)) },
+    { label: 'Proteínas', value: joinNames(bowl.proteins.map((item) => item.name)) },
+    { label: 'Acompañantes', value: joinNames(bowl.acompanantes.map((item) => item.name)) },
+    { label: 'Salsas', value: joinNames((bowl.sauces ?? []).map((item) => item.name)) },
+    { label: 'Complementos', value: joinNames((bowl.complementos ?? []).map((item) => item.name)) },
   ];
 
-  if (bowl.sauces?.length) {
-    parts.push(`Salsas: ${bowl.sauces.map((sauce) => sauce.name).join(', ')}`);
+  const extras = getBowlChargeableIngredients(bowl).map(
+    (item) => `${item.name} (+${formatPrice(item.price ?? 0)})`,
+  );
+
+  if (extras.length > 0) {
+    rows.push({ label: 'Cargos extra', value: extras.join(', ') });
   }
 
-  if (bowl.complementos?.length) {
-    parts.push(`Complementos: ${bowl.complementos.map((complemento) => complemento.name).join(', ')}`);
+  return rows;
+}
+
+export function formatBowlSummary(bowl: CustomBowl): string {
+  const header = `${bowl.size.name} · ${formatPrice(calculateBowlPrice(bowl))}`;
+  return [header, ...getBowlSummaryRows(bowl).map((row) => `${row.label}: ${row.value}`)].join('\n');
+}
+
+export function formatBowlDetailLines(bowl: CustomBowl): string[] {
+  const lines = getBowlSummaryRows(bowl).map((row) => `${row.label}: ${row.value}`);
+  const extraTotal = calculateBowlExtraCharges(bowl);
+
+  if (extraTotal > 0) {
+    lines.push(`Extras: ${formatPrice(extraTotal)}`);
   }
 
-  return parts.join(' • ');
+  return lines;
 }
 
 export function formatBowlDetail(bowl: CustomBowl): string {
-  let detail = `${bowl.size.name}: ${bowl.bases.map((base) => base.name).join(', ')} + ${bowl.proteins.map((protein) => protein.name).join(', ')} + ${bowl.acompanantes.map((acompanante) => acompanante.name).join(', ')}`;
-
-  if (bowl.sauces?.length) {
-    detail += ` + Salsas: ${bowl.sauces.map((sauce) => sauce.name).join(', ')}`;
-  }
-
-  if (bowl.complementos?.length) {
-    detail += ` + Complementos: ${bowl.complementos.map((complemento) => complemento.name).join(', ')}`;
-  }
-
-  return detail;
+  return [`Bowl ${bowl.size.name}`, ...formatBowlDetailLines(bowl), `Total: ${formatPrice(calculateBowlPrice(bowl))}`].join('\n');
 }

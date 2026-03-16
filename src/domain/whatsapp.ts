@@ -1,6 +1,6 @@
 import type { CartItem } from '@/types';
 import { formatPrice } from './formatPrice';
-import { formatBowlDetail } from './bowlSummary';
+import { formatBowlDetailLines } from './bowlSummary';
 
 interface OrderInfo {
   name: string;
@@ -40,8 +40,11 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
     if (item.type === 'product' && item.product) {
       lines.push(`${brand} ${item.quantity}x ${item.product.name} - ${formatPrice(item.totalPrice)}`);
     } else if (item.type === 'custom-bowl' && item.customBowl) {
-      lines.push(`${brand} 1x Bowl Personalizado - ${formatPrice(item.totalPrice)}`);
-      lines.push(`   - ${formatBowlDetail(item.customBowl)}`);
+      lines.push(`${brand} 1x Bowl ${item.customBowl.size.name} - ${formatPrice(item.totalPrice)}`);
+      formatBowlDetailLines(item.customBowl).forEach((line) => {
+        lines.push(`   ${line}`);
+      });
+      lines.push(`   Total bowl: ${formatPrice(item.totalPrice)}`);
     }
     if (item.notes) lines.push(`   - Nota: ${item.notes}`);
   });
