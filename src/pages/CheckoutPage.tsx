@@ -39,17 +39,31 @@ import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
 import { buildWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import type { PaymentMethod } from '@/types';
+
+const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Nequi', 'Daviplata'];
+
+function buildOrderNotes(paymentMethod: PaymentMethod, notes?: string) {
+  return [`Metodo de pago: ${paymentMethod}`, notes?.trim() ? `Notas: ${notes.trim()}` : null]
+    .filter(Boolean)
+    .join('\n');
+}
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
   phone: z.string().regex(/^\+?[\d\s-]{10,}$/, 'Ingresa un número de teléfono válido'),
   orderType: z.enum(['pickup', 'delivery']),
+  paymentMethod: z.enum(PAYMENT_METHOD_OPTIONS, {
+    required_error: 'Selecciona un mÃ©todo de pago',
+    invalid_type_error: 'Selecciona un mÃ©todo de pago',
+  }),
   address: z.string().optional(),
   deliveryZone: z.string().optional(),
   notes: z.string().max(500).optional(),
 });
 
-type CheckoutForm = z.infer<typeof checkoutSchema>;
+type CheckoutFormData = z.infer<typeof checkoutSchema>;
+type CheckoutForm = Omit<CheckoutFormData, 'paymentMethod'> & { paymentMethod: PaymentMethod | '' };
 type OrderStatus = 'idle' | 'submitting' | 'created';
 type WhatsAppOpenStatus = 'idle' | 'opening' | 'opened' | 'failed';
 
@@ -79,6 +93,7 @@ export default function CheckoutPage() {
     name: '',
     phone: '',
     orderType: 'pickup',
+    paymentMethod: '',
     address: '',
     deliveryZone: '',
     notes: '',
@@ -162,12 +177,15 @@ export default function CheckoutPage() {
     if (!result.success) {
       const fieldErrors: Partial<Record<keyof CheckoutForm, string>> = {};
       result.error.errors.forEach((err) => {
-        fieldErrors[err.path[0] as keyof CheckoutForm] = err.message;
+        const field = err.path[0] as keyof CheckoutForm;
+        fieldErrors[field] = field === 'paymentMethod' ? 'Selecciona un mÃ©todo de pago' : err.message;
       });
       setErrors(fieldErrors);
       setSubmitError('Revisa los campos marcados antes de enviar tu pedido.');
       return;
     }
+
+    const validatedForm = result.data;
 
     if (form.orderType === 'delivery' && !form.address) {
       setErrors((prev) => ({ ...prev, address: 'La dirección es requerida para entregas a domicilio' }));
@@ -232,6 +250,7 @@ export default function CheckoutPage() {
       }
 
       const finalOrderTotal = orderSubtotal + resolvedDeliveryFeeCents;
+      const persistedOrderNotes = buildOrderNotes(validatedForm.paymentMethod, form.notes);
       const orderItems = cart.items.map((item) => ({
         brand_id: item.brand,
         name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
@@ -246,9 +265,10 @@ export default function CheckoutPage() {
                 acompanantes: item.customBowl.acompanantes.map((a) => a.name),
                 sauces: item.customBowl.sauces?.map((s) => s.name),
                 complementos: item.customBowl.complementos?.map((c) => c.name),
+                payment_method: validatedForm.paymentMethod,
                 notes: item.notes,
               }
-            : { product_id: item.product?.id, notes: item.notes },
+            : { product_id: item.product?.id, payment_method: validatedForm.paymentMethod, notes: item.notes },
       }));
 
       const newOrderId = crypto.randomUUID();
@@ -261,7 +281,7 @@ export default function CheckoutPage() {
         address: form.address || null,
         delivery_zone: form.orderType === 'delivery' ? resolvedDeliveryZone || null : null,
         delivery_fee_cents: resolvedDeliveryFeeCents,
-        notes: form.notes || null,
+        notes: persistedOrderNotes || null,
         total_cents: finalOrderTotal,
       });
 
@@ -288,6 +308,7 @@ export default function CheckoutPage() {
         name: form.name,
         phone: form.phone,
         orderType: form.orderType,
+        paymentMethod: validatedForm.paymentMethod,
         address: form.address,
         deliveryZone: resolvedDeliveryZone,
         deliveryFeeCents: resolvedDeliveryFeeCents,
@@ -623,6 +644,34 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+              <div className="relative pl-4">
+                <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-ohana" />
+                <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Pago</h3>
+                <div>
+                  <Label htmlFor="payment-method">Método de pago</Label>
+                  <p className="mt-1 text-sm text-muted-foreground">Selecciona cómo vas a pagar tu pedido</p>
+                  <Select
+                    value={form.paymentMethod || undefined}
+                    onValueChange={(value) => updateField('paymentMethod', value as PaymentMethod)}
+                  >
+                    <SelectTrigger
+                      id="payment-method"
+                      className={cn('rounded-xl h-11 mt-3', errors.paymentMethod ? 'border-destructive' : '')}
+                    >
+                      <SelectValue placeholder="Selecciona un método de pago" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHOD_OPTIONS.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {method}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.paymentMethod && <p className="text-sm text-destructive mt-1">{errors.paymentMethod}</p>}
+                </div>
+              </div>
+
               {/* Notes */}
               <div className="relative pl-4">
                 <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-muted" />
@@ -742,6 +791,12 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                 )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Método de pago</span>
+                  <span className={form.paymentMethod ? '' : 'text-amber-700'}>
+                    {form.paymentMethod || 'Selecciona uno'}
+                  </span>
+                </div>
                 <div className="flex justify-between font-bold text-base pt-1">
                   <span>Total</span>
                   <span className="text-ohana-dark">{formatPrice(orderTotal)}</span>

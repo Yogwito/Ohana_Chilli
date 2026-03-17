@@ -17,6 +17,8 @@ export interface DeliveryZone {
   feeCents: number;
 }
 
+export type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Nequi' | 'Daviplata';
+
 // Ingredient Types for Bowl Builder
 export interface Ingredient {
   id: string;
@@ -102,6 +104,7 @@ export interface CustomerInfo {
   name: string;
   phone: string;
   orderType: 'pickup' | 'delivery';
+  paymentMethod?: PaymentMethod;
   address?: string;
   deliveryZone?: string;
   deliveryFeeCents?: number;

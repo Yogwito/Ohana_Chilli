@@ -1,4 +1,4 @@
-import type { CartItem } from '@/types';
+import type { CartItem, PaymentMethod } from '@/types';
 import { formatPrice } from './formatPrice';
 import { formatBowlDetailLines } from './bowlSummary';
 
@@ -6,6 +6,7 @@ interface OrderInfo {
   name: string;
   phone: string;
   orderType: 'pickup' | 'delivery';
+  paymentMethod: PaymentMethod;
   address?: string;
   deliveryZone?: string;
   deliveryFeeCents?: number;
@@ -22,6 +23,7 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
     `Cliente: ${info.name}`,
     `Telefono: ${info.phone}`,
     `Tipo: ${info.orderType === 'pickup' ? 'Recoger en sucursal' : 'Entrega a domicilio'}`,
+    `Metodo de pago: ${info.paymentMethod}`,
   ];
 
   if (info.orderType === 'delivery') {
