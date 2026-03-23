@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProductCard from '@/components/products/ProductCard';
 import PageHero from '@/components/layout/PageHero';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,6 +9,9 @@ import { GlassWater } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
 
 export default function BeveragesPage() {
+  const navigate = useNavigate();
+  useEffect(() => { navigate('/ohana#bebidas', { replace: true }); }, [navigate]);
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { data: beverageCategories = [] } = useBeverageCategories();
   const { data: beverages = [], isLoading, error } = useBeverages();
@@ -23,12 +27,12 @@ export default function BeveragesPage() {
 
   return (
     <div className="min-h-screen">
-      <SEOHead title="Bebidas" description="Refrescos, jugos naturales, smoothies y más. Complementa tu orden con las bebidas de Ohana & Chilli." path="/bebidas" />
+      <SEOHead title="Bebidas" description="Refrescos, jugos naturales, smoothies y más. Complementa tu orden con las bebidas de Ohana Bowls." path="/bebidas" />
       <PageHero
         icon={GlassWater}
         title="Bebidas"
         subtitle="Refrescos, cerveza y café"
-        description="Complementa tu orden con bebidas de la carta oficial de Ohana y Chilli."
+        description="Complementa tu orden con nuestras bebidas."
         brand="beverages"
       />
 

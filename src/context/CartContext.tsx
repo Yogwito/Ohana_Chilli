@@ -6,12 +6,12 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 
 // ─── Cart validation schema (versioned) ─────────────────
-const CART_VERSION = 'cart:v2';
-const CART_STORAGE_KEY = 'ohana-chilli-cart';
+const CART_VERSION = 'cart:v3';
+const CART_STORAGE_KEY = 'ohana-bowls-cart';
 
 const cartItemSchema = z.object({
   id: z.string(),
-  brand: z.enum(['ohana', 'chilli']),
+  brand: z.enum(['ohana']),
   type: z.enum(['product', 'custom-bowl']),
   product: z.any().optional().nullable(),
   customBowl: z.any().optional().nullable(),

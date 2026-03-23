@@ -7,9 +7,9 @@ interface SEOHeadProps {
   type?: string;
 }
 
-const SITE_NAME = 'Ohana & Chilli';
+const SITE_NAME = 'Ohana Bowls';
 const BASE_URL = 'https://ohanachilli.com';
-const DEFAULT_DESCRIPTION = 'Restaurante en Manizales con bowls frescos personalizables y comida Tex-Mex. Pide a domicilio o recoge en sucursal.';
+const DEFAULT_DESCRIPTION = 'Restaurante en Manizales con bowls frescos personalizables. Pide a domicilio o recoge en sucursal.';
 
 export default function SEOHead({
   title,
@@ -17,7 +17,7 @@ export default function SEOHead({
   path = '/',
   type = 'website',
 }: SEOHeadProps) {
-  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} | Bowls Frescos y Comida Tex-Mex en Manizales`;
+  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} | Bowls Frescos en Manizales`;
   const url = `${BASE_URL}${path}`;
 
   return (

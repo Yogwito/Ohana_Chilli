@@ -18,7 +18,6 @@ interface ProductCardProps {
 
 const BRAND_LABEL: Record<Brand, string> = {
   ohana: 'Ohana',
-  chilli: 'Chilli',
 };
 
 const CATEGORY_TOKEN_LABELS: Record<string, string> = {
@@ -42,7 +41,6 @@ export default function ProductCard({ product, variant = 'default', categoryName
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [added, setAdded] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const isOhana = product.brand === 'ohana';
 
   const descriptionText = product.description.trim();
   const ingredientsText = useMemo(() => {
@@ -70,32 +68,27 @@ export default function ProductCard({ product, variant = 'default', categoryName
       <article
         className={cn(
           'group flex items-center gap-3 rounded-xl border bg-card p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-          isOhana ? 'border-ohana/15 hover:border-ohana/40' : 'border-chilli-dark/15 hover:border-chilli-dark/40',
+          'border-ohana/15 hover:border-ohana/40',
         )}
       >
         <div
           className={cn(
             'w-12 h-12 rounded-lg flex items-center justify-center shrink-0 text-2xl font-black opacity-60',
-            isOhana ? 'bg-ohana/10 text-ohana' : 'bg-chilli-dark/10 text-chilli-dark',
+            'bg-ohana/10 text-ohana',
           )}
         >
           {product.name.charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold tracking-tight truncate">{product.name}</p>
-          <p className={cn('text-sm font-bold', isOhana ? 'text-ohana-dark' : 'text-chilli-dark')}>
+          <p className="text-sm font-bold text-ohana-dark">
             {formatPrice(product.price)}
           </p>
         </div>
         <Button
           onClick={handleAddToCart}
           size="icon"
-          className={cn(
-            'rounded-full h-8 w-8 shrink-0 transition-all duration-200',
-            isOhana
-              ? 'bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white'
-              : 'bg-chilli-dark/10 text-chilli-dark hover:bg-chilli-dark hover:text-white',
-          )}
+          className="rounded-full h-8 w-8 shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
         >
           {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
         </Button>
@@ -107,13 +100,12 @@ export default function ProductCard({ product, variant = 'default', categoryName
     <>
       <article
         className={cn(
-          'group flex flex-col rounded-xl overflow-hidden border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-          isOhana ? 'border-ohana/15 hover:border-ohana/40' : 'border-chilli-dark/15 hover:border-chilli-dark/40',
+          'group flex flex-col rounded-2xl overflow-hidden border border-border/60 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-brand/20',
         )}
       >
-        {/* Image or color header strip */}
+        {/* Image or muted fallback */}
         {product.imageUrl ? (
-          <div className="relative aspect-video overflow-hidden">
+          <div className="relative aspect-[4/3] overflow-hidden bg-brand-muted">
             {!imageLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
             <img
               src={product.imageUrl}
@@ -121,45 +113,22 @@ export default function ProductCard({ product, variant = 'default', categoryName
               loading="lazy"
               onLoad={() => setImageLoaded(true)}
               className={cn(
-                'w-full h-full object-cover transition-opacity duration-300',
+                'w-full h-full object-cover transition-all duration-300 group-hover:scale-105',
                 imageLoaded ? 'opacity-100' : 'opacity-0',
               )}
             />
           </div>
         ) : (
-          <div
-            className={cn(
-              'h-16 flex items-center justify-center overflow-hidden',
-              isOhana
-                ? 'bg-gradient-to-r from-ohana to-ohana-dark'
-                : 'bg-gradient-to-r from-chilli to-chilli-dark',
-            )}
-          >
-            <span className="text-7xl font-black text-white/10 select-none leading-none">
-              {product.name.charAt(0)}
-            </span>
-          </div>
+          <div className="h-16 bg-brand-muted" />
         )}
 
         <div className="flex flex-col flex-1 p-4 gap-2">
-          {/* Category badge */}
-          <span
-            className={cn(
-              'self-start text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wide',
-              isOhana
-                ? 'bg-ohana/10 text-ohana-dark border border-ohana/20'
-                : 'bg-chilli-dark/10 text-chilli-dark border border-chilli-dark/20',
-            )}
-          >
-            {resolvedCategoryName}
-          </span>
-
           {/* Name */}
-          <h3 className="text-base font-semibold tracking-tight leading-tight">{product.name}</h3>
+          <h3 className="font-display font-bold text-base leading-snug tracking-tight">{product.name}</h3>
 
           {/* Description */}
           {hasDetailContent && (
-            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed flex-1">
               {descriptionText || ingredientsText}
             </p>
           )}
@@ -174,38 +143,47 @@ export default function ProductCard({ product, variant = 'default', categoryName
             </button>
           )}
 
-          {/* Footer: price + badges + button */}
-          <div className="mt-auto pt-2">
-            <div className="flex items-center gap-2 mb-3">
-              <span className={cn('text-lg font-bold', isOhana ? 'text-ohana-dark' : 'text-chilli-dark')}>
-                {formatPrice(product.price)}
-              </span>
-              <div className="flex items-center gap-1.5 ml-auto">
+          {/* Price row + add button */}
+          <div className="flex items-center justify-between mt-auto pt-2">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base text-brand-dark">{formatPrice(product.price)}</span>
+              <div className="flex items-center gap-1">
                 {product.isVegan && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Vegano" />}
                 {product.isGlutenFree && <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Sin gluten" />}
-                {product.isPopular && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
+                {product.isPopular && <Star className="w-3 h-3 text-amber-500 fill-amber-500" />}
                 {product.isNew && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium border border-blue-200">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium border border-blue-200">
                     nuevo
                   </span>
                 )}
               </div>
             </div>
 
+            {/* Desktop: icon button */}
             <Button
               onClick={handleAddToCart}
+              size="icon"
               className={cn(
-                'w-full rounded-full h-10 font-semibold transition-all duration-200',
-                added && 'scale-105',
-                isOhana
-                  ? 'bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white'
-                  : 'bg-chilli-dark/10 text-chilli-dark hover:bg-chilli-dark hover:text-white',
+                'hidden sm:flex h-9 w-9 rounded-full bg-brand text-white hover:bg-brand-dark transition-all duration-200 shrink-0',
+                added && 'scale-110',
               )}
+              aria-label="Agregar al carrito"
             >
-              {added ? <Check className="h-4 w-4 mr-1.5 animate-scale-in" /> : <Plus className="h-4 w-4 mr-1.5" />}
-              {added ? '¡Agregado!' : 'Agregar'}
+              {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             </Button>
           </div>
+
+          {/* Mobile: full-width button */}
+          <Button
+            onClick={handleAddToCart}
+            className={cn(
+              'sm:hidden w-full h-10 rounded-xl font-semibold bg-brand/10 text-brand-dark hover:bg-brand hover:text-white transition-all duration-200',
+              added && 'scale-[1.02]',
+            )}
+          >
+            {added ? <Check className="h-4 w-4 mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}
+            {added ? '¡Agregado!' : 'Agregar'}
+          </Button>
         </div>
       </article>
 

@@ -84,6 +84,7 @@ export type Database = {
           id: string
           name: string
           slug: string | null
+          sort_order: number | null
         }
         Insert: {
           brand_id: string
@@ -91,6 +92,7 @@ export type Database = {
           id: string
           name: string
           slug?: string | null
+          sort_order?: number | null
         }
         Update: {
           brand_id?: string
@@ -98,6 +100,7 @@ export type Database = {
           id?: string
           name?: string
           slug?: string | null
+          sort_order?: number | null
         }
         Relationships: [
           {

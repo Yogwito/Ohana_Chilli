@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "mcp__claude_ai_Supabase__get_project",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Read(//mnt/skills/**)",
+      "Bash(npm run:*)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(node:*)",
+      "Bash(ls node_modules/lucide-react/dist/*.js)"
     ]
   }
 }

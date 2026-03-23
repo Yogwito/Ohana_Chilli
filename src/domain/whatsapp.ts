@@ -11,18 +11,25 @@ interface OrderInfo {
   deliveryFeeCents?: number;
   notes?: string;
   orderId: string;
+  paymentMethod?: 'cash' | 'transfer';
 }
 
 export function generateWhatsAppMessage(items: CartItem[], total: number, info: OrderInfo): string {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const lines = [
-    'Nueva Orden - Ohana & Chilli',
+    'Nueva Orden - Ohana Bowls',
     `Ref: ${info.orderId.slice(0, 8).toUpperCase()}`,
     '',
     `Cliente: ${info.name}`,
     `Telefono: ${info.phone}`,
     `Tipo: ${info.orderType === 'pickup' ? 'Recoger en sucursal' : 'Entrega a domicilio'}`,
   ];
+
+  if (info.paymentMethod) {
+    lines.push(
+      `Pago: ${info.paymentMethod === 'cash' ? 'Contra entrega' : 'Transferencia bancaria'}`
+    );
+  }
 
   if (info.orderType === 'delivery') {
     if (info.address) {
@@ -36,7 +43,7 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
   lines.push('', 'Productos:');
 
   items.forEach((item) => {
-    const brand = item.brand === 'ohana' ? '[Ohana]' : '[Chilli]';
+    const brand = '[Ohana]';
     if (item.type === 'product' && item.product) {
       lines.push(`${brand} ${item.quantity}x ${item.product.name} - ${formatPrice(item.totalPrice)}`);
     } else if (item.type === 'custom-bowl' && item.customBowl) {
@@ -70,6 +77,15 @@ export function buildWhatsAppUrl(phone: string, message: string): string {
   const encodedMessage = encodeURIComponent(message);
   // Only use wa.me — never api.whatsapp.com.
   return `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
+}
+
+export function buildPlatformWhatsAppUrl(
+  phone: string,
+  message: string,
+): { url: string; platform: 'mobile' | 'desktop' } {
+  const url = buildWhatsAppUrl(phone, message);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  return { url, platform: isMobile ? 'mobile' : 'desktop' };
 }
 
 // ─── Embed detection ─────────────────────────────────────────────────────────

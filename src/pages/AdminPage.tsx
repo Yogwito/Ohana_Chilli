@@ -15,7 +15,7 @@ import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deli
 import { formatPrice } from '@/domain/formatPrice';
 import {
   LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
-  Leaf, Flame, Search, Truck, Upload, BarChart3,
+  Leaf, Search, Truck, Upload, BarChart3,
 } from 'lucide-react';
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 
@@ -67,7 +67,7 @@ export default function AdminPage() {
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container flex h-14 items-center justify-between">
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-ohana">Ohana</span>&<span className="text-chilli-dark">Chilli</span>
+            <span className="text-brand font-display font-black">Ohana Bowls</span>
             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Admin</span>
           </h1>
           <div className="flex items-center gap-2">
@@ -226,8 +226,8 @@ function ProductsAdmin() {
           ) : (
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${p.brand_id === 'ohana' ? 'bg-ohana/10' : 'bg-chilli/10'}`}>
-                  {p.brand_id === 'ohana' ? <Leaf className="w-4 h-4 text-ohana" /> : <Flame className="w-4 h-4 text-chilli-dark" />}
+                <div className="w-8 h-8 rounded flex items-center justify-center shrink-0 bg-ohana/10">
+                  <Leaf className="w-4 h-4 text-ohana" />
                 </div>
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{p.name}</p>

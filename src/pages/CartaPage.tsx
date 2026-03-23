@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Leaf, Flame, Coffee, MapPin, Phone, Clock, Instagram, MessageCircle, ChevronDown, Star, Users, Plus } from 'lucide-react';
+import { Search, Leaf, Coffee, MapPin, Phone, Clock, Instagram, MessageCircle, ChevronDown, Star, Plus } from 'lucide-react';
 import { useProducts, useCategories, useBowlRules, useIngredients, useBeverages, useBeverageCategories } from '@/hooks/use-catalog';
 import { useCart } from '@/context/CartContext';
 import { formatPrice } from '@/domain/formatPrice';
@@ -12,15 +12,10 @@ import { trackEvent } from '@/lib/analytics';
 import type { Product, Ingredient, BowlSizeRule } from '@/types';
 
 /* ─── helpers ─── */
-const BRAND_TABS = [
-  { id: 'ohana' as const, label: 'Ohana Bowls', icon: Leaf, accent: 'ohana' },
-  { id: 'chilli' as const, label: 'Chilli', icon: Flame, accent: 'chilli' },
-] as const;
 
 /* ─── mini product card for the carta ─── */
 function MenuItemCard({ product, categoryName }: { product: Product; categoryName?: string }) {
   const { addProduct } = useCart();
-  const isOhana = product.brand === 'ohana';
 
   const handleAdd = () => {
     addProduct(product);
@@ -29,23 +24,14 @@ function MenuItemCard({ product, categoryName }: { product: Product; categoryNam
   };
 
   return (
-    <article className={cn(
-      'group relative flex flex-col rounded-2xl border bg-card p-4 gap-2 transition-all duration-200 hover:shadow-lg',
-      isOhana ? 'border-ohana/10 hover:border-ohana/30' : 'border-chilli-dark/10 hover:border-chilli-dark/30',
-    )}>
+    <article className="group relative flex flex-col rounded-2xl border bg-card p-4 gap-2 transition-all duration-200 hover:shadow-lg border-ohana/10 hover:border-ohana/30">
       {/* top accent line */}
-      <div className={cn(
-        'absolute top-0 left-4 right-4 h-0.5 rounded-b-full',
-        isOhana ? 'bg-gradient-to-r from-ohana/60 to-ohana-dark/60' : 'bg-gradient-to-r from-chilli/60 to-chilli-dark/60',
-      )} />
+      <div className="absolute top-0 left-4 right-4 h-0.5 rounded-b-full bg-gradient-to-r from-ohana/60 to-ohana-dark/60" />
 
       {/* name + price */}
       <div className="flex items-start justify-between gap-3">
         <h4 className="font-semibold text-sm sm:text-base leading-tight">{product.name}</h4>
-        <span className={cn(
-          'shrink-0 font-bold tabular-nums text-sm sm:text-base whitespace-nowrap',
-          isOhana ? 'text-ohana-dark' : 'text-chilli-dark',
-        )}>
+        <span className="shrink-0 font-bold tabular-nums text-sm sm:text-base whitespace-nowrap text-ohana-dark">
           {formatPrice(product.price)}
         </span>
       </div>
@@ -78,12 +64,7 @@ function MenuItemCard({ product, categoryName }: { product: Product; categoryNam
       <Button
         onClick={handleAdd}
         size="sm"
-        className={cn(
-          'w-full mt-1 rounded-xl font-medium min-h-[40px] active:scale-[0.97] transition-all',
-          isOhana
-            ? 'bg-ohana text-ohana-foreground hover:bg-ohana-dark shadow-sm shadow-ohana/20'
-            : 'bg-gradient-to-r from-chilli to-chilli-dark text-chilli-foreground hover:from-chilli-dark hover:to-chilli-dark shadow-sm shadow-chilli-dark/20',
-        )}
+        className="w-full mt-1 rounded-xl font-medium min-h-[40px] active:scale-[0.97] transition-all bg-ohana text-ohana-foreground hover:bg-ohana-dark shadow-sm shadow-ohana/20"
       >
         <Plus className="h-4 w-4 mr-1" /> Agregar
       </Button>
@@ -177,18 +158,11 @@ function BowlBuilderSection({ rules, ingredients }: { rules: BowlSizeRule[]; ing
 }
 
 /* ─── category section ─── */
-function CategorySection({ name, products, brand }: { name: string; products: Product[]; brand: 'ohana' | 'chilli' }) {
-  const isOhana = brand === 'ohana';
+function CategorySection({ name, products }: { name: string; products: Product[] }) {
   return (
     <section className="space-y-3">
-      <h3 className={cn(
-        'text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2',
-        isOhana ? 'text-ohana-dark' : 'text-chilli-dark',
-      )}>
-        <span className={cn(
-          'w-1 h-6 rounded-full',
-          isOhana ? 'bg-ohana' : 'bg-chilli-dark',
-        )} />
+      <h3 className="text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2 text-ohana-dark">
+        <span className="w-1 h-6 rounded-full bg-ohana" />
         {name}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -216,22 +190,19 @@ function MenuSkeleton() {
 
 /* ─── main page ─── */
 export default function CartaPage() {
-  const [activeBrand, setActiveBrand] = useState<'ohana' | 'chilli'>('ohana');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Data
   const { data: ohanaProducts = [], isLoading: loadingOhana } = useProducts({ brandId: 'ohana' });
-  const { data: chilliProducts = [], isLoading: loadingChilli } = useProducts({ brandId: 'chilli' });
   const { data: ohanaCategories = [] } = useCategories('ohana');
-  const { data: chilliCategories = [] } = useCategories('chilli');
   const { data: bowlRules = [] } = useBowlRules();
   const { data: ingredients = [] } = useIngredients();
   const { data: beverages = [], isLoading: loadingBeverages } = useBeverages();
   const { data: beverageCategories = [] } = useBeverageCategories();
 
-  const isLoading = activeBrand === 'ohana' ? loadingOhana : loadingChilli;
-  const allProducts = activeBrand === 'ohana' ? ohanaProducts : chilliProducts;
-  const categories = activeBrand === 'ohana' ? ohanaCategories : chilliCategories;
+  const isLoading = loadingOhana;
+  const allProducts = ohanaProducts;
+  const categories = ohanaCategories;
 
   // Filter by search
   const filtered = useMemo(() => {
@@ -288,18 +259,17 @@ export default function CartaPage() {
     return beverages.filter((b) => b.name.toLowerCase().includes(q));
   }, [beverages, searchTerm]);
 
-  // Check if ohana premade category is excluded from bowl builder display
-  const showBowlBuilder = activeBrand === 'ohana' && bowlRules.length > 0 && ingredients.length > 0;
+  const showBowlBuilder = bowlRules.length > 0 && ingredients.length > 0;
 
   return (
     <>
       <SEOHead
-        title="Carta — Ohana Bowls & Chilli"
-        description="Menú completo de Ohana Bowls y Chilli. Bowls personalizados, hamburguesas, hot dogs, papas y más. Pide por WhatsApp."
+        title="Carta — Ohana Bowls"
+        description="Menú completo de Ohana Bowls. Bowls personalizados y bebidas. Pide por WhatsApp."
       />
 
       {/* ─── hero ─── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-ohana-light via-background to-chilli-muted/40 border-b border-border">
+      <section className="relative overflow-hidden bg-ohana-gradient border-b border-ohana/15">
         <div className="container py-10 sm:py-14">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-2">Nuestra carta</p>
@@ -307,42 +277,16 @@ export default function CartaPage() {
               Menú Completo
             </h1>
             <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-              Dos marcas, un solo lugar. Explora bowls saludables, hamburguesas artesanales, papas cargadas y mucho más.
+              Explora bowls saludables y personalizables, y mucho más.
             </p>
           </div>
         </div>
-        {/* decorative circles */}
         <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-ohana/5 blur-3xl" />
-        <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-chilli/5 blur-3xl" />
       </section>
 
       <div className="container py-6 sm:py-8 space-y-6">
-        {/* ─── brand tabs + search ─── */}
+        {/* ─── search ─── */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          {/* tabs */}
-          <div className="flex gap-2">
-            {BRAND_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeBrand === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveBrand(tab.id)}
-                  className={cn(
-                    'flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200',
-                    isActive && tab.accent === 'ohana' && 'bg-ohana text-ohana-foreground shadow-md shadow-ohana/25',
-                    isActive && tab.accent === 'chilli' && 'bg-gradient-to-r from-chilli to-chilli-dark text-chilli-foreground shadow-md shadow-chilli-dark/25',
-                    !isActive && 'bg-muted text-muted-foreground hover:bg-muted/80',
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* search */}
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -376,7 +320,6 @@ export default function CartaPage() {
                 key={group.catId}
                 name={group.name}
                 products={group.products}
-                brand={activeBrand}
               />
             ))}
           </div>
@@ -411,7 +354,7 @@ export default function CartaPage() {
         ) : null}
 
         {/* ─── WhatsApp CTA ─── */}
-        <section className="rounded-2xl bg-gradient-to-r from-ohana/10 via-background to-chilli/10 border border-border p-6 sm:p-8 text-center space-y-4">
+        <section className="rounded-2xl bg-gradient-to-r from-ohana/10 via-background to-brand-muted border border-border p-6 sm:p-8 text-center space-y-4">
           <h2 className="text-xl sm:text-2xl font-bold">¿Listo para pedir?</h2>
           <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto">
             Arma tu pedido y envíalo por WhatsApp. También puedes visitarnos en el local.
@@ -460,7 +403,7 @@ export default function CartaPage() {
               <Instagram className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
               <div>
                 <p className="font-medium text-foreground">Redes</p>
-                <a href="#" className="hover:text-foreground transition-colors">@ohana_chilli</a>
+                <a href="#" className="hover:text-foreground transition-colors">@bowlsohana</a>
               </div>
             </div>
           </div>

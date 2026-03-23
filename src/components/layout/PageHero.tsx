@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 
-type BrandVariant = 'ohana' | 'chilli' | 'beverages' | 'neutral';
+type BrandVariant = 'ohana' | 'beverages' | 'neutral';
 
 interface PageHeroProps {
   icon: LucideIcon;
@@ -17,18 +17,13 @@ const brandStyles: Record<BrandVariant, { section: string; iconWrap: string; tit
     iconWrap: 'rounded-full bg-gradient-to-br from-ohana to-ohana-dark shadow-lg shadow-ohana/30',
     title: 'text-ohana-dark',
   },
-  chilli: {
-    section: 'bg-chilli-gradient border-b border-chilli-dark/15',
-    iconWrap: 'rounded-lg bg-gradient-to-r from-chilli to-chilli-dark shadow-lg shadow-chilli-dark/40',
-    title: 'text-chilli-dark',
-  },
   beverages: {
-    section: 'bg-gradient-to-br from-ohana-light/40 via-background to-chilli-muted/40 border-b border-border',
+    section: 'bg-gradient-to-br from-ohana-light/40 via-background to-brand-muted/40 border-b border-border',
     iconWrap: 'rounded-2xl bg-primary/10',
     title: 'text-foreground',
   },
   neutral: {
-    section: 'bg-gradient-to-br from-ohana-light via-background to-chilli-muted border-b border-border',
+    section: 'bg-gradient-to-br from-ohana-light via-background to-brand-muted border-b border-border',
     iconWrap: 'rounded-2xl bg-primary/10',
     title: 'text-foreground',
   },

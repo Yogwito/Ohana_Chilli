@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
               <Lock className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-2xl font-bold">Admin Panel</h1>
-            <p className="text-sm text-muted-foreground mt-1">Ohana & Chilli</p>
+            <p className="text-sm text-muted-foreground mt-1">Ohana Bowls</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">

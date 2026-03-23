@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCart } from '@/context/CartContext';
-import { Minus, Plus, Trash2, ShoppingBag, Leaf, Flame } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, Leaf } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
@@ -42,7 +42,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
               <ShoppingBag className="h-10 w-10 text-muted-foreground" />
             </div>
             <h3 className="mb-2 text-lg font-semibold">Tu carrito esta vacio</h3>
-            <p className="mb-6 text-sm text-muted-foreground">Agrega productos de Ohana o Chilli para comenzar.</p>
+            <p className="mb-6 text-sm text-muted-foreground">Agrega productos de Ohana Bowls para comenzar.</p>
             <Button onClick={() => onOpenChange(false)} variant="outline">
               Explorar menu
             </Button>
@@ -53,27 +53,15 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
               <div className="space-y-4 py-4">
                 {cart.items.map((item) => (
                   <div key={item.id} className="flex gap-3 rounded-lg bg-muted/50 p-3">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                        item.brand === 'ohana' ? 'bg-ohana/10' : 'bg-chilli/10'
-                      }`}
-                    >
-                      {item.brand === 'ohana' ? (
-                        <Leaf className="h-5 w-5 text-ohana" />
-                      ) : (
-                        <Flame className="h-5 w-5 text-chilli-dark" />
-                      )}
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ohana/10">
+                      <Leaf className="h-5 w-5 text-ohana" />
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-2xs font-medium ${
-                              item.brand === 'ohana' ? 'badge-ohana' : 'badge-chilli'
-                            }`}
-                          >
-                            {item.brand === 'ohana' ? 'Ohana' : 'Chilli'}
+                          <span className="rounded px-1.5 py-0.5 text-2xs font-medium badge-ohana">
+                            Ohana
                           </span>
                           <h4 className="mt-1 text-sm font-medium">
                             {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}

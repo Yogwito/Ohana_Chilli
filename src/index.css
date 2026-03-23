@@ -14,19 +14,19 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
 
-    /* Ohana Brand - Fresh, Healthy, Calm (Mint/Teal) */
-    --ohana: 162 72% 45%;
-    --ohana-light: 162 50% 95%;
-    --ohana-dark: 162 80% 32%;
-    --ohana-foreground: 0 0% 100%;
-    --ohana-muted: 162 25% 88%;
+    /* Brand tokens */
+    --brand: 142 45% 62%;
+    --brand-light: 138 40% 77%;
+    --brand-dark: 142 45% 48%;
+    --brand-foreground: 0 0% 100%;
+    --brand-muted: 142 40% 95%;
 
-    /* Chilli Brand - Bold, Energetic, Fast (Red/Orange) */
-    --chilli: 25 95% 53%;
-    --chilli-dark: 0 72% 51%;
-    --chilli-light: 35 100% 96%;
-    --chilli-foreground: 0 0% 100%;
-    --chilli-muted: 25 100% 94%;
+    /* Ohana aliases (backward compat) */
+    --ohana: var(--brand);
+    --ohana-light: var(--brand-light);
+    --ohana-dark: var(--brand-dark);
+    --ohana-foreground: var(--brand-foreground);
+    --ohana-muted: var(--brand-muted);
 
     /* Beverages Brand - Neutral, Refreshing */
     --beverages: 220 14% 30%;
@@ -109,6 +109,10 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
   }
@@ -137,26 +141,14 @@
     @apply bg-ohana text-ohana-foreground hover:bg-ohana-dark rounded-full px-6 py-3 font-medium transition-all duration-300 shadow-lg shadow-ohana/20 hover:shadow-xl hover:shadow-ohana/30 hover:-translate-y-0.5;
   }
 
-  .btn-chilli {
-    @apply bg-gradient-to-r from-chilli to-chilli-dark text-chilli-foreground hover:from-chilli-dark hover:to-chilli-dark rounded-none px-6 py-3 font-black uppercase tracking-widest transition-all duration-150 shadow-lg shadow-chilli-dark/30 hover:shadow-xl hover:shadow-chilli-dark/40 border-b-4 border-chilli-dark/50 hover:border-chilli-dark;
-  }
-
   /* Brand cards */
   .card-ohana {
     @apply bg-gradient-to-br from-white to-ohana-light/30 rounded-3xl shadow-lg border border-ohana/20 hover:shadow-xl hover:border-ohana/40 transition-all duration-300;
   }
 
-  .card-chilli {
-    @apply bg-gradient-to-br from-white to-chilli-light rounded-none shadow-lg border-l-4 border-chilli-dark hover:shadow-xl transition-all duration-150 relative overflow-hidden;
-  }
-
   /* Brand backgrounds */
   .bg-ohana-gradient {
     background: linear-gradient(180deg, hsl(var(--ohana-light)) 0%, hsl(162 50% 98%) 50%, hsl(0 0% 100%) 100%);
-  }
-
-  .bg-chilli-gradient {
-    background: linear-gradient(135deg, hsl(var(--chilli-light)) 0%, hsl(25 100% 98%) 50%, hsl(0 72% 97%) 100%);
   }
 
   /* Product card hover effects */
@@ -168,17 +160,9 @@
     @apply bg-gradient-to-b from-white to-ohana-light/20 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-ohana/10;
   }
 
-  .product-card-chilli {
-    @apply bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-150 border-l-4 border-chilli-dark hover:border-chilli;
-  }
-
   /* Badge styles */
   .badge-ohana {
     @apply bg-ohana/10 text-ohana-dark border border-ohana/30 rounded-full px-3 py-1 text-xs font-medium tracking-wide;
-  }
-
-  .badge-chilli {
-    @apply bg-chilli-dark text-chilli-foreground rounded-none px-3 py-1 text-xs font-black uppercase tracking-wider;
   }
 
   /* Step indicator */
@@ -265,6 +249,16 @@
   @keyframes slide-in {
     from { opacity: 0; transform: translateX(10px); }
     to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Hide scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 
   /* Custom scrollbar */

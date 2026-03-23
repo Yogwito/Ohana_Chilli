@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { CartProvider } from "@/context/CartContext";
 import { lazy, Suspense } from "react";
@@ -13,7 +13,6 @@ import NotFound from "./pages/NotFound";
 
 // Lazy-loaded routes
 const OhanaPage = lazy(() => import("./pages/OhanaPage"));
-const ChilliPage = lazy(() => import("./pages/ChilliPage"));
 const BeveragesPage = lazy(() => import("./pages/BeveragesPage"));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
@@ -53,9 +52,9 @@ const App = () => (
               <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><AdminPage /></Suspense></ErrorBoundary>} />
 
               {/* Public routes with Layout */}
-              <Route path="/" element={<Layout><HomePage /></Layout>} />
-              <Route path="/ohana" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OhanaPage /></Layout></Suspense></ErrorBoundary>} />
-              <Route path="/chilli" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><ChilliPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OhanaPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/ohana" element={<Navigate to="/" replace />} />
+              <Route path="/chilli" element={<Navigate to="/" replace />} />
               <Route path="/bebidas" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><BeveragesPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/checkout" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><CheckoutPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/nosotros" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><AboutPage /></Layout></Suspense></ErrorBoundary>} />

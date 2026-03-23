@@ -121,7 +121,7 @@ export default function AnalyticsAdmin() {
           value={`${orderTypeBreakdown.pickup} (${orderTypeBreakdown.total > 0 ? Math.round((orderTypeBreakdown.pickup / orderTypeBreakdown.total) * 100) : 0}%)`}
         />
         <KpiCard
-          icon={<Truck className="w-5 h-5 text-chilli-dark" />}
+          icon={<Truck className="w-5 h-5 text-brand-dark" />}
           label="Delivery"
           value={`${orderTypeBreakdown.delivery} (${orderTypeBreakdown.total > 0 ? Math.round((orderTypeBreakdown.delivery / orderTypeBreakdown.total) * 100) : 0}%)`}
         />
@@ -162,7 +162,7 @@ export default function AnalyticsAdmin() {
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${p.brand === 'ohana' ? 'bg-ohana' : 'bg-chilli-dark'}`}
+                      className="h-full rounded-full bg-brand"
                       style={{ width: `${(p.qty / maxQty) * 100}%` }}
                     />
                   </div>

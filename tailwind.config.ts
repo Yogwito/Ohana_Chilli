@@ -59,12 +59,12 @@ export default {
           foreground: "hsl(var(--ohana-foreground))",
           muted: "hsl(var(--ohana-muted))",
         },
-        chilli: {
-          DEFAULT: "hsl(var(--chilli))",
-          dark: "hsl(var(--chilli-dark))",
-          light: "hsl(var(--chilli-light))",
-          foreground: "hsl(var(--chilli-foreground))",
-          muted: "hsl(var(--chilli-muted))",
+        brand: {
+          DEFAULT: "hsl(var(--brand))",
+          light: "hsl(var(--brand-light))",
+          dark: "hsl(var(--brand-dark))",
+          foreground: "hsl(var(--brand-foreground))",
+          muted: "hsl(var(--brand-muted))",
         },
         beverages: {
           DEFAULT: "hsl(var(--beverages))",
@@ -88,7 +88,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Nunito', 'system-ui', 'sans-serif'],
+        display: ['Nunito', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.75rem' }],

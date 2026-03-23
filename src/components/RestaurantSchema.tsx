@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 const schema = {
   '@context': 'https://schema.org',
   '@type': 'Restaurant',
-  name: 'Ohana & Chilli',
+  name: 'Ohana Bowls',
   address: {
     '@type': 'PostalAddress',
     streetAddress: 'c.c Cable Plaza Piso 4 Terraza',
@@ -13,7 +13,7 @@ const schema = {
   },
   telephone: '+573215667170',
   openingHours: ['Mo-Fr 11:00-21:00', 'Sa-Su 11:00-21:00'],
-  servesCuisine: ['Bowls', 'Tex-Mex'],
+  servesCuisine: ['Bowls', 'Comida saludable'],
   url: 'https://ohanachilli.com',
 };
 

@@ -25,6 +25,7 @@ interface CategoryQueryRow {
   brand_id: string;
   slug: string | null;
   icon: string | null;
+  sort_order: number | null;
 }
 
 interface IngredientQueryRow {
@@ -100,7 +101,7 @@ export function useCategories(brandId?: Brand) {
   return useQuery({
     queryKey: ['categories', brandId],
     queryFn: async () => {
-      let query = supabase.from('categories').select('*').order('name');
+      let query = supabase.from('categories').select('*').order('sort_order').order('name');
       if (brandId) query = query.eq('brand_id', brandId);
       const { data, error } = await query;
       if (error) throw error;
@@ -256,5 +257,19 @@ export function useActiveDeliveryZones() {
     refetchInterval: 1000 * 30,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useSettingValue(key: string) {
+  return useQuery({
+    queryKey: ['setting', key],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', key)
+        .maybeSingle();
+      return data?.value ?? null;
+    },
   });
 }

@@ -5,20 +5,17 @@ export default function Footer() {
   return (
     <footer className="bg-zinc-950 text-zinc-400">
       {/* Brand gradient separator */}
-      <div className="h-px bg-gradient-to-r from-ohana/40 via-transparent to-chilli-dark/40" />
+      <div className="h-px bg-brand/40" />
 
       <div className="container py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="bg-ohana/20 text-ohana text-sm font-semibold px-3 py-1 rounded-full">Ohana</span>
-              <span className="w-px h-4 bg-zinc-700" />
-              <span className="bg-chilli-dark/20 text-chilli text-sm font-semibold px-3 py-1 rounded-full">Chilli</span>
-            </div>
-            <p className="text-zinc-500 text-sm leading-relaxed">
-              Dos experiencias gastronómicas bajo un mismo techo.
-              Bowls saludables y comida rápida deliciosa.
+            <span className="font-display font-black text-2xl text-brand">
+              Ohana Bowls
+            </span>
+            <p className="text-zinc-500 text-sm leading-relaxed mt-4">
+              Bowls frescos y personalizables en Manizales.
             </p>
           </div>
 
@@ -27,8 +24,7 @@ export default function Footer() {
             <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Enlaces</h4>
             <nav className="flex flex-col gap-2">
               {[
-                { to: '/ohana', label: 'Menú Ohana' },
-                { to: '/chilli', label: 'Menú Chilli' },
+                { to: '/ohana', label: 'Menú' },
                 { to: '/bebidas', label: 'Bebidas' },
                 { to: '/nosotros', label: 'Nosotros' },
               ].map(({ to, label }) => (
@@ -105,7 +101,7 @@ export default function Footer() {
 
         <div className="border-t border-zinc-800 mt-8 pt-8 text-center">
           <p className="text-sm text-zinc-600">
-            © {new Date().getFullYear()} Ohana & Chilli. Todos los derechos reservados.
+            © {new Date().getFullYear()} Ohana Bowls. Todos los derechos reservados.
           </p>
           <p className="text-xs text-zinc-700 mt-1">Hecho con ♥ en Manizales</p>
         </div>

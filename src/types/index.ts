@@ -1,5 +1,5 @@
 // Brand Types
-export type Brand = 'ohana' | 'chilli';
+export type Brand = 'ohana';
 
 // Product Category Types
 export interface Category {

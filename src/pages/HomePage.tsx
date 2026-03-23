@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Leaf, Flame, Utensils, ShoppingCart, CreditCard } from 'lucide-react';
+import { ArrowRight, Leaf, Utensils, ShoppingCart, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/products/ProductCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,85 +16,32 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       <SEOHead path="/" />
-      {/* Hero Section - Split Brand */}
-      <section className="relative overflow-hidden">
-        <div className="container py-12 sm:py-20">
-          <div className="text-center mb-12">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-ohana-gradient border-b border-ohana/15">
+        <div className="container py-16 sm:py-24">
+          <div className="max-w-2xl">
             <h1 className="mb-4">
-              Dos sabores,{' '}
-              <span className="text-ohana">un destino</span>
+              Bowls frescos,{' '}
+              <span className="text-brand">hecho para ti</span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Descubre la perfecta combinación entre comida saludable y antojos irresistibles. 
-              Todo bajo un mismo techo.
+            <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
+              Personaliza tu bowl con ingredientes frescos y naturales.
+              Saludable, delicioso y listo para pedir por WhatsApp.
             </p>
-          </div>
-
-          {/* Brand Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-            {/* Ohana Card */}
-            <Link 
-              to="/ohana"
-              className="group relative overflow-hidden rounded-[2rem] bg-ohana-gradient p-8 sm:p-10 transition-all duration-300 hover:shadow-2xl hover:shadow-ohana/30 border border-ohana/20"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 sm:w-48 sm:h-48 bg-ohana/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-ohana/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-              
-              <div className="relative">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-ohana to-ohana-dark flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-ohana/40">
-                  <Leaf className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                </div>
-                
-                <h2 className="text-3xl sm:text-4xl font-medium text-ohana-dark mb-3 tracking-wide">Ohana</h2>
-                <p className="text-lg text-muted-foreground mb-6 max-w-sm leading-relaxed">
-                  Bowls frescos y personalizables. Elige tus ingredientes favoritos y crea tu combinación perfecta.
-                </p>
-                
-                <div className="flex flex-wrap gap-2 mb-6">
-                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">🥗 Bowls</span>
-                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">🥑 Saludable</span>
-                  <span className="px-4 py-1.5 rounded-full bg-ohana/15 text-ohana-dark text-sm font-medium">✨ Personalizable</span>
-                </div>
-
-                <Button className="btn-ohana group-hover:translate-x-1 transition-transform">
-                  Ordenar Ohana
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild className="btn-ohana">
+                <Link to="/ohana">
+                  Ver Menú
                   <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </Link>
-
-            {/* Chilli Card */}
-            <Link 
-              to="/chilli"
-              className="group relative overflow-hidden bg-chilli-gradient p-8 sm:p-10 transition-all duration-150 hover:shadow-2xl hover:shadow-chilli-dark/30 border-l-4 border-chilli-dark"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 sm:w-48 sm:h-48 bg-chilli/15 rotate-12 -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-chilli-dark/10 -rotate-12 translate-y-1/2 -translate-x-1/2" />
-              
-              <div className="relative">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-chilli to-chilli-dark flex items-center justify-center mb-6 group-hover:scale-105 transition-transform duration-150 shadow-lg shadow-chilli-dark/50">
-                  <Flame className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                </div>
-                
-                <h2 className="text-3xl sm:text-4xl font-black text-chilli-dark mb-3 uppercase tracking-wider">Chilli</h2>
-                <p className="text-lg text-muted-foreground mb-6 max-w-sm">
-                  Comida rápida con el sabor que te encanta. Hamburguesas, hot dogs, papas y más.
-                </p>
-                
-                <div className="flex flex-wrap gap-2 mb-6">
-                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">🍔 Burgers</span>
-                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">🌭 Hot Dogs</span>
-                  <span className="px-4 py-1.5 bg-chilli-dark text-white text-sm font-black uppercase tracking-wide">🍟 Papas</span>
-                </div>
-
-                <Button className="btn-chilli group-hover:scale-105 transition-transform">
-                  Ordenar Chilli
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </Link>
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/carta">Carta completa</Link>
+              </Button>
+            </div>
           </div>
         </div>
+        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-ohana/5 blur-3xl" />
       </section>
 
       {/* How it Works */}
@@ -112,15 +59,15 @@ export default function HomePage() {
               </div>
               <div className="w-8 h-8 rounded-full bg-ohana text-ohana-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">1</div>
               <h3 className="text-lg font-semibold mb-2">Explora el Menú</h3>
-              <p className="text-muted-foreground">Elige entre bowls saludables de Ohana o los antojitos de Chilli</p>
+              <p className="text-muted-foreground">Elige entre bowls saludables y personalizables</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center mx-auto mb-4">
-                <ShoppingCart className="w-8 h-8 text-chilli-dark" />
+                <ShoppingCart className="w-8 h-8 text-brand-dark" />
               </div>
               <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center mx-auto mb-4 text-sm font-bold">2</div>
               <h3 className="text-lg font-semibold mb-2">Personaliza y Agrega</h3>
-              <p className="text-muted-foreground">Arma tu bowl o elige tus extras favoritos</p>
+              <p className="text-muted-foreground">Arma tu bowl con tus ingredientes favoritos</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
@@ -168,7 +115,6 @@ export default function HomePage() {
       <section className="py-16 bg-beverages-light">
         <div className="container">
           <div className="text-center mb-8">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-beverages/10 text-beverages text-sm font-medium mb-4">🥤 Para ambas marcas</span>
             <h2 className="mb-2 text-beverages">Refréscate</h2>
             <p className="text-muted-foreground">Complementa tu orden con nuestras bebidas</p>
           </div>
@@ -205,18 +151,12 @@ export default function HomePage() {
       <section className="py-20 bg-foreground text-background">
         <div className="container text-center">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">¿Listo para ordenar?</h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">Mezcla lo mejor de ambos mundos en una sola orden</p>
+          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">Bowls frescos y personalizables a tu gusto</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/ohana">
               <Button size="lg" className="btn-ohana w-full sm:w-auto">
                 <Leaf className="w-5 h-5 mr-2" />
-                Ordenar Ohana
-              </Button>
-            </Link>
-            <Link to="/chilli">
-              <Button size="lg" className="btn-chilli w-full sm:w-auto">
-                <Flame className="w-5 h-5 mr-2" />
-                Ordenar Chilli
+                Ver Menú
               </Button>
             </Link>
           </div>

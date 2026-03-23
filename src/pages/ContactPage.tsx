@@ -4,13 +4,13 @@ import SEOHead from '@/components/SEOHead';
 
 export default function ContactPage() {
   const handleWhatsApp = () => {
-    const message = encodeURIComponent('Hola! Tengo una pregunta sobre Ohana & Chilli');
+    const message = encodeURIComponent('Hola! Tengo una pregunta sobre Ohana Bowls');
     window.open(`https://wa.me/525512345678?text=${message}`, '_blank');
   };
 
   return (
     <div className="min-h-screen py-12 sm:py-16">
-      <SEOHead title="Contacto" description="Contáctanos por WhatsApp, teléfono o visítanos en Manizales. Horarios, ubicación y redes sociales de Ohana & Chilli." path="/contacto" />
+      <SEOHead title="Contacto" description="Contáctanos por WhatsApp, teléfono o visítanos en Manizales. Horarios, ubicación y redes sociales de Ohana Bowls." path="/contacto" />
       <div className="container">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
