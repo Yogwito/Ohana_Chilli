@@ -1,10 +1,11 @@
 import { useState, lazy, Suspense, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, ShoppingCart } from 'lucide-react';
+import { Menu, ShoppingCart, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useCart } from '@/context/CartContext';
 import { useCategories } from '@/hooks/use-catalog';
+import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
 const CartDrawer = lazy(() => import('@/components/cart/CartDrawer'));
@@ -24,6 +25,8 @@ export default function Navbar() {
   const { getItemCount } = useCart();
   const { data: rawCategories = [] } = useCategories('ohana');
 
+  const { theme, setTheme } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [badgeAnimating, setBadgeAnimating] = useState(false);
@@ -47,6 +50,13 @@ export default function Navbar() {
     }
     prevCountRef.current = itemCount;
   }, [itemCount]);
+
+  // Crystallize navbar on scroll
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Sync active category from scroll-spy events dispatched by OhanaPage
   useEffect(() => {
@@ -78,7 +88,12 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-xl border-b border-border/40">
+      <header className={cn(
+        'sticky top-0 z-50 w-full transition-all duration-300',
+        scrolled
+          ? 'bg-background/90 backdrop-blur-xl border-b border-border/40 shadow-sm'
+          : 'bg-background/0 border-b border-transparent shadow-none',
+      )}>
         <nav className="container flex h-14 items-center gap-4">
 
           {/* Logo */}
@@ -142,6 +157,16 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+
+            {/* Theme toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label="Cambiar tema"
+            >
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
 
             {/* Cart button */}
             <Button

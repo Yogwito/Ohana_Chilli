@@ -53,11 +53,11 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-sm mx-4">
         <div className="bg-card rounded-2xl border shadow-lg p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-primary" />
+            <div className="font-display font-black text-3xl text-brand mb-4">Ohana Bowls</div>
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+              <Lock className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold">Admin Panel</h1>
-            <p className="text-sm text-muted-foreground mt-1">Ohana Bowls</p>
+            <h1 className="text-xl font-bold">Panel de Administración</h1>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">

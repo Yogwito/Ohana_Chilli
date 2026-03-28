@@ -1,26 +1,27 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Phone, Clock, Instagram, Facebook } from 'lucide-react';
+import { AnimatedElement } from '@/components/ui/AnimatedElement';
 
 export default function Footer() {
   return (
-    <footer className="bg-zinc-950 text-zinc-400">
+    <footer className="bg-zinc-900 dark:bg-zinc-950 text-zinc-400">
       {/* Brand gradient separator */}
       <div className="h-px bg-brand/40" />
 
       <div className="container py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
-          <div>
+          <AnimatedElement animation="fade-up" delay={0}>
             <span className="font-display font-black text-2xl text-brand">
               Ohana Bowls
             </span>
             <p className="text-zinc-500 text-sm leading-relaxed mt-4">
               Bowls frescos y personalizables en Manizales.
             </p>
-          </div>
+          </AnimatedElement>
 
           {/* Quick Links */}
-          <div>
+          <AnimatedElement animation="fade-up" delay={75}>
             <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Enlaces</h4>
             <nav className="flex flex-col gap-2">
               {[
@@ -37,10 +38,10 @@ export default function Footer() {
                 </Link>
               ))}
             </nav>
-          </div>
+          </AnimatedElement>
 
           {/* Contact */}
-          <div>
+          <AnimatedElement animation="fade-up" delay={150}>
             <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Contacto</h4>
             <div className="flex flex-col gap-3">
               <a
@@ -60,10 +61,10 @@ export default function Footer() {
                 <span>+57 321 5667170</span>
               </a>
             </div>
-          </div>
+          </AnimatedElement>
 
           {/* Hours + Social */}
-          <div>
+          <AnimatedElement animation="fade-up" delay={225}>
             <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Horario</h4>
             <div className="flex flex-col gap-2 text-sm text-zinc-500">
               <div className="flex items-center gap-2">
@@ -96,15 +97,23 @@ export default function Footer() {
                 <Facebook className="h-5 w-5" />
               </a>
             </div>
-          </div>
+          </AnimatedElement>
         </div>
 
-        <div className="border-t border-zinc-800 mt-8 pt-8 text-center">
+        <AnimatedElement animation="fade-in" delay={300} className="border-t border-zinc-800 mt-8 pt-8 text-center">
           <p className="text-sm text-zinc-600">
             © {new Date().getFullYear()} Ohana Bowls. Todos los derechos reservados.
           </p>
           <p className="text-xs text-zinc-700 mt-1">Hecho con ♥ en Manizales</p>
-        </div>
+          <div className="mt-4">
+            <Link
+              to="/admin/login"
+              className="text-xs text-zinc-800 dark:text-zinc-700 hover:text-zinc-400 dark:hover:text-zinc-500 transition-colors"
+            >
+              Admin
+            </Link>
+          </div>
+        </AnimatedElement>
       </div>
     </footer>
   );

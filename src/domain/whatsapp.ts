@@ -14,56 +14,56 @@ interface OrderInfo {
   paymentMethod?: 'cash' | 'transfer';
 }
 
+const SEP = '─────────────────';
+
 export function generateWhatsAppMessage(items: CartItem[], total: number, info: OrderInfo): string {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-  const lines = [
-    'Nueva Orden - Ohana Bowls',
+  const lines: string[] = [
+    'Nueva Orden — Ohana Bowls',
     `Ref: ${info.orderId.slice(0, 8).toUpperCase()}`,
-    '',
+    SEP,
     `Cliente: ${info.name}`,
-    `Telefono: ${info.phone}`,
+    `Teléfono: ${info.phone}`,
     `Tipo: ${info.orderType === 'pickup' ? 'Recoger en sucursal' : 'Entrega a domicilio'}`,
   ];
 
   if (info.paymentMethod) {
-    lines.push(
-      `Pago: ${info.paymentMethod === 'cash' ? 'Contra entrega' : 'Transferencia bancaria'}`
-    );
+    lines.push(`Pago: ${info.paymentMethod === 'cash' ? 'Contra entrega' : 'Transferencia bancaria'}`);
   }
 
   if (info.orderType === 'delivery') {
-    if (info.address) {
-      lines.push(`Direccion: ${info.address}`);
-    }
+    lines.push(SEP);
+    if (info.address) lines.push(`Dirección: ${info.address}`);
     // Always include barrio + domicilio for delivery (even $0 must be confirmed).
     lines.push(`Barrio: ${info.deliveryZone ?? 'No especificado'}`);
     lines.push(`Domicilio: ${formatPrice(info.deliveryFeeCents ?? 0)}`);
   }
 
-  lines.push('', 'Productos:');
+  lines.push(SEP, 'PRODUCTOS:');
 
   items.forEach((item) => {
     const brand = '[Ohana]';
     if (item.type === 'product' && item.product) {
-      lines.push(`${brand} ${item.quantity}x ${item.product.name} - ${formatPrice(item.totalPrice)}`);
+      lines.push(`• ${brand} ${item.quantity}x ${item.product.name} — ${formatPrice(item.totalPrice)}`);
     } else if (item.type === 'custom-bowl' && item.customBowl) {
-      lines.push(`${brand} 1x Bowl ${item.customBowl.size.name} - ${formatPrice(item.totalPrice)}`);
+      lines.push(`• ${brand} 1x Bowl ${item.customBowl.size.name} — ${formatPrice(item.totalPrice)}`);
       formatBowlDetailLines(item.customBowl).forEach((line) => {
         lines.push(`   ${line}`);
       });
-      lines.push(`   Total bowl: ${formatPrice(item.totalPrice)}`);
     }
-    if (item.notes) lines.push(`   - Nota: ${item.notes}`);
+    if (item.notes) lines.push(`   Nota: ${item.notes}`);
   });
 
-  lines.push('');
+  lines.push(SEP);
   lines.push(`Subtotal: ${formatPrice(subtotal)}`);
   // Always show delivery line in delivery orders (even when $0, so operator can verify barrio fee).
   if (info.orderType === 'delivery') {
     lines.push(`Domicilio: ${formatPrice(info.deliveryFeeCents ?? 0)}`);
   }
-  lines.push(`Total: ${formatPrice(total)}`);
-  if (info.notes) lines.push('', `Notas: ${info.notes}`);
+  lines.push(`TOTAL: ${formatPrice(total)}`);
+  if (info.notes) {
+    lines.push(SEP, `Notas: ${info.notes}`);
+  }
   return lines.join('\n');
 }
 

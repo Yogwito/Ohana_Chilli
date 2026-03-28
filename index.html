@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        var theme = localStorage.getItem('ohana-theme');
+        var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (theme === 'dark' || (!theme && systemDark) || (theme === 'system' && systemDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
 
     <title>Ohana Bowls | Bowls Frescos en Manizales</title>
     <meta name="description" content="Restaurante en Manizales con bowls frescos personalizables. Pide a domicilio o recoge en sucursal. ¡Ordena ahora por WhatsApp!" />

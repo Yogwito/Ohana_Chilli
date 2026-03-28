@@ -1,6 +1,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import { useCart } from '@/context/CartContext';
 import { Minus, Plus, Trash2, ShoppingBag, Leaf } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -51,8 +52,13 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
           <>
             <ScrollArea className="-mx-6 flex-1 px-6">
               <div className="space-y-4 py-4">
-                {cart.items.map((item) => (
-                  <div key={item.id} className="flex gap-3 rounded-lg bg-muted/50 p-3">
+                {cart.items.map((item, index) => (
+                  <AnimatedElement
+                    key={item.id}
+                    animation="fade-up"
+                    delay={Math.min(index * 75, 300) as 0 | 75 | 150 | 225 | 300}
+                    className="flex gap-3 rounded-lg bg-muted/50 p-3"
+                  >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ohana/10">
                       <Leaf className="h-5 w-5 text-ohana" />
                     </div>
@@ -104,7 +110,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                         <span className="font-semibold">{formatPrice(item.totalPrice)}</span>
                       </div>
                     </div>
-                  </div>
+                  </AnimatedElement>
                 ))}
               </div>
             </ScrollArea>

@@ -1,4 +1,5 @@
 import { Suspense, lazy, useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useIntersection } from '@/hooks/use-intersection';
 import { useLocation } from 'react-router-dom';
 import {
   MapPin, Clock, Star, Plus, Check, Search,
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import { useProducts, useCategories } from '@/hooks/use-catalog';
 import { useCart } from '@/context/CartContext';
 import { trackEvent } from '@/lib/analytics';
@@ -49,7 +51,8 @@ function ProductRowSkeleton() {
 
 // ─── Product row (La Cocina style: text left, image right) ───────────────────
 
-function ProductRow({ product }: { product: Product }) {
+function ProductRow({ product, index = 0 }: { product: Product; index?: number }) {
+  const { ref, isVisible } = useIntersection({ threshold: 0.05 });
   const { addProduct } = useCart();
   const [added, setAdded] = useState(false);
 
@@ -69,7 +72,16 @@ function ProductRow({ product }: { product: Product }) {
   };
 
   return (
-    <div className="flex items-start justify-between gap-4 py-4 border-b border-border/10 hover:bg-muted/30 dark:hover:bg-white/5 transition-colors px-2 rounded-lg cursor-pointer">
+    <div
+      ref={ref}
+      style={{ transitionDelay: `${Math.min(index % 4 * 60, 240)}ms` }}
+      className={cn(
+        'flex items-start justify-between gap-4 py-4 border-b border-border/10',
+        'hover:bg-muted/30 dark:hover:bg-white/5 px-2 rounded-lg cursor-pointer',
+        'transition-all duration-500 ease-out',
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4',
+      )}
+    >
       {/* Left: text */}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-base text-foreground">{product.name}</p>
@@ -84,16 +96,19 @@ function ProductRow({ product }: { product: Product }) {
       </div>
 
       {/* Right: image with add button */}
-      <div className="w-32 h-24 md:w-40 md:h-28 rounded-xl overflow-hidden relative shrink-0">
+      <div className="w-32 h-24 md:w-40 md:h-28 rounded-xl overflow-hidden relative shrink-0 bg-brand/10">
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
             alt={product.name}
             loading="lazy"
-            className="object-cover w-full h-full"
+            decoding="async"
+            className="w-full h-full object-cover transition-all duration-500 data-[loaded=false]:blur-sm data-[loaded=true]:blur-0"
+            data-loaded="false"
+            onLoad={(e) => e.currentTarget.setAttribute('data-loaded', 'true')}
           />
         ) : (
-          <div className="bg-brand/10 w-full h-full flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center">
             <span className="text-4xl font-black text-brand/30 select-none">
               {product.name.charAt(0)}
             </span>
@@ -104,9 +119,9 @@ function ProductRow({ product }: { product: Product }) {
         <button
           onClick={handleAdd}
           className={cn(
-            'absolute bottom-2 right-2 w-8 h-8 rounded-full bg-brand text-white shadow-md',
-            'flex items-center justify-center hover:bg-brand-dark active:scale-95 transition-all duration-200',
-            added && 'scale-110',
+            'absolute bottom-2 right-2 w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-brand text-white shadow-md',
+            'flex items-center justify-center hover:bg-brand-dark active:scale-90 transition-all duration-200',
+            added && 'scale-110 bg-brand-dark',
           )}
           aria-label="Agregar al carrito"
         >
@@ -123,6 +138,9 @@ export default function OhanaPage() {
   const location = useLocation();
   const tabsRef = useRef<HTMLDivElement>(null);
   const [activeSlug, setActiveSlug] = useState<string>('arma-tu-bowl');
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const { data: categories = [] } = useCategories('ohana');
   const { data: allProducts = [], isLoading } = useProducts({ brandId: 'ohana' });
@@ -197,7 +215,7 @@ export default function OhanaPage() {
   }, [activeSlug]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0f0f0f]">
+    <div className="min-h-screen bg-background">
       <SEOHead
         title="Ohana Bowls — Menú"
         description="Bowls frescos, burgers, hot dogs, nachos y más. Arma tu bowl o elige entre nuestras opciones."
@@ -215,11 +233,18 @@ export default function OhanaPage() {
         />
 
         {/* Info row */}
-        <div className="bg-white dark:bg-[#0f0f0f] px-4 pb-5">
+        <div className="bg-background px-4 pb-5">
           <div className="container max-w-4xl">
             <div className="flex items-end gap-4 -mt-12 mb-4">
               {/* Logo card */}
-              <div className="w-[120px] h-[120px] rounded-2xl shadow-lg bg-white dark:bg-[#1a1a1a] border border-brand/30 flex flex-col items-center justify-center shrink-0">
+              <div
+                style={{ transitionDelay: '0ms' }}
+                className={cn(
+                  'w-[120px] h-[120px] rounded-2xl shadow-lg bg-card border border-brand/30 flex flex-col items-center justify-center shrink-0',
+                  'scroll-fade-up',
+                  mounted && 'in-view',
+                )}
+              >
                 <span className="font-display font-black text-2xl text-brand leading-none">Ohana</span>
                 <span className="font-display font-light text-xl text-brand leading-none">Bowls</span>
               </div>
@@ -227,11 +252,17 @@ export default function OhanaPage() {
               {/* Name + badges + social */}
               <div className="flex-1 min-w-0 pt-14 flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h1 className="font-display font-black text-2xl text-foreground leading-tight truncate">
+                  <h1
+                    style={{ transitionDelay: '80ms' }}
+                    className={cn('font-display font-black text-2xl text-foreground leading-tight truncate', 'scroll-fade-up', mounted && 'in-view')}
+                  >
                     Ohana Bowls
                   </h1>
-                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                  <div
+                    style={{ transitionDelay: '160ms' }}
+                    className={cn('flex flex-wrap items-center gap-2 mt-1.5', 'scroll-fade-up', mounted && 'in-view')}
+                  >
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-muted text-brand-dark">
                       Abierto
                     </span>
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -279,7 +310,10 @@ export default function OhanaPage() {
             </div>
 
             {/* Address + hours */}
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+            <div
+              style={{ transitionDelay: '240ms' }}
+              className={cn('flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground', 'scroll-fade-up', mounted && 'in-view')}
+            >
               <span className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 shrink-0" />
                 c.c Cable Plaza Piso 4 Terraza, Manizales, Caldas
@@ -294,7 +328,7 @@ export default function OhanaPage() {
       </div>
 
       {/* ── SECTION 2: Sticky category tabs ─────────────────────────────── */}
-      <div className="sticky top-14 z-40 bg-background/95 dark:bg-[#0f0f0f]/95 backdrop-blur-md border-b border-border/40">
+      <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/40">
         <div className="container max-w-4xl">
           <div className="flex items-center gap-2">
             {/* Left: action icons (visual only) */}
@@ -317,6 +351,7 @@ export default function OhanaPage() {
             <div
               ref={tabsRef}
               className="flex-1 flex overflow-x-auto scrollbar-hide"
+              style={{ touchAction: 'pan-x' }}
             >
               {allTabs.map((cat) => {
                 const isActive = activeSlug === cat.slug;
@@ -326,14 +361,15 @@ export default function OhanaPage() {
                     data-active={isActive}
                     onClick={() => scrollToSection(cat.slug)}
                     className={cn(
-                      'px-4 py-3 text-sm font-semibold uppercase tracking-wide whitespace-nowrap shrink-0',
-                      'transition-colors duration-150 border-b-2',
-                      isActive
-                        ? 'text-brand border-brand'
-                        : 'text-muted-foreground border-transparent hover:text-foreground',
+                      'relative px-4 py-3 text-sm font-semibold uppercase tracking-wide whitespace-nowrap shrink-0',
+                      'transition-colors duration-150',
+                      isActive ? 'text-brand' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     {cat.name}
+                    {isActive && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand rounded-full animate-scale-in" />
+                    )}
                   </button>
                 );
               })}
@@ -366,24 +402,26 @@ export default function OhanaPage() {
                   data-section={cat.slug}
                 >
                   {/* Category section header */}
-                  <div className="flex items-center gap-3 py-3 border-b border-border/20 mb-2">
-                    <h2 className="font-display font-bold text-xl uppercase tracking-wide text-foreground dark:text-white">
-                      {cat.name}
-                    </h2>
-                    {isBowlBuilder && (
-                      <span className="text-xs bg-brand text-white px-2 py-0.5 rounded-full font-semibold">
-                        Personalizable
-                      </span>
-                    )}
-                  </div>
+                  <AnimatedElement animation="fade-up">
+                    <div className="flex items-center gap-3 py-3 border-b border-border/20 mb-2">
+                      <h2 className="font-display font-bold text-xl uppercase tracking-wide text-foreground dark:text-white">
+                        {cat.name}
+                      </h2>
+                      {isBowlBuilder && (
+                        <span className="text-xs bg-brand text-white px-2 py-0.5 rounded-full font-semibold">
+                          Personalizable
+                        </span>
+                      )}
+                    </div>
+                  </AnimatedElement>
 
                   {/* Bowl Builder section */}
                   {isBowlBuilder && (
-                    <div className="rounded-2xl border bg-card p-4 md:p-6 mt-4">
+                    <AnimatedElement animation="scale-up" threshold={0.05} className="rounded-2xl border bg-card p-4 md:p-6 mt-4">
                       <Suspense fallback={<Skeleton className="h-[520px] rounded-xl" />}>
                         <BowlBuilder />
                       </Suspense>
-                    </div>
+                    </AnimatedElement>
                   )}
 
                   {/* Product rows */}
@@ -391,7 +429,7 @@ export default function OhanaPage() {
                     <div>
                       {isLoading
                         ? [1, 2, 3].map((i) => <ProductRowSkeleton key={i} />)
-                        : products.map((p) => <ProductRow key={p.id} product={p} />)
+                        : products.map((p, idx) => <ProductRow key={p.id} product={p} index={idx} />)
                       }
                     </div>
                   )}

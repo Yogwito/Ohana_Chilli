@@ -34,7 +34,6 @@ import {
   Plus,
   Trash2,
   Copy,
-  Phone,
   AlertCircle,
   ExternalLink,
 } from 'lucide-react';
@@ -44,9 +43,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
-import { buildWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
+import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { AnimatedElement } from '@/components/ui/AnimatedElement';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -77,11 +77,8 @@ export default function CheckoutPage() {
   const [whatsappUrl, setWhatsappUrl] = useState<string>('');
   const [submitError, setSubmitError] = useState<string>('');
   const [selectedZoneId, setSelectedZoneId] = useState('');
-  const [showMessage, setShowMessage] = useState(false);
-
   const [whatsAppOpenStatus, setWhatsAppOpenStatus] = useState<WhatsAppOpenStatus>('idle');
-  const [whatsAppOpenMethod, setWhatsAppOpenMethod] = useState<string>('');
-  const [wasEmbeddedContext, setWasEmbeddedContext] = useState<boolean>(false);
+  const [platform, setPlatform] = useState<'mobile' | 'desktop'>('mobile');
 
   // CHANGE 1 — delivery as default
   const [form, setForm] = useState<CheckoutForm>({
@@ -117,6 +114,21 @@ export default function CheckoutPage() {
     if (!orderId) return null;
     return orderId.slice(0, 8).toUpperCase();
   }, [orderId]);
+
+  const messagePreview = useMemo(() => {
+    if (cart.items.length === 0) return '';
+    return generateWhatsAppMessage(cart.items, orderTotal, {
+      name: form.name || 'Cliente',
+      phone: form.phone || '',
+      orderType: form.orderType,
+      address: form.address,
+      deliveryZone: selectedDeliveryZone?.name,
+      deliveryFeeCents,
+      notes: form.notes,
+      orderId: 'PREVIEW000',
+      paymentMethod,
+    });
+  }, [cart.items, orderTotal, form, selectedDeliveryZone, deliveryFeeCents, paymentMethod]);
 
   const updateField = <K extends keyof CheckoutForm>(field: K, value: CheckoutForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -169,8 +181,6 @@ export default function CheckoutPage() {
     if (!whatsappUrl) return;
     setWhatsAppOpenStatus('opening');
     const result = openWhatsAppHandoff(whatsappUrl, { debugLabel: 'checkout_manual' });
-    setWasEmbeddedContext(result.embedded);
-    setWhatsAppOpenMethod(result.method);
     if (result.ok) {
       setWhatsAppOpenStatus('opened');
       toast.success('Abriendo WhatsApp...');
@@ -219,6 +229,18 @@ export default function CheckoutPage() {
       setSubmitError(message);
       toast.error(message);
       return;
+    }
+
+    // Open a blank desktop tab NOW, inside the user-gesture chain, before any await.
+    // Browsers revoke the user-gesture token after the first await, so popup blockers would
+    // kill window.open if called later. We navigate the blank tab to WhatsApp after the order
+    // is created successfully.
+    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    let desktopWin: Window | null = null;
+    if (!isMobileDevice) {
+      desktopWin = window.open('', '_blank');
+      // Null out opener in the new tab for security (cross-origin protection)
+      if (desktopWin) desktopWin.opener = null;
     }
 
     setOrderStatus('submitting');
@@ -322,7 +344,8 @@ export default function CheckoutPage() {
         orderId: createdOrderId,
         paymentMethod,
       });
-      const url = buildWhatsAppUrl(phone, message);
+      const { url, platform: detectedPlatform } = buildPlatformWhatsAppUrl(phone, message);
+      setPlatform(detectedPlatform);
 
       setOrderId(createdOrderId);
       setWhatsappMessage(message);
@@ -338,9 +361,24 @@ export default function CheckoutPage() {
       });
 
       setOrderStatus('created');
-      setWhatsAppOpenStatus('idle');
-      toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
+
+      if (detectedPlatform === 'desktop') {
+        if (desktopWin) {
+          desktopWin.location.href = url;
+          setWhatsAppOpenStatus('opened');
+          toast.success('WhatsApp Web se abrió en una nueva pestaña.');
+        } else {
+          // window.open was blocked even before awaits (aggressive popup blocker)
+          setWhatsAppOpenStatus('failed');
+          toast.error('Pedido creado. Abre WhatsApp con el botón de abajo.');
+        }
+      } else {
+        desktopWin?.close(); // close blank tab if somehow opened on mobile
+        setWhatsAppOpenStatus('idle');
+        toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
+      }
     } catch (err) {
+      desktopWin?.close();
       console.error('Unexpected error:', err);
       setSubmitError('Ocurrió un error inesperado al crear tu pedido.');
       toast.error('Error inesperado. Intenta de nuevo.');
@@ -382,105 +420,79 @@ export default function CheckoutPage() {
 
   // Success state
   if (orderStatus === 'created') {
-    const phone = whatsappNumber || '573215667170';
-    const showFallback = whatsAppOpenStatus === 'failed';
-
     return (
-      <div className="min-h-screen flex items-center justify-center py-12">
-        <div className="max-w-lg mx-auto px-4 w-full animate-scale-in">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 bg-green-100">
-              <CheckCircle className="w-10 h-10 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Pedido creado</h2>
+      <div className="min-h-screen flex items-center justify-center py-12 px-4">
+        <div className="max-w-md w-full space-y-6 text-center">
+
+          {/* Animated checkmark */}
+          <div className="w-20 h-20 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+            <CheckCircle className="w-10 h-10 text-brand" />
+          </div>
+
+          {/* Order reference */}
+          <div>
+            <h2 className="text-2xl font-display font-bold">¡Pedido creado!</h2>
             {formattedOrderRef && (
-              <p className="text-sm text-muted-foreground mb-2">
+              <p className="text-sm text-muted-foreground mt-1">
                 Referencia:{' '}
-                <span className="font-mono font-bold text-foreground">{formattedOrderRef}</span>
+                <span className="font-mono font-bold text-foreground">
+                  {formattedOrderRef}
+                </span>
               </p>
             )}
-            {whatsAppOpenStatus === 'idle' && (
-              <p className="text-muted-foreground">Toca el botón para enviar tu pedido por WhatsApp.</p>
-            )}
-            {whatsAppOpenStatus === 'opening' && (
-              <p className="text-muted-foreground">Abriendo WhatsApp...</p>
-            )}
-            {whatsAppOpenStatus === 'opened' && (
-              <p className="text-muted-foreground">WhatsApp se abrió en otra pestaña.</p>
-            )}
-            {whatsAppOpenStatus === 'failed' && (
-              <p className="text-destructive text-sm">No se pudo abrir WhatsApp. Usa el enlace directo o copia el mensaje.</p>
-            )}
           </div>
 
-          {showFallback && (
-            <Alert className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>No se pudo abrir WhatsApp automáticamente</AlertTitle>
-              <AlertDescription>
-                {wasEmbeddedContext
-                  ? 'Estás en un contexto embebido (preview/iframe). Usa "Enlace directo" o copia el mensaje.'
-                  : 'Tu navegador bloqueó la apertura. Usa "Enlace directo" o copia el mensaje manualmente.'}
-              </AlertDescription>
-            </Alert>
+          {/* Status message */}
+          <p className="text-muted-foreground text-sm">
+            {whatsAppOpenStatus === 'opened' && platform === 'desktop'
+              ? 'WhatsApp Web se abrió en una nueva pestaña. Envía el mensaje para confirmar tu pedido.'
+              : whatsAppOpenStatus === 'opened'
+              ? 'Abriendo WhatsApp...'
+              : 'Toca el botón para enviar tu pedido por WhatsApp.'}
+          </p>
+
+          {/* Primary CTA */}
+          <Button
+            onClick={attemptOpenWhatsApp}
+            className="w-full h-12 rounded-full text-base font-semibold"
+            style={{ backgroundColor: '#25D366', color: 'white' }}
+          >
+            <MessageCircle className="w-5 h-5 mr-2" />
+            {platform === 'desktop' ? 'Abrir WhatsApp Web' : 'Abrir WhatsApp'}
+          </Button>
+
+          {/* Fallback — only show if opening failed */}
+          {whatsAppOpenStatus === 'failed' && (
+            <div className="space-y-2">
+              <p className="text-sm text-destructive">
+                No se pudo abrir WhatsApp automáticamente.
+              </p>
+              <Button variant="outline" className="w-full" asChild>
+                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Enlace directo
+                </a>
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={handleCopyMessage}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copiar mensaje
+              </Button>
+            </div>
           )}
 
-          <div className="bg-card border rounded-xl p-6 space-y-3 mb-6">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Phone className="w-4 h-4" />
-              <span>Número: <strong className="text-foreground">{phone}</strong></span>
-            </div>
-
-            <Button
-              type="button"
-              onClick={attemptOpenWhatsApp}
-              className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2"
-            >
-              <MessageCircle className="w-5 h-5" /> Abrir WhatsApp
-            </Button>
-
-            <Button variant="outline" className="w-full" asChild>
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-4 h-4 mr-2" /> Enlace directo
-              </a>
-            </Button>
-
-            <Button type="button" onClick={handleCopyMessage} variant="outline" className="w-full">
-              <Copy className="w-4 h-4 mr-2" /> Copiar mensaje
-            </Button>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setShowMessage((v) => !v)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showMessage ? 'Ocultar mensaje' : 'Ver mensaje completo'}
-              </button>
-              {showMessage && (
-                <div className="animate-fade-in space-y-1">
-                  <Textarea
-                    id="whatsapp-message"
-                    readOnly
-                    value={whatsappMessage}
-                    rows={10}
-                    className="text-xs font-mono"
-                    onFocus={(e) => e.currentTarget.select()}
-                  />
-                  {formattedOrderRef && (
-                    <p className="text-xs text-muted-foreground">
-                      Referencia: <span className="font-mono font-semibold">{formattedOrderRef}</span>
-                      {whatsAppOpenMethod ? <span> · Método: {whatsAppOpenMethod}</span> : null}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <Button type="button" onClick={() => navigate('/')} className="w-full btn-ohana">
-            Volver al inicio
+          {/* Back to menu */}
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/')}
+            className="w-full text-muted-foreground hover:text-brand"
+          >
+            ← Volver al menú
           </Button>
+
         </div>
       </div>
     );
@@ -505,7 +517,7 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
             {/* Form */}
             <div className="lg:col-span-3 order-2 lg:order-1">
-              <form onSubmit={handleSubmit} className="space-y-8">
+              <form onSubmit={handleSubmit} className="space-y-8 pb-32 lg:pb-0">
                 {submitError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -515,7 +527,7 @@ export default function CheckoutPage() {
                 )}
 
                 {/* Contact info */}
-                <div className="relative pl-4">
+                <AnimatedElement as="div" animation="fade-up" delay={0} className="relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-ohana" />
                   <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Información de contacto</h3>
                   <div className="space-y-4">
@@ -543,10 +555,10 @@ export default function CheckoutPage() {
                       {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone}</p>}
                     </div>
                   </div>
-                </div>
+                </AnimatedElement>
 
                 {/* Order type */}
-                <div className="relative pl-4">
+                <AnimatedElement as="div" animation="fade-up" delay={75} className="relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-ohana" />
                   <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Tipo de orden</h3>
                   <div className="grid grid-cols-2 gap-3">
@@ -641,10 +653,10 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </AnimatedElement>
 
                 {/* CHANGE 2 — Payment method */}
-                <div className="bg-card rounded-xl p-6 border">
+                <AnimatedElement as="div" animation="fade-up" delay={150} className="bg-card rounded-xl p-6 border">
                   <h3 className="font-semibold mb-4">Método de pago</h3>
                   <div className="grid grid-cols-2 gap-3">
                     <button
@@ -653,7 +665,7 @@ export default function CheckoutPage() {
                       className={cn(
                         'flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all duration-200',
                         paymentMethod === 'cash'
-                          ? 'ring-2 ring-brand bg-brand/5'
+                          ? 'ring-2 ring-brand bg-brand/5 dark:bg-brand/10'
                           : 'border hover:border-brand/50',
                       )}
                     >
@@ -668,7 +680,7 @@ export default function CheckoutPage() {
                       className={cn(
                         'flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all duration-200',
                         paymentMethod === 'transfer'
-                          ? 'ring-2 ring-brand bg-brand/5'
+                          ? 'ring-2 ring-brand bg-brand/5 dark:bg-brand/10'
                           : 'border hover:border-brand/50',
                       )}
                     >
@@ -679,7 +691,7 @@ export default function CheckoutPage() {
                   </div>
 
                   {paymentMethod === 'transfer' && (
-                    <div className="mt-4 rounded-xl bg-brand/5 border border-brand/20 p-4 space-y-3 animate-fade-in">
+                    <div className="mt-4 rounded-xl bg-brand/5 dark:bg-brand/10 border border-brand/20 dark:border-brand/30 p-4 space-y-3 animate-fade-in">
                       <p className="text-sm font-medium text-brand-dark">
                         Con el fin de verificar el pago inmediatamente, SOLO aceptamos
                         transferencias realizadas desde Davivienda, Bancolombia, Nequi
@@ -725,10 +737,10 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </AnimatedElement>
 
                 {/* Notes */}
-                <div className="relative pl-4">
+                <AnimatedElement as="div" animation="fade-up" delay={225} className="relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-muted" />
                   <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Notas adicionales (opcional)</h3>
                   <Textarea
@@ -738,10 +750,10 @@ export default function CheckoutPage() {
                     rows={3}
                     className="rounded-xl"
                   />
-                </div>
+                </AnimatedElement>
 
                 {/* CHANGE 5 — Terms checkbox */}
-                <div className="flex items-start gap-3 p-4 bg-muted/40 rounded-xl border border-border/60">
+                <AnimatedElement as="div" animation="fade-up" delay={300} className="flex items-start gap-3 p-4 bg-muted/40 rounded-xl border border-border/60">
                   <input
                     type="checkbox"
                     id="terms"
@@ -767,9 +779,9 @@ export default function CheckoutPage() {
                       Tratamiento de mis Datos Personales
                     </button>
                   </label>
-                </div>
+                </AnimatedElement>
 
-                <div className="space-y-2">
+                <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-auto p-4 lg:p-0 bg-background/95 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none border-t lg:border-0 border-border/40 z-40 lg:z-auto space-y-2">
                   <Button
                     type="submit"
                     disabled={orderStatus === 'submitting' || submitBlockedByZone || !termsAccepted}
@@ -801,7 +813,7 @@ export default function CheckoutPage() {
 
             {/* Order summary sidebar */}
             <div className="lg:col-span-2 order-1 lg:order-2">
-              <div className="bg-card rounded-xl border p-4 sm:p-6 sticky top-20">
+              <AnimatedElement animation="scale-up" delay={75} className="bg-card rounded-xl border p-4 sm:p-6 sticky top-20">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="font-semibold">Tu orden</h3>
                   <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-medium">
@@ -880,6 +892,21 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
+                {/* WhatsApp message preview */}
+                {messagePreview && (
+                  <div className="mt-4 pt-4 border-t border-border/40">
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-brand transition-colors py-1 select-none list-none flex items-center gap-1">
+                        <span className="text-base">▾</span>
+                        Vista previa del mensaje WhatsApp
+                      </summary>
+                      <pre className="mt-2 p-3 bg-muted rounded-lg text-xs font-mono whitespace-pre-wrap text-muted-foreground overflow-auto max-h-48">
+                        {messagePreview}
+                      </pre>
+                    </details>
+                  </div>
+                )}
+
                 {/* CHANGE 4 — Seguir comprando */}
                 <div className="mt-4 pt-4 border-t border-border/40">
                   <Button
@@ -892,7 +919,7 @@ export default function CheckoutPage() {
                     ← Seguir comprando
                   </Button>
                 </div>
-              </div>
+              </AnimatedElement>
             </div>
           </div>
         </div>

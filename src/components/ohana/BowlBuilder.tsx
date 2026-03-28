@@ -1,7 +1,7 @@
-import { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { getOfficialBowlSizes, getOfficialIngredients } from '@/config/bowlIngredients';
+import { useIngredients, useBowlRules } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useCart } from '@/context/CartContext';
@@ -19,13 +19,6 @@ const steps: { id: BowlBuilderStep; label: string }[] = [
   { id: 'complementos', label: 'Complementos' },
   { id: 'summary', label: 'Resumen' },
 ];
-
-const bowlSizes = getOfficialBowlSizes();
-const baseOptions = getOfficialIngredients('base');
-const proteinOptions = getOfficialIngredients('protein');
-const acompananteOptions = getOfficialIngredients('acompanante');
-const sauceOptions = getOfficialIngredients('sauce');
-const complementoOptions = getOfficialIngredients('topping');
 
 interface BowlBuilderProps {
   onComplete?: () => void;
@@ -48,6 +41,14 @@ function getSelectionLabel(items: Ingredient[]) {
 export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const { addCustomBowl } = useCart();
 
+  const { data: bowlSizes = [], isLoading: sizesLoading } = useBowlRules();
+  const { data: baseOptions = [], isLoading: basesLoading } = useIngredients('base');
+  const { data: proteinOptions = [], isLoading: proteinsLoading } = useIngredients('protein');
+  const { data: acompananteOptions = [], isLoading: acompLoading } = useIngredients('acompanante');
+  const { data: sauceOptions = [], isLoading: saucesLoading } = useIngredients('sauce');
+  const { data: complementoOptions = [], isLoading: complLoading } = useIngredients('topping');
+  const dataLoading = sizesLoading || basesLoading || proteinsLoading || acompLoading || saucesLoading || complLoading;
+
   const [currentStep, setCurrentStep] = useState<BowlBuilderStep>('size');
   const [selectedSize, setSelectedSize] = useState<BowlSizeRule | null>(null);
   const [selectedBases, setSelectedBases] = useState<Ingredient[]>([]);
@@ -56,8 +57,19 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const [selectedSauces, setSelectedSauces] = useState<Ingredient[]>([]);
   const [selectedComplementos, setSelectedComplementos] = useState<Ingredient[]>([]);
   const [notes, setNotes] = useState('');
+  const [adicionalSelections, setAdicionalSelections] = useState<Record<string, Ingredient | null>>({});
+  const [stepVisible, setStepVisible] = useState(false);
 
   const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
+
+  // Double-RAF trick: reset → layout → transition to visible on each step change
+  useEffect(() => {
+    setStepVisible(false);
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setStepVisible(true));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [currentStep]);
 
   const previewBowl = useMemo<CustomBowl | null>(() => {
     if (!selectedSize) return null;
@@ -121,6 +133,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedSauces([]);
     setSelectedComplementos([]);
     setNotes('');
+    setAdicionalSelections({});
     setCurrentStep('size');
   };
 
@@ -159,10 +172,18 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         return selectedSize !== null;
       case 'bases':
         return selectedBases.length === (selectedSize?.maxBases ?? 0);
-      case 'proteins':
-        return selectedProteins.length === (selectedSize?.maxProteins ?? 0);
-      case 'acompanantes':
-        return selectedAcompanantes.length === (selectedSize?.maxAcompanantes ?? 0);
+      case 'proteins': {
+        const filled = selectedProteins.length === (selectedSize?.maxProteins ?? 0);
+        const adicionales = selectedProteins.filter(i => i.name.toLowerCase().includes('adicional'));
+        const allSpecified = adicionales.every(a => adicionalSelections[a.id]);
+        return filled && allSpecified;
+      }
+      case 'acompanantes': {
+        const filled = selectedAcompanantes.length === (selectedSize?.maxAcompanantes ?? 0);
+        const adicionales = selectedAcompanantes.filter(i => i.name.toLowerCase().includes('adicional'));
+        const allSpecified = adicionales.every(a => adicionalSelections[a.id]);
+        return filled && allSpecified;
+      }
       case 'salsas':
         return selectedSauces.length === (selectedSize?.maxSauces ?? 0);
       case 'complementos':
@@ -201,7 +222,27 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const handleSubmit = () => {
     if (!previewBowl) return;
 
-    addCustomBowl(previewBowl, notes || undefined);
+    const enrichedProteins = selectedProteins.map(item => {
+      if (item.name.toLowerCase().includes('adicional')) {
+        const specific = adicionalSelections[item.id];
+        return specific ? { ...item, name: `${item.name} (${specific.name})` } : item;
+      }
+      return item;
+    });
+    const enrichedAcompanantes = selectedAcompanantes.map(item => {
+      if (item.name.toLowerCase().includes('adicional')) {
+        const specific = adicionalSelections[item.id];
+        return specific ? { ...item, name: `${item.name} (${specific.name})` } : item;
+      }
+      return item;
+    });
+    const enrichedBowl: CustomBowl = {
+      ...previewBowl,
+      proteins: enrichedProteins,
+      acompanantes: enrichedAcompanantes,
+    };
+
+    addCustomBowl(enrichedBowl, notes || undefined);
     toast.success('Bowl personalizado agregado al carrito', {
       description: `${previewBowl.size.name} - ${formatPrice(totalPrice)}`,
     });
@@ -241,8 +282,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       className={cn(
         'group rounded-2xl border bg-card p-4 text-left shadow-sm transition-all duration-200',
         isSelected
-          ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
-          : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
+          ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-md shadow-primary/10'
+          : 'border-border hover:border-primary/40 hover:bg-primary/5 dark:hover:bg-primary/10 hover:shadow-md',
         isDisabled && !isSelected && 'cursor-not-allowed opacity-40',
       )}
     >
@@ -283,29 +324,73 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedItems: Dispatch<SetStateAction<Ingredient[]>>;
     max: number;
     label: string;
-  }) => (
-    <div className="animate-slide-in">
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h3 className="text-xl font-semibold">{title}</h3>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        </div>
-        <CounterBadge current={selectedItems.length} max={max} label={label} />
-      </div>
+  }) => {
+    const selectedAdicionales = selectedItems.filter(item =>
+      item.name.toLowerCase().includes('adicional')
+    );
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-        {items.map((item) => (
-          <IngredientCard
-            key={item.id}
-            ingredient={item}
-            isSelected={selectedItems.some((selectedItem) => selectedItem.id === item.id)}
-            isDisabled={selectedItems.length >= max}
-            onClick={() => toggleIngredient(item, selectedItems, setSelectedItems, max)}
-          />
+    return (
+      <div className="animate-slide-in">
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="text-xl font-semibold">{title}</h3>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
+          </div>
+          <CounterBadge current={selectedItems.length} max={max} label={label} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+          {items.map((item) => (
+            <IngredientCard
+              key={item.id}
+              ingredient={item}
+              isSelected={selectedItems.some((selectedItem) => selectedItem.id === item.id)}
+              isDisabled={selectedItems.length >= max}
+              onClick={() => toggleIngredient(item, selectedItems, setSelectedItems, max)}
+            />
+          ))}
+        </div>
+
+        {selectedAdicionales.map(adicional => (
+          <div
+            key={adicional.id}
+            className="mt-4 p-4 rounded-xl border border-brand/20 dark:border-brand/30 bg-brand/5 dark:bg-brand/10 animate-fade-in"
+          >
+            <p className="text-sm font-medium text-brand-dark mb-2">
+              ¿Cuál {adicional.name.replace(/\s*adicional/i, '').trim().toLowerCase()} extra quieres?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {items
+                .filter(i => !i.name.toLowerCase().includes('adicional'))
+                .map(option => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setAdicionalSelections(prev => ({
+                      ...prev,
+                      [adicional.id]: prev[adicional.id]?.id === option.id ? null : option,
+                    }))}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                      adicionalSelections[adicional.id]?.id === option.id
+                        ? 'bg-brand text-white border-brand'
+                        : 'bg-card border-border hover:border-brand/50',
+                    )}
+                  >
+                    {option.name}
+                  </button>
+                ))}
+            </div>
+            {!adicionalSelections[adicional.id] && (
+              <p className="text-xs text-amber-600 mt-2">
+                Selecciona cuál quieres agregar
+              </p>
+            )}
+          </div>
         ))}
       </div>
-    </div>
-  );
+    );
+  };
 
   const SizeSelector = () => (
     <section className="border-b bg-muted/20 px-6 py-6">
@@ -337,8 +422,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               className={cn(
                 'rounded-2xl border bg-card p-5 text-left shadow-sm transition-all duration-200',
                 isSelected
-                  ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
-                  : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
+                  ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-md shadow-primary/10'
+                  : 'border-border hover:border-primary/40 hover:bg-primary/5 dark:hover:bg-primary/10 hover:shadow-md',
               )}
             >
               <div className="flex items-start justify-between gap-3">
@@ -368,6 +453,17 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   );
 
   const progressPercent = ((currentStepIndex + 1) / steps.length) * 100;
+
+  if (dataLoading) {
+    return (
+      <div className="overflow-hidden rounded-[2rem] border bg-card shadow-lg p-12 flex items-center justify-center min-h-[300px]">
+        <div className="text-center space-y-2">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-ohana border-t-transparent mx-auto" />
+          <p className="text-sm text-muted-foreground">Cargando ingredientes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-[2rem] border bg-card shadow-lg">
@@ -419,7 +515,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       <SizeSelector />
 
       <div className="p-6" role="tabpanel">
-        <div key={currentStep} className="animate-slide-in">
+        <div className={cn('scroll-fade-up', stepVisible && 'in-view')}>
           {currentStep === 'size' ? (
             <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center">
               <h3 className="text-xl font-semibold">Selecciona un tamaño arriba</h3>

@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,7 +17,7 @@ import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deli
 import { formatPrice } from '@/domain/formatPrice';
 import {
   LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
-  Leaf, Search, Truck, Upload, BarChart3,
+  Leaf, Search, Truck, Upload, BarChart3, Plus, Tag, Trash2,
 } from 'lucide-react';
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 
@@ -50,6 +52,24 @@ interface DeliveryZoneRow {
   created_at: string;
 }
 
+interface CategoryRow {
+  id: string;
+  name: string;
+  slug: string | null;
+  brand_id: string;
+  sort_order: number | null;
+}
+
+// ─── Helpers ─────────────────────────────────────────────
+function toSlug(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const { user, isAdmin, loading: authLoading, signOut } = useAdminAuth();
@@ -68,7 +88,8 @@ export default function AdminPage() {
         <div className="container flex h-14 items-center justify-between">
           <h1 className="text-lg font-bold flex items-center gap-2">
             <span className="text-brand font-display font-black">Ohana Bowls</span>
-            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Admin</span>
+            <span className="text-muted-foreground font-normal hidden sm:inline">—</span>
+            <span className="text-sm text-muted-foreground font-normal hidden sm:inline">Panel de Administración</span>
           </h1>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:block">{user?.email}</span>
@@ -84,6 +105,7 @@ export default function AdminPage() {
           <TabsList className="mb-6 flex flex-wrap">
             <TabsTrigger value="orders" className="flex items-center gap-1"><ClipboardList className="w-4 h-4" />Pedidos</TabsTrigger>
             <TabsTrigger value="products" className="flex items-center gap-1"><Package className="w-4 h-4" />Productos</TabsTrigger>
+            <TabsTrigger value="categories" className="flex items-center gap-1"><Tag className="w-4 h-4" />Categorías</TabsTrigger>
             <TabsTrigger value="ingredients" className="flex items-center gap-1"><Salad className="w-4 h-4" />Ingredientes</TabsTrigger>
             <TabsTrigger value="bowl_rules" className="flex items-center gap-1"><Ruler className="w-4 h-4" />Bowl Rules</TabsTrigger>
             <TabsTrigger value="delivery_zones" className="flex items-center gap-1"><Truck className="w-4 h-4" />Domicilios</TabsTrigger>
@@ -93,6 +115,7 @@ export default function AdminPage() {
 
           <TabsContent value="orders"><OrdersAdmin /></TabsContent>
           <TabsContent value="products"><ProductsAdmin /></TabsContent>
+          <TabsContent value="categories"><CategoriesAdmin /></TabsContent>
           <TabsContent value="ingredients"><IngredientsAdmin /></TabsContent>
           <TabsContent value="bowl_rules"><BowlRulesAdmin /></TabsContent>
           <TabsContent value="delivery_zones"><DeliveryZonesAdmin /></TabsContent>
@@ -176,16 +199,26 @@ function ProductsAdmin() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<ProductRow>>({});
+  const [newOpen, setNewOpen] = useState(false);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [newForm, setNewForm] = useState({
+    name: '', description: '', price_cents: 0, category_id: '',
+    is_active: true, is_popular: false, is_new: false, is_vegan: false,
+  });
 
   const fetchProducts = async () => {
     setLoading(true);
-    // Admin can see all products (active and inactive) via RLS
     const { data } = await supabase.from('products').select('*').order('brand_id').order('name');
     setProducts((data ?? []) as ProductRow[]);
     setLoading(false);
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => {
+    fetchProducts();
+    supabase.from('categories').select('id,name').eq('brand_id', 'ohana').order('name').then(({ data }) => {
+      setCategories((data ?? []) as { id: string; name: string }[]);
+    });
+  }, []);
 
   const startEdit = (p: ProductRow) => {
     setEditing(p.id);
@@ -206,11 +239,94 @@ function ProductsAdmin() {
     toast.success(active ? 'Producto activado' : 'Producto desactivado');
   };
 
+  const createProduct = async () => {
+    if (!newForm.name || !newForm.price_cents || !newForm.category_id) {
+      toast.error('Nombre, precio y categoría son requeridos');
+      return;
+    }
+    const { error } = await supabase.from('products').insert({
+      name: newForm.name,
+      description: newForm.description || null,
+      price_cents: newForm.price_cents,
+      brand_id: 'ohana',
+      category_id: newForm.category_id,
+      is_active: newForm.is_active,
+      is_popular: newForm.is_popular,
+      is_new: newForm.is_new,
+      is_vegan: newForm.is_vegan,
+    });
+    if (error) { toast.error('Error al crear producto'); return; }
+    toast.success('Producto creado');
+    setNewOpen(false);
+    setNewForm({ name: '', description: '', price_cents: 0, category_id: '', is_active: true, is_popular: false, is_new: false, is_vegan: false });
+    fetchProducts();
+  };
+
   if (loading) return <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16" />)}</div>;
 
   return (
     <div className="space-y-3">
-      <h2 className="text-xl font-bold mb-4">Productos ({products.length})</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Productos ({products.length})</h2>
+        <Button size="sm" onClick={() => setNewOpen(true)}>
+          <Plus className="w-4 h-4 mr-1" /> Nuevo Producto
+        </Button>
+      </div>
+
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nuevo Producto</DialogTitle>
+            <DialogDescription>Agrega un producto al menú de Ohana Bowls</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre *</Label>
+              <Input value={newForm.name} onChange={e => setNewForm(p => ({ ...p, name: e.target.value }))} placeholder="Nombre del producto" />
+            </div>
+            <div>
+              <Label>Descripción</Label>
+              <Textarea value={newForm.description} onChange={e => setNewForm(p => ({ ...p, description: e.target.value }))} rows={2} />
+            </div>
+            <div>
+              <Label>Precio (COP) *</Label>
+              <Input type="number" value={newForm.price_cents || ''} onChange={e => setNewForm(p => ({ ...p, price_cents: Number(e.target.value) }))} placeholder="ej: 27900" />
+            </div>
+            <div>
+              <Label>Categoría *</Label>
+              <Select value={newForm.category_id} onValueChange={v => setNewForm(p => ({ ...p, category_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecciona categoría" /></SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={newForm.is_active} onCheckedChange={v => setNewForm(p => ({ ...p, is_active: !!v }))} />
+                Activo
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={newForm.is_popular} onCheckedChange={v => setNewForm(p => ({ ...p, is_popular: !!v }))} />
+                Popular
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={newForm.is_new} onCheckedChange={v => setNewForm(p => ({ ...p, is_new: !!v }))} />
+                Nuevo
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={newForm.is_vegan} onCheckedChange={v => setNewForm(p => ({ ...p, is_vegan: !!v }))} />
+                Vegano
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
+            <Button onClick={createProduct} className="btn-ohana">Crear Producto</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {products.map(p => (
         <div key={p.id} className={`bg-card border rounded-xl p-4 ${!p.is_active ? 'opacity-60' : ''}`}>
           {editing === p.id ? (
@@ -244,6 +360,185 @@ function ProductsAdmin() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Categories Admin ─────────────────────────────────────
+function CategoriesAdmin() {
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [productCounts, setProductCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; sort_order: string }>({ name: '', sort_order: '' });
+  const [newOpen, setNewOpen] = useState(false);
+  const [newForm, setNewForm] = useState({ name: '', sort_order: '' });
+
+  const load = async () => {
+    setLoading(true);
+    const [catRes, prodRes] = await Promise.all([
+      supabase.from('categories').select('*').order('sort_order').order('name'),
+      supabase.from('products').select('category_id'),
+    ]);
+    setCategories((catRes.data ?? []) as CategoryRow[]);
+    const counts: Record<string, number> = {};
+    (prodRes.data ?? []).forEach((p: { category_id: string }) => {
+      counts[p.category_id] = (counts[p.category_id] ?? 0) + 1;
+    });
+    setProductCounts(counts);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const startEdit = (cat: CategoryRow) => {
+    setEditing(cat.id);
+    setEditForm({ name: cat.name, sort_order: cat.sort_order != null ? String(cat.sort_order) : '' });
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editForm.name) { toast.error('Nombre requerido'); return; }
+    await supabase.from('categories').update({
+      name: editForm.name,
+      sort_order: editForm.sort_order !== '' ? Number(editForm.sort_order) : null,
+    }).eq('id', id);
+    toast.success('Categoría actualizada');
+    setEditing(null);
+    load();
+  };
+
+  const createCategory = async () => {
+    if (!newForm.name) { toast.error('Nombre requerido'); return; }
+    const { error } = await supabase.from('categories').insert({
+      name: newForm.name,
+      slug: toSlug(newForm.name),
+      brand_id: 'ohana',
+      sort_order: newForm.sort_order !== '' ? Number(newForm.sort_order) : null,
+    });
+    if (error) { toast.error('Error al crear categoría'); return; }
+    toast.success('Categoría creada');
+    setNewOpen(false);
+    setNewForm({ name: '', sort_order: '' });
+    load();
+  };
+
+  const deleteCategory = async (id: string) => {
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (error) { toast.error('Error al eliminar categoría'); return; }
+    toast.success('Categoría eliminada');
+    load();
+  };
+
+  if (loading) return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-14" />)}</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">Categorías ({categories.length})</h2>
+        <Button size="sm" onClick={() => setNewOpen(true)}>
+          <Plus className="w-4 h-4 mr-1" /> Nueva Categoría
+        </Button>
+      </div>
+
+      <div className="border rounded-xl overflow-x-auto bg-card">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="p-3 font-semibold">Nombre</th>
+              <th className="p-3 font-semibold">Slug</th>
+              <th className="p-3 font-semibold">Orden</th>
+              <th className="p-3 font-semibold text-center">Productos</th>
+              <th className="p-3 font-semibold text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.length === 0 && (
+              <tr><td className="p-6 text-center text-muted-foreground" colSpan={5}>Sin categorías</td></tr>
+            )}
+            {categories.map(cat => (
+              <tr key={cat.id} className="border-b last:border-b-0">
+                {editing === cat.id ? (
+                  <>
+                    <td className="p-2">
+                      <Input
+                        value={editForm.name}
+                        onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && saveEdit(cat.id)}
+                      />
+                    </td>
+                    <td className="p-2 text-xs text-muted-foreground">{toSlug(editForm.name || cat.name)}</td>
+                    <td className="p-2">
+                      <Input
+                        type="number"
+                        value={editForm.sort_order}
+                        onChange={e => setEditForm(p => ({ ...p, sort_order: e.target.value }))}
+                        className="w-20"
+                        onKeyDown={e => e.key === 'Enter' && saveEdit(cat.id)}
+                      />
+                    </td>
+                    <td className="p-2 text-center">{productCounts[cat.id] ?? 0}</td>
+                    <td className="p-2 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <Button size="sm" onClick={() => saveEdit(cat.id)}><Save className="w-3 h-3 mr-1" />Guardar</Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="p-3 font-medium">{cat.name}</td>
+                    <td className="p-3 text-xs text-muted-foreground font-mono">{cat.slug ?? '—'}</td>
+                    <td className="p-3 text-muted-foreground">{cat.sort_order ?? '—'}</td>
+                    <td className="p-3 text-center">{productCounts[cat.id] ?? 0}</td>
+                    <td className="p-3 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <Button size="icon" variant="ghost" onClick={() => startEdit(cat)} aria-label="Editar">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={!!(productCounts[cat.id] ?? 0)}
+                          onClick={() => deleteCategory(cat.id)}
+                          aria-label="Eliminar"
+                          className="text-destructive hover:text-destructive disabled:opacity-30"
+                          title={(productCounts[cat.id] ?? 0) > 0 ? `${productCounts[cat.id]} productos en esta categoría` : 'Eliminar categoría'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Categoría</DialogTitle>
+            <DialogDescription>Crea una nueva categoría para Ohana Bowls</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre *</Label>
+              <Input value={newForm.name} onChange={e => setNewForm(p => ({ ...p, name: e.target.value }))} placeholder="ej: Bowls Especiales" />
+              {newForm.name && <p className="text-xs text-muted-foreground mt-1">Slug: {toSlug(newForm.name)}</p>}
+            </div>
+            <div>
+              <Label>Orden</Label>
+              <Input type="number" value={newForm.sort_order} onChange={e => setNewForm(p => ({ ...p, sort_order: e.target.value }))} placeholder="ej: 1" className="w-32" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
+            <Button onClick={createCategory} className="btn-ohana">Crear</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -418,6 +713,8 @@ function DeliveryZonesAdmin() {
   const [importing, setImporting] = useState(false);
   const [summary, setSummary] = useState<{ created: number; updated: number; errors: string[] } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { name: string; feeInput: string; is_active: boolean }>>({});
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [newZoneForm, setNewZoneForm] = useState({ name: '', fee_cents: '', is_active: true });
 
   const loadZones = async () => {
     setLoading(true);
@@ -475,6 +772,22 @@ function DeliveryZonesAdmin() {
     }
 
     toast.success('Domicilio actualizado');
+    loadZones();
+  };
+
+  const addZone = async () => {
+    const name = normalizeZoneName(newZoneForm.name);
+    const feeCents = parseFeeToCents(newZoneForm.fee_cents);
+    if (!name) { toast.error('Nombre requerido'); return; }
+    if (feeCents === null) { toast.error('Tarifa inválida'); return; }
+    const { error } = await supabase.from('delivery_zones').insert({ name, fee_cents: feeCents, is_active: newZoneForm.is_active });
+    if (error) {
+      toast.error(error.message.includes('duplicate') ? 'Ya existe una zona con ese nombre' : 'Error al crear zona');
+      return;
+    }
+    toast.success('Zona creada');
+    setZoneOpen(false);
+    setNewZoneForm({ name: '', fee_cents: '', is_active: true });
     loadZones();
   };
 
@@ -574,10 +887,15 @@ function DeliveryZonesAdmin() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-bold">Domicilios ({zones.length})</h2>
-        <Button variant="outline" onClick={() => setCsvOpen(true)}>
-          <Upload className="w-4 h-4 mr-2" />
-          Importar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setZoneOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Nueva Zona
+          </Button>
+          <Button variant="outline" onClick={() => setCsvOpen(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Importar CSV
+          </Button>
+        </div>
       </div>
 
       <div className="relative max-w-md">
@@ -640,6 +958,35 @@ function DeliveryZonesAdmin() {
         </table>
       </div>
 
+      {/* Nueva Zona Dialog */}
+      <Dialog open={zoneOpen} onOpenChange={setZoneOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Zona de Domicilio</DialogTitle>
+            <DialogDescription>Agrega una zona individual con su tarifa</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre *</Label>
+              <Input value={newZoneForm.name} onChange={e => setNewZoneForm(p => ({ ...p, name: e.target.value }))} placeholder="ej: Chapinero" />
+            </div>
+            <div>
+              <Label>Tarifa (COP) *</Label>
+              <Input value={newZoneForm.fee_cents} onChange={e => setNewZoneForm(p => ({ ...p, fee_cents: e.target.value }))} placeholder="ej: 5000" />
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={newZoneForm.is_active} onCheckedChange={v => setNewZoneForm(p => ({ ...p, is_active: !!v }))} />
+              Activa
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setZoneOpen(false)}>Cancelar</Button>
+            <Button onClick={addZone} className="btn-ohana">Crear Zona</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Import Dialog */}
       <Dialog open={csvOpen} onOpenChange={setCsvOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
