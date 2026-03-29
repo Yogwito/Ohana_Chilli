@@ -8,7 +8,9 @@
       "mcp__claude_ai_Supabase__list_projects",
       "Bash(echo \"EXIT: $?\")",
       "Bash(node:*)",
-      "Bash(ls node_modules/lucide-react/dist/*.js)"
+      "Bash(ls node_modules/lucide-react/dist/*.js)",
+      "Bash(wrangler --version)",
+      "Bash(wrangler pages:*)"
     ]
   }
 }

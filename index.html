@@ -3,41 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script>
-      (function() {
-        var theme = localStorage.getItem('ohana-theme');
-        var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (theme === 'dark' || (!theme && systemDark) || (theme === 'system' && systemDark)) {
-          document.documentElement.classList.add('dark');
-        }
-      })();
-    </script>
 
-    <title>Ohana Bowls | Bowls Frescos en Manizales</title>
-    <meta name="description" content="Restaurante en Manizales con bowls frescos personalizables. Pide a domicilio o recoge en sucursal. ¡Ordena ahora por WhatsApp!" />
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Primary Meta -->
+    <title>Ohana Bowls — Bowls frescos en Manizales</title>
+    <meta name="description" content="Pide tus bowls favoritos y comida deliciosa en Ohana Bowls, Manizales. Arma tu bowl personalizado o elige entre nuestros combos. Entrega a domicilio y recoger en tienda." />
+    <meta name="theme-color" content="#8CC878" />
     <meta name="author" content="Ohana Bowls" />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://ohanachilli.com/" />
+    <link rel="canonical" href="https://ohanabowls.com/" />
 
-    <!-- Nunito font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,700;0,900;1,400&display=swap" rel="stylesheet">
-
-    <!-- OpenGraph -->
-    <meta property="og:site_name" content="Ohana Bowls" />
-    <meta property="og:title" content="Ohana Bowls | Bowls Frescos en Manizales" />
-    <meta property="og:description" content="Bowls saludables y personalizables en Manizales. Pide a domicilio o recoge en sucursal." />
-    <meta property="og:type" content="restaurant" />
-    <meta property="og:url" content="https://ohanachilli.com/" />
-    <meta property="og:image" content="https://ohanachilli.com/og-image.jpg" />
+    <!-- Open Graph (WhatsApp, Facebook, LinkedIn previews) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ohanabowls.com/" />
+    <meta property="og:title" content="Ohana Bowls — Bowls frescos en Manizales" />
+    <meta property="og:description" content="Pide tus bowls favoritos y comida deliciosa. Arma tu bowl personalizado con ingredientes frescos. Entrega a domicilio en Manizales." />
+    <meta property="og:image" content="https://ohanabowls.com/og-image.jpg" />
+    <meta property="og:image:width" content="1080" />
+    <meta property="og:image:height" content="1080" />
     <meta property="og:locale" content="es_CO" />
+    <meta property="og:site_name" content="Ohana Bowls" />
 
-    <!-- Twitter -->
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Ohana Bowls | Bowls Frescos en Manizales" />
-    <meta name="twitter:description" content="Bowls saludables y personalizables en Manizales." />
-    <meta name="twitter:image" content="https://ohanachilli.com/og-image.jpg" />
+    <meta name="twitter:title" content="Ohana Bowls — Bowls frescos en Manizales" />
+    <meta name="twitter:description" content="Pide tus bowls favoritos y comida deliciosa. Arma tu bowl personalizado con ingredientes frescos." />
+    <meta name="twitter:image" content="https://ohanabowls.com/og-image.jpg" />
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -46,7 +41,7 @@
       "@type": "Restaurant",
       "name": "Ohana Bowls",
       "description": "Restaurante en Manizales con bowls frescos personalizables. Pedidos a domicilio y para recoger.",
-      "url": "https://ohanachilli.com",
+      "url": "https://ohanabowls.com",
       "telephone": "+573215667170",
       "servesCuisine": ["Bowls", "Comida saludable"],
       "priceRange": "$$",
@@ -86,6 +81,22 @@
       },
       "sameAs": []
     }
+    </script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,700;0,900;1,400&display=swap" rel="stylesheet" />
+
+    <!-- Anti-flash dark mode script -->
+    <script>
+      (function() {
+        var theme = localStorage.getItem('ohana-theme');
+        var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (theme === 'dark' || (!theme && systemDark) || (theme === 'system' && systemDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
     </script>
   </head>
 

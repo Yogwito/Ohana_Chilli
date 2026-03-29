@@ -43,7 +43,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
-import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
+import { buildPlatformWhatsAppUrl, generateWhatsAppMessage } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
@@ -179,14 +179,24 @@ export default function CheckoutPage() {
 
   const attemptOpenWhatsApp = () => {
     if (!whatsappUrl) return;
-    setWhatsAppOpenStatus('opening');
-    const result = openWhatsAppHandoff(whatsappUrl, { debugLabel: 'checkout_manual' });
-    if (result.ok) {
+
+    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (mobile) {
+      // Direct location change — never blocked by Safari on mobile.
+      // wa.me handles the app/web fallback natively on iOS/Android.
+      window.location.href = whatsappUrl;
       setWhatsAppOpenStatus('opened');
-      toast.success('Abriendo WhatsApp...');
     } else {
-      setWhatsAppOpenStatus('failed');
-      toast.error('Pedido creado, pero no se pudo abrir WhatsApp automáticamente');
+      const win = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      if (win) {
+        win.opener = null;
+        setWhatsAppOpenStatus('opened');
+        toast.success('Abriendo WhatsApp Web...');
+      } else {
+        setWhatsAppOpenStatus('failed');
+        toast.error('No se pudo abrir WhatsApp');
+      }
     }
   };
 
@@ -299,37 +309,35 @@ export default function CheckoutPage() {
             : { product_id: item.product?.id, notes: item.notes },
       }));
 
-      const newOrderId = crypto.randomUUID();
-
-      const { error: orderError } = await supabase.from('orders').insert({
-        id: newOrderId,
-        customer_name: form.name,
-        phone: form.phone,
-        order_type: form.orderType,
-        address: form.address || null,
-        delivery_zone: form.orderType === 'delivery' ? resolvedDeliveryZone || null : null,
-        delivery_fee_cents: resolvedDeliveryFeeCents,
-        notes: form.notes || null,
-        total_cents: finalOrderTotal,
-      });
-
-      if (orderError) {
-        console.error('Error creating order:', orderError);
-        setSubmitError('No pudimos crear el pedido. Intenta nuevamente.');
-        toast.error('Error al crear el pedido. Intenta de nuevo.');
-        setOrderStatus('idle');
-        return;
-      }
-
-      const { error: itemsError } = await supabase.from('order_items').insert(
-        orderItems.map((item) => ({ ...item, order_id: newOrderId }))
+      // Use SECURITY DEFINER RPC — bypasses RLS so anon users can insert orders.
+      // Direct inserts into orders/order_items are blocked by RLS (no anon policies).
+      const { data: createdOrderId, error: createOrderError } = await supabase.rpc(
+        'create_order_with_items',
+        {
+          p_customer_name: form.name,
+          p_phone: form.phone,
+          p_order_type: form.orderType,
+          p_address: form.address || null,
+          p_delivery_zone: form.orderType === 'delivery' ? resolvedDeliveryZone || null : null,
+          p_delivery_fee_cents: resolvedDeliveryFeeCents,
+          p_notes: form.notes || null,
+          p_total_cents: finalOrderTotal,
+          p_items: orderItems,
+        }
       );
 
-      if (itemsError) {
-        console.error('Error creating order items:', itemsError);
+      if (createOrderError || !createdOrderId) {
+        console.error('Error creating order:', createOrderError);
+        setSubmitError(
+          createOrderError?.message
+            ? `Error: ${createOrderError.message}`
+            : 'No pudimos crear el pedido. Intenta nuevamente.'
+        );
+        toast.error('Error al crear el pedido. Intenta de nuevo.');
+        setOrderStatus('idle');
+        desktopWin?.close();
+        return;
       }
-
-      const createdOrderId = newOrderId;
 
       const phone = whatsappNumber || '573215667170';
       // CHANGE 3 — pass paymentMethod to WhatsApp message generator
@@ -452,14 +460,29 @@ export default function CheckoutPage() {
           </p>
 
           {/* Primary CTA */}
-          <Button
-            onClick={attemptOpenWhatsApp}
-            className="w-full h-12 rounded-full text-base font-semibold"
-            style={{ backgroundColor: '#25D366', color: 'white' }}
-          >
-            <MessageCircle className="w-5 h-5 mr-2" />
-            {platform === 'desktop' ? 'Abrir WhatsApp Web' : 'Abrir WhatsApp'}
-          </Button>
+          {platform === 'mobile' ? (
+            <a
+              href={whatsappUrl}
+              className={cn(
+                'w-full h-12 rounded-full text-base font-semibold',
+                'flex items-center justify-center gap-2',
+                'text-white transition-colors',
+              )}
+              style={{ backgroundColor: '#25D366' }}
+            >
+              <MessageCircle className="w-5 h-5" />
+              Abrir WhatsApp
+            </a>
+          ) : (
+            <Button
+              onClick={attemptOpenWhatsApp}
+              className="w-full h-12 rounded-full text-base font-semibold"
+              style={{ backgroundColor: '#25D366', color: 'white' }}
+            >
+              <MessageCircle className="w-5 h-5 mr-2" />
+              Abrir WhatsApp Web
+            </Button>
+          )}
 
           {/* Fallback — only show if opening failed */}
           {whatsAppOpenStatus === 'failed' && (

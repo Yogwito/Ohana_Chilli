@@ -142,8 +142,8 @@ export default function OhanaPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const { data: categories = [] } = useCategories('ohana');
-  const { data: allProducts = [], isLoading } = useProducts({ brandId: 'ohana' });
+  const { data: categories = [], error: categoriesError } = useCategories('ohana');
+  const { data: allProducts = [], isLoading, error: productsError } = useProducts({ brandId: 'ohana' });
 
   // Build tab list: virtual bowl builder first, then all DB categories except the bowl-builder one
   const allTabs = useMemo<Category[]>(() => {
