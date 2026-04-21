@@ -97,6 +97,22 @@ export interface CartState {
   total: number;
 }
 
+// Promotion Types
+export interface Promotion {
+  id: string;
+  title: string;
+  description?: string;
+  discount_type: 'percentage' | 'fixed' | 'label';
+  discount_value: number;
+  badge_text?: string;
+  image_url?: string;
+  is_active: boolean;
+  starts_at?: string;
+  ends_at?: string;
+  sort_order: number;
+  created_at: string;
+}
+
 // Order Types
 export interface CustomerInfo {
   name: string;

@@ -8,7 +8,13 @@ import {
 import SEOHead from '@/components/SEOHead';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
-import { useProducts, useCategories } from '@/hooks/use-catalog';
+import ProductImage from '@/components/products/ProductImage';
+import {
+  buildBusinessWhatsAppUrl,
+  formatCompactHours,
+  isBusinessOpenNow,
+} from '@/domain/businessSettings';
+import { useBusinessSettings, useProducts, useCategories } from '@/hooks/use-catalog';
 import { useCart } from '@/context/CartContext';
 import { trackEvent } from '@/lib/analytics';
 import { toast } from 'sonner';
@@ -16,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { Product, Category } from '@/types';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
+const PromotionsSection = lazy(() => import('@/components/ohana/PromotionsSection'));
 
 // Virtual bowl-builder tab — always first, regardless of DB order
 const BOWL_BUILDER_ID = 'arma-tu-bowl';
@@ -44,7 +51,7 @@ function ProductRowSkeleton() {
         <Skeleton className="h-4 w-64 rounded" />
         <Skeleton className="h-5 w-24 rounded mt-3" />
       </div>
-      <Skeleton className="w-32 h-24 md:w-40 md:h-28 rounded-xl shrink-0" />
+      <Skeleton className="w-24 h-[72px] rounded-xl shrink-0" />
     </div>
   );
 }
@@ -76,9 +83,9 @@ function ProductRow({ product, index = 0 }: { product: Product; index?: number }
       ref={ref}
       style={{ transitionDelay: `${Math.min(index % 4 * 60, 240)}ms` }}
       className={cn(
-        'flex items-start justify-between gap-4 py-4 border-b border-border/10',
+        'group flex items-start justify-between gap-4 py-4 border-b border-border/10',
         'hover:bg-muted/30 dark:hover:bg-white/5 px-2 rounded-lg cursor-pointer',
-        'transition-all duration-500 ease-out',
+        'transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-sm',
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4',
       )}
     >
@@ -90,30 +97,20 @@ function ProductRow({ product, index = 0 }: { product: Product; index?: number }
             {product.description.trim()}
           </p>
         )}
-        <p className="font-bold text-lg text-foreground dark:text-white mt-3">
+        <p className="font-bold text-lg text-brand mt-3">
           {formatCOP(product.price)}
         </p>
       </div>
 
       {/* Right: image with add button */}
-      <div className="w-32 h-24 md:w-40 md:h-28 rounded-xl overflow-hidden relative shrink-0 bg-brand/10">
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover transition-all duration-500 data-[loaded=false]:blur-sm data-[loaded=true]:blur-0"
-            data-loaded="false"
-            onLoad={(e) => e.currentTarget.setAttribute('data-loaded', 'true')}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-4xl font-black text-brand/30 select-none">
-              {product.name.charAt(0)}
-            </span>
-          </div>
-        )}
+      <div className="relative w-24 shrink-0 overflow-hidden rounded-xl">
+        <ProductImage
+          product={product}
+          ratio={4 / 3}
+          imageClassName="group-hover:scale-105"
+          className="rounded-xl"
+          fallbackClassName="rounded-xl bg-gradient-to-br from-brand/30 to-brand-dark/50"
+        />
 
         {/* Floating add button */}
         <button
@@ -144,12 +141,28 @@ export default function OhanaPage() {
 
   const { data: categories = [], error: categoriesError } = useCategories('ohana');
   const { data: allProducts = [], isLoading, error: productsError } = useProducts({ brandId: 'ohana' });
+  const { data: businessSettings } = useBusinessSettings();
 
   // Build tab list: virtual bowl builder first, then all DB categories except the bowl-builder one
   const allTabs = useMemo<Category[]>(() => {
     const rest = categories.filter((c) => c.id !== BOWL_BUILDER_DB_ID);
     return [VIRTUAL_BOWL_TAB, ...rest];
   }, [categories]);
+
+  const compactHours = useMemo(() => formatCompactHours({
+    hoursWeekday: businessSettings?.hoursWeekday ?? null,
+    hoursWeekend: businessSettings?.hoursWeekend ?? null,
+  }), [businessSettings?.hoursWeekday, businessSettings?.hoursWeekend]);
+
+  const storeIsOpen = useMemo(() => isBusinessOpenNow({
+    hoursWeekday: businessSettings?.hoursWeekday ?? null,
+    hoursWeekend: businessSettings?.hoursWeekend ?? null,
+  }), [businessSettings?.hoursWeekday, businessSettings?.hoursWeekend]);
+
+  const whatsappHref = useMemo(
+    () => buildBusinessWhatsAppUrl(businessSettings?.whatsappNumber, 'Hola! Quiero hacer un pedido en Ohana Bowls.'),
+    [businessSettings?.whatsappNumber],
+  );
 
   // Products grouped by categoryId
   const productsByCategory = useMemo(() => {
@@ -224,13 +237,47 @@ export default function OhanaPage() {
 
       {/* ── SECTION 1: Restaurant header ────────────────────────────────── */}
       <div>
-        {/* Cover photo strip */}
+        {/* Hero strip */}
         <div
-          className="w-full h-[200px] md:h-[280px] overflow-hidden"
-          style={{
-            background: 'linear-gradient(135deg, #8CC878 0%, #4a9e3f 50%, #2d6e28 100%)',
-          }}
-        />
+          className="hero-grain relative w-full overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, #8CC878 0%, #4a9e3f 50%, #2d6e28 100%)' }}
+        >
+          <div className="container max-w-4xl flex items-center justify-between gap-6 px-4 py-10 md:py-14">
+            {/* Left: copy + CTAs */}
+            <div className="flex flex-col gap-3 max-w-xs">
+              <span className="inline-flex w-fit items-center rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white">
+                🌿 Comida real. Sabor real.
+              </span>
+              <h1 className="text-3xl font-black text-white leading-tight">
+                Bowls frescos<br />hechos para ti
+              </h1>
+              <p className="text-sm text-white/85">
+                Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
+              </p>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <button
+                  onClick={() => scrollToSection(BOWL_BUILDER_ID)}
+                  className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-brand-dark hover:bg-white/90 transition-colors"
+                >
+                  Arma tu Bowl
+                </button>
+                <button
+                  onClick={() => {
+                    const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
+                    scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
+                  }}
+                  className="rounded-full border border-white px-5 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                >
+                  Ver menú
+                </button>
+              </div>
+            </div>
+            {/* Right: decorative circle */}
+            <div className="hidden sm:flex w-32 h-32 shrink-0 rounded-full bg-white/15 items-center justify-center">
+              <span className="select-none text-6xl">🥗</span>
+            </div>
+          </div>
+        </div>
 
         {/* Info row */}
         <div className="bg-background px-4 pb-5">
@@ -252,59 +299,71 @@ export default function OhanaPage() {
               {/* Name + badges + social */}
               <div className="flex-1 min-w-0 pt-14 flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h1
+                  <p
                     style={{ transitionDelay: '80ms' }}
                     className={cn('font-display font-black text-2xl text-foreground leading-tight truncate', 'scroll-fade-up', mounted && 'in-view')}
                   >
                     Ohana Bowls
-                  </h1>
+                  </p>
                   <div
                     style={{ transitionDelay: '160ms' }}
                     className={cn('flex flex-wrap items-center gap-2 mt-1.5', 'scroll-fade-up', mounted && 'in-view')}
                   >
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-muted text-brand-dark">
-                      Abierto
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                      35–50 min
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Star className="w-3.5 h-3.5 shrink-0 text-amber-400 fill-amber-400" />
-                      4.9
-                    </span>
+                    {storeIsOpen !== null ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-muted text-brand-dark">
+                        {storeIsOpen ? 'Abierto' : 'Cerrado'}
+                      </span>
+                    ) : null}
+                    {businessSettings?.deliveryEta ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        {businessSettings.deliveryEta}
+                      </span>
+                    ) : null}
+                    {businessSettings?.reviewRating ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Star className="w-3.5 h-3.5 shrink-0 text-amber-400 fill-amber-400" />
+                        {businessSettings.reviewRating}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
                 {/* Social links */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <a
-                    href="https://wa.me/573215667170"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-muted p-2 hover:bg-brand/10 transition-colors"
-                    aria-label="WhatsApp"
-                  >
-                    <MessageCircle className="w-4 h-4 text-muted-foreground" />
-                  </a>
-                  <a
-                    href="https://www.instagram.com/bowlsohana"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-muted p-2 hover:bg-brand/10 transition-colors"
-                    aria-label="Instagram"
-                  >
-                    <Instagram className="w-4 h-4 text-muted-foreground" />
-                  </a>
-                  <a
-                    href="https://www.facebook.com/share/1FMJDYhpdD/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-muted p-2 hover:bg-brand/10 transition-colors"
-                    aria-label="Facebook"
-                  >
-                    <Facebook className="w-4 h-4 text-muted-foreground" />
-                  </a>
+                  {whatsappHref ? (
+                    <a
+                      href={whatsappHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-muted p-2 hover:bg-brand/10 transition-colors"
+                      aria-label="WhatsApp"
+                    >
+                      <MessageCircle className="w-4 h-4 text-muted-foreground" />
+                    </a>
+                  ) : null}
+                  {businessSettings?.instagramUrl ? (
+                    <a
+                      href={businessSettings.instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-muted p-2 hover:bg-brand/10 transition-colors"
+                      aria-label="Instagram"
+                    >
+                      <Instagram className="w-4 h-4 text-muted-foreground" />
+                    </a>
+                  ) : null}
+                  {businessSettings?.facebookUrl ? (
+                    <a
+                      href={businessSettings.facebookUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-muted p-2 hover:bg-brand/10 transition-colors"
+                      aria-label="Facebook"
+                    >
+                      <Facebook className="w-4 h-4 text-muted-foreground" />
+                    </a>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -314,20 +373,29 @@ export default function OhanaPage() {
               style={{ transitionDelay: '240ms' }}
               className={cn('flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground', 'scroll-fade-up', mounted && 'in-view')}
             >
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 shrink-0" />
-                c.c Cable Plaza Piso 4 Terraza, Manizales, Caldas
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 shrink-0" />
-                Lun–Dom: 11:00 – 21:00
-              </span>
+              {businessSettings?.contactAddress ? (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 shrink-0" />
+                  {businessSettings.contactAddress}
+                </span>
+              ) : null}
+              {compactHours ? (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 shrink-0" />
+                  {compactHours}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── SECTION 2: Sticky category tabs ─────────────────────────────── */}
+      {/* ── SECTION 2: Promotions ───────────────────────────────────────── */}
+      <Suspense fallback={null}>
+        <PromotionsSection />
+      </Suspense>
+
+      {/* ── SECTION 3: Sticky category tabs ────────────────────────────── */}
       <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/40">
         <div className="container max-w-4xl">
           <div className="flex items-center gap-2">
@@ -350,7 +418,7 @@ export default function OhanaPage() {
             {/* Scrollable category tabs — use allTabs so they appear before products load */}
             <div
               ref={tabsRef}
-              className="flex-1 flex overflow-x-auto scrollbar-hide"
+              className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-hide py-2"
               style={{ touchAction: 'pan-x' }}
             >
               {allTabs.map((cat) => {
@@ -361,15 +429,14 @@ export default function OhanaPage() {
                     data-active={isActive}
                     onClick={() => scrollToSection(cat.slug)}
                     className={cn(
-                      'relative px-4 py-3 text-sm font-semibold uppercase tracking-wide whitespace-nowrap shrink-0',
-                      'transition-colors duration-150',
-                      isActive ? 'text-brand' : 'text-muted-foreground hover:text-foreground',
+                      'px-4 py-1.5 text-sm font-semibold whitespace-nowrap shrink-0 rounded-full',
+                      'transition-all duration-200',
+                      isActive
+                        ? 'bg-brand text-white shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                     )}
                   >
                     {cat.name}
-                    {isActive && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand rounded-full animate-scale-in" />
-                    )}
                   </button>
                 );
               })}
@@ -403,15 +470,18 @@ export default function OhanaPage() {
                 >
                   {/* Category section header */}
                   <AnimatedElement animation="fade-up">
-                    <div className="flex items-center gap-3 py-3 border-b border-border/20 mb-2">
-                      <h2 className="font-display font-bold text-xl uppercase tracking-wide text-foreground dark:text-white">
-                        {cat.name}
-                      </h2>
-                      {isBowlBuilder && (
-                        <span className="text-xs bg-brand text-white px-2 py-0.5 rounded-full font-semibold">
-                          Personalizable
-                        </span>
-                      )}
+                    <div className="py-3 mb-2">
+                      <div className="flex items-center gap-3">
+                        <h2 className="font-display font-bold text-2xl text-foreground dark:text-white">
+                          {cat.name}
+                        </h2>
+                        {isBowlBuilder && (
+                          <span className="text-xs bg-brand text-white px-2 py-0.5 rounded-full font-semibold">
+                            Personalizable
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 h-[3px] w-9 rounded-full bg-brand" />
                     </div>
                   </AnimatedElement>
 
@@ -439,6 +509,28 @@ export default function OhanaPage() {
           </div>
         )}
       </div>
+
+      {/* ── WhatsApp CTA ─────────────────────────────────────────────────── */}
+      {whatsappHref ? (
+        <div className="container max-w-4xl px-4 pb-8">
+          <div className="flex items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-brand to-brand-dark p-5">
+            <div className="flex flex-col gap-1">
+              <p className="text-xs text-white/80">📍 Cable Plaza · Piso 4 Terraza</p>
+              <h3 className="text-base font-semibold text-white">¿Listo para pedir?</h3>
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-brand-dark hover:bg-white/90 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Pedir por WhatsApp
+              </a>
+            </div>
+            <span className="shrink-0 select-none text-5xl opacity-90">🥗</span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,27 +1,48 @@
-import type { CustomBowl } from '@/types';
+import type { CustomBowl, Ingredient } from '@/types';
 import { formatPrice } from './formatPrice';
-import { calculateBowlExtraCharges, calculateBowlPrice, getBowlChargeableIngredients } from './bowlPricing';
+import { calculateBowlExtraCharges, calculateBowlPrice, getBowlChargeLines } from './bowlPricing';
 
 interface BowlSummaryRow {
   label: string;
   value: string;
 }
 
-function joinNames(values: string[]) {
-  return values.length > 0 ? values.join(', ') : 'Sin seleccionar';
+function groupIngredients(items: Ingredient[]) {
+  const grouped = new Map<string, { name: string; quantity: number }>();
+
+  items.forEach((item) => {
+    const current = grouped.get(item.id);
+
+    if (current) {
+      current.quantity += 1;
+      return;
+    }
+
+    grouped.set(item.id, { name: item.name, quantity: 1 });
+  });
+
+  return Array.from(grouped.values());
+}
+
+export function formatGroupedIngredients(items: Ingredient[]) {
+  if (items.length === 0) return 'Sin seleccionar';
+
+  return groupIngredients(items)
+    .map((item) => (item.quantity > 1 ? `${item.name} x${item.quantity}` : item.name))
+    .join(', ');
 }
 
 export function getBowlSummaryRows(bowl: CustomBowl): BowlSummaryRow[] {
   const rows: BowlSummaryRow[] = [
-    { label: 'Base', value: joinNames(bowl.bases.map((item) => item.name)) },
-    { label: 'Proteínas', value: joinNames(bowl.proteins.map((item) => item.name)) },
-    { label: 'Acompañantes', value: joinNames(bowl.acompanantes.map((item) => item.name)) },
-    { label: 'Salsas', value: joinNames((bowl.sauces ?? []).map((item) => item.name)) },
-    { label: 'Complementos', value: joinNames((bowl.complementos ?? []).map((item) => item.name)) },
+    { label: 'Base', value: formatGroupedIngredients(bowl.bases) },
+    { label: 'Proteínas', value: formatGroupedIngredients(bowl.proteins) },
+    { label: 'Acompañantes', value: formatGroupedIngredients(bowl.acompanantes) },
+    { label: 'Salsas', value: formatGroupedIngredients(bowl.sauces ?? []) },
+    { label: 'Complementos', value: formatGroupedIngredients(bowl.complementos ?? []) },
   ];
 
-  const extras = getBowlChargeableIngredients(bowl).map(
-    (item) => `${item.name} (+${formatPrice(item.price ?? 0)})`,
+  const extras = getBowlChargeLines(bowl).map(
+    (line) => `${line.label}${line.quantity > 1 ? ` x${line.quantity}` : ''} (+${formatPrice(line.amount)})`,
   );
 
   if (extras.length > 0) {

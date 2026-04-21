@@ -1,12 +1,31 @@
-import { MapPin, Phone, Clock, Mail, Instagram, Facebook } from 'lucide-react';
+import { MapPin, Phone, Instagram, Facebook } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  buildBusinessWhatsAppUrl,
+  formatBusinessPhone,
+} from '@/domain/businessSettings';
+import {
+  useWhatsAppNumber,
+  useAddress,
+  useBusinessHours,
+  useInstagramUrl,
+  useFacebookUrl,
+} from '@/hooks/use-catalog';
 import SEOHead from '@/components/SEOHead';
 
 export default function ContactPage() {
-  const handleWhatsApp = () => {
-    const message = encodeURIComponent('Hola! Tengo una pregunta sobre Ohana Bowls');
-    window.open(`https://wa.me/525512345678?text=${message}`, '_blank');
-  };
+  const { data: whatsappNumber } = useWhatsAppNumber();
+  const { data: address } = useAddress();
+  const { data: businessHours, isLoading: hoursLoading } = useBusinessHours();
+  const { data: instagramUrl } = useInstagramUrl();
+  const { data: facebookUrl } = useFacebookUrl();
+
+  const whatsappHref = buildBusinessWhatsAppUrl(
+    whatsappNumber ?? undefined,
+    'Hola! Tengo una pregunta sobre Ohana Bowls.',
+  );
+  const phoneLabel = formatBusinessPhone(whatsappNumber ?? undefined);
 
   return (
     <div className="min-h-screen py-12 sm:py-16">
@@ -21,90 +40,87 @@ export default function ContactPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Contact Info */}
             <div className="space-y-6">
+
+              {/* Información */}
               <div className="bg-card rounded-2xl p-6 border">
                 <h3 className="font-semibold mb-4">Información</h3>
-                
+
                 <div className="space-y-4">
-                  <a 
-                    href="https://maps.google.com" 
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-3 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <MapPin className="w-5 h-5 mt-0.5 shrink-0 text-ohana" />
-                    <div>
-                      <p className="font-medium text-foreground">Ubicación</p>
-                      <p>Av. Principal #123, Col. Centro</p>
-                      <p>Ciudad, CP 12345</p>
+                  {phoneLabel && whatsappHref ? (
+                    <a
+                      href={whatsappHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Phone className="w-5 h-5 mt-0.5 shrink-0 text-ohana" />
+                      <div>
+                        <p className="font-medium text-foreground">WhatsApp</p>
+                        <p>{phoneLabel}</p>
+                      </div>
+                    </a>
+                  ) : null}
+
+                  {address ? (
+                    <div className="flex items-start gap-3 text-muted-foreground">
+                      <MapPin className="w-5 h-5 mt-0.5 shrink-0 text-ohana" />
+                      <div>
+                        <p className="font-medium text-foreground">Ubicación</p>
+                        <p>{address}</p>
+                      </div>
                     </div>
-                  </a>
-                  
-                  <a 
-                    href="tel:+525512345678"
-                    className="flex items-start gap-3 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Phone className="w-5 h-5 mt-0.5 shrink-0 text-ohana" />
-                    <div>
-                      <p className="font-medium text-foreground">Teléfono</p>
-                      <p>+52 55 1234 5678</p>
-                    </div>
-                  </a>
-                  
-                  <a 
-                    href="mailto:hola@ohanachilli.com"
-                    className="flex items-start gap-3 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Mail className="w-5 h-5 mt-0.5 shrink-0 text-ohana" />
-                    <div>
-                      <p className="font-medium text-foreground">Email</p>
-                      <p>hola@ohanachilli.com</p>
-                    </div>
-                  </a>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="bg-card rounded-2xl p-6 border">
-                <h3 className="font-semibold mb-4">Horario</h3>
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Lunes - Viernes</span>
-                    <span className="font-medium">11:00 - 21:00</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sábado - Domingo</span>
-                    <span className="font-medium">12:00 - 22:00</span>
-                  </div>
+              {/* Horario — only rendered while loading or when a value exists */}
+              {(hoursLoading || businessHours) ? (
+                <div className="bg-card rounded-2xl p-6 border">
+                  <h3 className="font-semibold mb-4">Horario</h3>
+                  {hoursLoading ? (
+                    <Skeleton className="h-5 w-48 rounded" />
+                  ) : (
+                    <p className="text-muted-foreground">{businessHours}</p>
+                  )}
                 </div>
-              </div>
+              ) : null}
 
-              <div className="bg-card rounded-2xl p-6 border">
-                <h3 className="font-semibold mb-4">Síguenos</h3>
-                
-                <div className="flex gap-4">
-                  <a 
-                    href="https://instagram.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white hover:opacity-90 transition-opacity"
-                  >
-                    <Instagram className="w-6 h-6" />
-                  </a>
-                  <a 
-                    href="https://facebook.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white hover:opacity-90 transition-opacity"
-                  >
-                    <Facebook className="w-6 h-6" />
-                  </a>
+              {/* Síguenos — only rendered when at least one URL exists */}
+              {(instagramUrl || facebookUrl) ? (
+                <div className="bg-card rounded-2xl p-6 border">
+                  <h3 className="font-semibold mb-4">Síguenos</h3>
+
+                  <div className="space-y-3">
+                    {instagramUrl ? (
+                      <a
+                        href={instagramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Instagram className="w-5 h-5 text-ohana shrink-0" />
+                        <span>Instagram</span>
+                      </a>
+                    ) : null}
+
+                    {facebookUrl ? (
+                      <a
+                        href={facebookUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Facebook className="w-5 h-5 text-ohana shrink-0" />
+                        <span>Facebook</span>
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
 
-            {/* WhatsApp CTA */}
+            {/* CTA card */}
             <div className="flex flex-col">
               <div className="bg-ohana-gradient rounded-2xl p-8 flex-1 flex flex-col items-center justify-center text-center">
                 <div className="w-20 h-20 rounded-full bg-ohana/10 flex items-center justify-center mb-6">
@@ -112,16 +128,27 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-2xl font-bold mb-3">¿Necesitas ayuda?</h3>
                 <p className="text-muted-foreground mb-6">
-                  Escríbenos por WhatsApp y te responderemos lo antes posible
+                  Haz tu pedido o resuelve tus dudas directamente por WhatsApp — respondemos en minutos.
                 </p>
-                <Button 
-                  onClick={handleWhatsApp}
-                  size="lg" 
-                  className="bg-green-500 hover:bg-green-600 text-white"
-                >
-                  <Phone className="w-5 h-5 mr-2" />
-                  Enviar WhatsApp
-                </Button>
+
+                {whatsappHref ? (
+                  <Button asChild size="lg" className="bg-green-500 hover:bg-green-600 text-white">
+                    <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                      <Phone className="w-5 h-5 mr-2" />
+                      Enviar WhatsApp
+                    </a>
+                  </Button>
+                ) : (
+                  <Button size="lg" disabled className="bg-green-500 text-white">
+                    <Phone className="w-5 h-5 mr-2" />
+                    WhatsApp no configurado
+                  </Button>
+                )}
+
+                <p className="mt-4 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                  Respondemos en minutos
+                </p>
               </div>
             </div>
           </div>

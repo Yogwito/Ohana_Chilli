@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { CartProvider } from "@/context/CartContext";
+import { useCatalogCrossTabSync } from "@/hooks/use-catalog-sync";
 import { lazy, Suspense } from "react";
 import Layout from "@/components/layout/Layout";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
@@ -18,7 +19,6 @@ const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
-const CartaPage = lazy(() => import("./pages/CartaPage"));
 const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 
@@ -38,9 +38,15 @@ const PageFallback = () => (
   </div>
 );
 
+const CatalogSyncBridge = () => {
+  useCatalogCrossTabSync();
+  return null;
+};
+
 const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
+      <CatalogSyncBridge />
       <CartProvider>
         <TooltipProvider>
           <Toaster />
@@ -60,7 +66,7 @@ const App = () => (
               <Route path="/nosotros" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><AboutPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/contacto" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><ContactPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/pedidos" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OrdersPage /></Layout></Suspense></ErrorBoundary>} />
-              <Route path="/carta" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><CartaPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/carta" element={<Navigate to="/" replace />} />
               <Route path="*" element={<Layout><NotFound /></Layout>} />
             </Routes>
           </BrowserRouter>

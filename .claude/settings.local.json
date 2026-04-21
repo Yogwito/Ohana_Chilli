@@ -10,7 +10,10 @@
       "Bash(node:*)",
       "Bash(ls node_modules/lucide-react/dist/*.js)",
       "Bash(wrangler --version)",
-      "Bash(wrangler pages:*)"
+      "Bash(wrangler pages:*)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(npx tsc *)",
+      "Bash(grep *)"
     ]
   }
 }

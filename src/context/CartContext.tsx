@@ -1,7 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { CartItem, CartState, Product, CustomBowl, Brand } from '@/types';
+import { reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
 import { calculateBowlPrice } from '@/domain/bowlPricing';
+import { useBowlRules, useIngredients, useProducts } from '@/hooks/use-catalog';
 import { z } from 'zod';
 import { toast } from 'sonner';
 
@@ -34,6 +36,7 @@ type CartAction =
   | { type: 'ADD_CUSTOM_BOWL'; payload: { customBowl: CustomBowl; notes?: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
   | { type: 'REMOVE_ITEM'; payload: { itemId: string } }
+  | { type: 'RECONCILE_CATALOG'; payload: { products: Product[]; bowlRules: Parameters<typeof reconcileCartWithCatalog>[1]['bowlRules']; ingredients: Parameters<typeof reconcileCartWithCatalog>[1]['ingredients'] } }
   | { type: 'CLEAR_CART' }
   | { type: 'LOAD_CART'; payload: CartState };
 
@@ -94,6 +97,8 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       const newItems = state.items.filter(item => item.id !== action.payload.itemId);
       return { items: newItems, ...calculateTotals(newItems) };
     }
+    case 'RECONCILE_CATALOG':
+      return reconcileCartWithCatalog(state, action.payload);
     case 'CLEAR_CART':
       return initialState;
     case 'LOAD_CART':
@@ -148,8 +153,22 @@ function saveCartToStorage(cart: CartState) {
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [cart, dispatch] = useReducer(cartReducer, initialState, () => loadCartFromStorage());
+  const { data: products = [], isSuccess: productsReady } = useProducts();
+  const { data: bowlRules = [], isSuccess: bowlRulesReady } = useBowlRules();
+  const { data: ingredients = [], isSuccess: ingredientsReady } = useIngredients();
+
+  const catalogReady = productsReady && bowlRulesReady && ingredientsReady;
 
   useEffect(() => { saveCartToStorage(cart); }, [cart]);
+
+  useEffect(() => {
+    if (!catalogReady) return;
+
+    dispatch({
+      type: 'RECONCILE_CATALOG',
+      payload: { products, bowlRules, ingredients },
+    });
+  }, [bowlRules, catalogReady, ingredients, products]);
 
   const addProduct = useCallback((product: Product, quantity = 1, notes?: string) => {
     dispatch({ type: 'ADD_PRODUCT', payload: { product, quantity, notes } });

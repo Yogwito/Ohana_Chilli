@@ -4,7 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import { useCart } from '@/context/CartContext';
 import { Minus, Plus, Trash2, ShoppingBag, Leaf } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
 
@@ -16,10 +16,22 @@ interface CartDrawerProps {
 export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
   const { cart, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const currentPath = `${location.pathname}${location.search}${location.hash}`;
 
   const handleCheckout = () => {
     onOpenChange(false);
-    navigate('/checkout');
+    navigate('/checkout', { state: { from: currentPath } });
+  };
+
+  const handleContinueShopping = () => {
+    onOpenChange(false);
+  };
+
+  const handleViewMenu = () => {
+    onOpenChange(false);
+    navigate('/carta');
   };
 
   return (
@@ -44,9 +56,14 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
             </div>
             <h3 className="mb-2 text-lg font-semibold">Tu carrito esta vacio</h3>
             <p className="mb-6 text-sm text-muted-foreground">Agrega productos de Ohana Bowls para comenzar.</p>
-            <Button onClick={() => onOpenChange(false)} variant="outline">
-              Explorar menu
-            </Button>
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button onClick={handleContinueShopping} variant="outline" className="w-full sm:w-auto">
+                Seguir comprando
+              </Button>
+              <Button onClick={handleViewMenu} className="w-full sm:w-auto btn-ohana">
+                Ver menú
+              </Button>
+            </div>
           </div>
         ) : (
           <>
@@ -127,6 +144,14 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
               <Button onClick={handleCheckout} className="w-full btn-ohana" size="lg">
                 Ir a Checkout
               </Button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button onClick={handleContinueShopping} variant="outline" className="w-full">
+                  Seguir comprando
+                </Button>
+                <Button onClick={handleViewMenu} variant="ghost" className="w-full">
+                  Ver menú
+                </Button>
+              </div>
             </div>
           </>
         )}

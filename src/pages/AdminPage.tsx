@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
+import { useCatalogMutationSync } from '@/hooks/use-catalog-sync';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,6 +14,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import {
+  BUSINESS_SETTING_DEFINITIONS,
+  type BusinessSettingKey,
+} from '@/domain/businessSettings';
 import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deliveryZones';
 import { formatPrice } from '@/domain/formatPrice';
 import {
@@ -20,6 +25,7 @@ import {
   Leaf, Search, Truck, Upload, BarChart3, Plus, Tag, Trash2,
 } from 'lucide-react';
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
+import PromotionsAdmin from '@/components/admin/PromotionsAdmin';
 
 // ─── Types ───────────────────────────────────────────────
 interface ProductRow {
@@ -110,6 +116,7 @@ export default function AdminPage() {
             <TabsTrigger value="bowl_rules" className="flex items-center gap-1"><Ruler className="w-4 h-4" />Bowl Rules</TabsTrigger>
             <TabsTrigger value="delivery_zones" className="flex items-center gap-1"><Truck className="w-4 h-4" />Domicilios</TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-1"><Settings className="w-4 h-4" />Config</TabsTrigger>
+            <TabsTrigger value="promotions" className="flex items-center gap-1">🏷️ Promociones</TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-1"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
           </TabsList>
 
@@ -120,6 +127,7 @@ export default function AdminPage() {
           <TabsContent value="bowl_rules"><BowlRulesAdmin /></TabsContent>
           <TabsContent value="delivery_zones"><DeliveryZonesAdmin /></TabsContent>
           <TabsContent value="settings"><SettingsAdmin /></TabsContent>
+          <TabsContent value="promotions"><PromotionsAdmin /></TabsContent>
           <TabsContent value="analytics"><AnalyticsAdmin /></TabsContent>
         </Tabs>
       </div>
@@ -140,6 +148,21 @@ function OrdersAdmin() {
   };
 
   useEffect(() => { fetchOrders(); }, []);
+
+  // Real-time: refetch when orders are inserted or updated
+  useEffect(() => {
+    const channel = supabase
+      .channel('orders-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+        toast.success('Nuevo pedido recibido');
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const updateStatus = async (id: string, status: string) => {
     await supabase.from('orders').update({ status }).eq('id', id);
@@ -195,6 +218,7 @@ function OrdersAdmin() {
 
 // ─── Products Admin ──────────────────────────────────────
 function ProductsAdmin() {
+  const syncCatalog = useCatalogMutationSync();
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
@@ -228,13 +252,16 @@ function ProductsAdmin() {
   const saveEdit = async (id: string) => {
     const { error } = await supabase.from('products').update(editForm).eq('id', id);
     if (error) { toast.error('Error al guardar'); return; }
+    await syncCatalog(['products']);
     toast.success('Producto actualizado');
     setEditing(null);
     fetchProducts();
   };
 
   const toggleActive = async (id: string, active: boolean) => {
-    await supabase.from('products').update({ is_active: active }).eq('id', id);
+    const { error } = await supabase.from('products').update({ is_active: active }).eq('id', id);
+    if (error) { toast.error('Error al actualizar el producto'); return; }
+    await syncCatalog(['products']);
     setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: active } : p));
     toast.success(active ? 'Producto activado' : 'Producto desactivado');
   };
@@ -256,6 +283,7 @@ function ProductsAdmin() {
       is_vegan: newForm.is_vegan,
     });
     if (error) { toast.error('Error al crear producto'); return; }
+    await syncCatalog(['products']);
     toast.success('Producto creado');
     setNewOpen(false);
     setNewForm({ name: '', description: '', price_cents: 0, category_id: '', is_active: true, is_popular: false, is_new: false, is_vegan: false });
@@ -366,6 +394,7 @@ function ProductsAdmin() {
 
 // ─── Categories Admin ─────────────────────────────────────
 function CategoriesAdmin() {
+  const syncCatalog = useCatalogMutationSync();
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [productCounts, setProductCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -398,10 +427,13 @@ function CategoriesAdmin() {
 
   const saveEdit = async (id: string) => {
     if (!editForm.name) { toast.error('Nombre requerido'); return; }
-    await supabase.from('categories').update({
+    const { error } = await supabase.from('categories').update({
       name: editForm.name,
+      slug: toSlug(editForm.name),
       sort_order: editForm.sort_order !== '' ? Number(editForm.sort_order) : null,
     }).eq('id', id);
+    if (error) { toast.error('Error al actualizar categoría'); return; }
+    await syncCatalog(['categories']);
     toast.success('Categoría actualizada');
     setEditing(null);
     load();
@@ -416,6 +448,7 @@ function CategoriesAdmin() {
       sort_order: newForm.sort_order !== '' ? Number(newForm.sort_order) : null,
     });
     if (error) { toast.error('Error al crear categoría'); return; }
+    await syncCatalog(['categories']);
     toast.success('Categoría creada');
     setNewOpen(false);
     setNewForm({ name: '', sort_order: '' });
@@ -425,6 +458,7 @@ function CategoriesAdmin() {
   const deleteCategory = async (id: string) => {
     const { error } = await supabase.from('categories').delete().eq('id', id);
     if (error) { toast.error('Error al eliminar categoría'); return; }
+    await syncCatalog(['categories']);
     toast.success('Categoría eliminada');
     load();
   };
@@ -545,6 +579,7 @@ function CategoriesAdmin() {
 
 // ─── Ingredients Admin ───────────────────────────────────
 function IngredientsAdmin() {
+  const syncCatalog = useCatalogMutationSync();
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -558,7 +593,9 @@ function IngredientsAdmin() {
   useEffect(() => { fetchIngredients(); }, []);
 
   const toggleActive = async (id: string, active: boolean) => {
-    await supabase.from('ingredients').update({ is_active: active }).eq('id', id);
+    const { error } = await supabase.from('ingredients').update({ is_active: active }).eq('id', id);
+    if (error) { toast.error('Error al actualizar ingrediente'); return; }
+    await syncCatalog(['ingredients']);
     setIngredients(prev => prev.map(i => i.id === id ? { ...i, is_active: active } : i));
     toast.success(active ? 'Ingrediente activado' : 'Ingrediente desactivado');
   };
@@ -595,6 +632,7 @@ function IngredientsAdmin() {
 
 // ─── Bowl Rules Admin ────────────────────────────────────
 function BowlRulesAdmin() {
+  const syncCatalog = useCatalogMutationSync();
   const [rules, setRules] = useState<BowlRuleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
@@ -613,7 +651,9 @@ function BowlRulesAdmin() {
   };
 
   const saveEdit = async (size: string) => {
-    await supabase.from('bowl_rules').update(editForm).eq('size', size);
+    const { error } = await supabase.from('bowl_rules').update(editForm).eq('size', size);
+    if (error) { toast.error('Error al actualizar regla'); return; }
+    await syncCatalog(['bowl_rules']);
     toast.success('Regla actualizada');
     setEditing(null);
     const { data } = await supabase.from('bowl_rules').select('*');
@@ -704,6 +744,7 @@ function parseCsvLine(line: string) {
 }
 
 function DeliveryZonesAdmin() {
+  const syncCatalog = useCatalogMutationSync();
   const [zones, setZones] = useState<DeliveryZoneRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -771,6 +812,7 @@ function DeliveryZonesAdmin() {
       return;
     }
 
+    await syncCatalog(['delivery_zones']);
     toast.success('Domicilio actualizado');
     loadZones();
   };
@@ -785,6 +827,7 @@ function DeliveryZonesAdmin() {
       toast.error(error.message.includes('duplicate') ? 'Ya existe una zona con ese nombre' : 'Error al crear zona');
       return;
     }
+    await syncCatalog(['delivery_zones']);
     toast.success('Zona creada');
     setZoneOpen(false);
     setNewZoneForm({ name: '', fee_cents: '', is_active: true });
@@ -858,10 +901,12 @@ function DeliveryZonesAdmin() {
       fee_cents: item.fee_cents,
       is_active: true,
     }));
+    let writeSucceeded = false;
 
     if (payload.length > 0) {
       const { error } = await supabase.from('delivery_zones').upsert(payload, { onConflict: 'name' });
       if (error) errors.push(`Error Supabase: ${error.message}`);
+      else writeSucceeded = true;
     }
 
     const created = Array.from(upsertByKey.values()).filter((item) => !item.existed).length;
@@ -876,6 +921,9 @@ function DeliveryZonesAdmin() {
       toast.success(`Importacion lista: ${created} creados, ${updated} actualizados`);
     }
 
+    if (writeSucceeded) {
+      await syncCatalog(['delivery_zones']);
+    }
     loadZones();
   };
 
@@ -1029,31 +1077,76 @@ function DeliveryZonesAdmin() {
 }
 
 function SettingsAdmin() {
-  const [whatsapp, setWhatsapp] = useState('');
+  const syncCatalog = useCatalogMutationSync();
+  const [settingsForm, setSettingsForm] = useState<Record<BusinessSettingKey, string>>(
+    () => Object.fromEntries(
+      BUSINESS_SETTING_DEFINITIONS.map((setting) => [setting.key, '']),
+    ) as Record<BusinessSettingKey, string>,
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from('settings').select('value').eq('key', 'whatsapp_number').single().then(({ data }) => {
-      setWhatsapp(data?.value ?? '');
-      setLoading(false);
-    });
+    const keys = BUSINESS_SETTING_DEFINITIONS.map((setting) => setting.key);
+
+    supabase
+      .from('settings')
+      .select('key,value')
+      .in('key', keys)
+      .then(({ data, error }) => {
+        if (error) {
+          toast.error('Error al cargar configuración');
+          setLoading(false);
+          return;
+        }
+
+        const nextSettings = Object.fromEntries(
+          BUSINESS_SETTING_DEFINITIONS.map((setting) => [setting.key, '']),
+        ) as Record<BusinessSettingKey, string>;
+
+        (data ?? []).forEach((row) => {
+          if (row.key in nextSettings) {
+            nextSettings[row.key as BusinessSettingKey] = row.value ?? '';
+          }
+        });
+
+        setSettingsForm(nextSettings);
+        setLoading(false);
+      });
   }, []);
 
   const save = async () => {
-    await supabase.from('settings').update({ value: whatsapp }).eq('key', 'whatsapp_number');
-    toast.success('Número de WhatsApp actualizado');
+    const { error } = await supabase
+      .from('settings')
+      .upsert(
+        BUSINESS_SETTING_DEFINITIONS.map((setting) => ({
+          key: setting.key,
+          value: settingsForm[setting.key].trim(),
+        })),
+        { onConflict: 'key' },
+      );
+    if (error) { toast.error('Error al actualizar configuración'); return; }
+    await syncCatalog(['settings']);
+    toast.success('Configuración actualizada');
   };
 
   if (loading) return <Skeleton className="h-24" />;
 
   return (
-    <div className="max-w-md space-y-6">
+    <div className="max-w-3xl space-y-6">
       <h2 className="text-xl font-bold">Configuración</h2>
       <div className="bg-card border rounded-xl p-6 space-y-4">
-        <div>
-          <Label>Número de WhatsApp</Label>
-          <Input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="573215667170" />
-          <p className="text-xs text-muted-foreground mt-1">Sin espacios ni guiones (ej: 573215667170)</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {BUSINESS_SETTING_DEFINITIONS.map((setting) => (
+            <div key={setting.key} className={setting.key === 'contact_address' ? 'md:col-span-2' : ''}>
+              <Label>{setting.label}</Label>
+              <Input
+                value={settingsForm[setting.key]}
+                onChange={(event) => setSettingsForm((prev) => ({ ...prev, [setting.key]: event.target.value }))}
+                placeholder={setting.placeholder}
+              />
+              <p className="text-xs text-muted-foreground mt-1">{setting.description}</p>
+            </div>
+          ))}
         </div>
         <Button onClick={save} className="btn-ohana"><Save className="w-4 h-4 mr-2" />Guardar</Button>
       </div>

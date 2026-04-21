@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
-import { useActiveDeliveryZones, useWhatsAppNumber } from '@/hooks/use-catalog';
+import { useActiveDeliveryZones, useBusinessSettings } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,15 +35,15 @@ import {
   Trash2,
   Copy,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
+import { formatBusinessPhone, parseBusinessAddress } from '@/domain/businessSettings';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
-import { buildPlatformWhatsAppUrl, generateWhatsAppMessage } from '@/domain/whatsapp';
+import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
@@ -59,12 +59,13 @@ const checkoutSchema = z.object({
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 type OrderStatus = 'idle' | 'submitting' | 'created';
-type WhatsAppOpenStatus = 'idle' | 'opening' | 'opened' | 'failed';
+type CheckoutLocationState = { from?: string } | null;
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { cart, updateQuantity, removeItem, clearCart } = useCart();
-  const { data: whatsappNumber } = useWhatsAppNumber();
+  const { data: businessSettings } = useBusinessSettings();
   const {
     data: deliveryZones = [],
     isLoading: loadingDeliveryZones,
@@ -77,7 +78,6 @@ export default function CheckoutPage() {
   const [whatsappUrl, setWhatsappUrl] = useState<string>('');
   const [submitError, setSubmitError] = useState<string>('');
   const [selectedZoneId, setSelectedZoneId] = useState('');
-  const [whatsAppOpenStatus, setWhatsAppOpenStatus] = useState<WhatsAppOpenStatus>('idle');
   const [platform, setPlatform] = useState<'mobile' | 'desktop'>('mobile');
 
   // CHANGE 1 — delivery as default
@@ -97,6 +97,12 @@ export default function CheckoutPage() {
   // CHANGE 5 — terms states
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const previousShoppingPath = typeof (location.state as CheckoutLocationState | undefined)?.from === 'string'
+    ? (location.state as CheckoutLocationState).from
+    : null;
+  const continueShoppingPath = previousShoppingPath && !previousShoppingPath.startsWith('/checkout')
+    ? previousShoppingPath
+    : '/carta';
 
   const isDeliveryZoneQueryError = Boolean(deliveryZonesError);
   const selectedDeliveryZone = useMemo(
@@ -109,6 +115,9 @@ export default function CheckoutPage() {
   const orderTotal = orderSubtotal + deliveryFeeCents;
   const submitBlockedByZone = form.orderType === 'delivery'
     && (loadingDeliveryZones || isDeliveryZoneQueryError || !hasSelectedDeliveryZone);
+  const whatsappNumber = businessSettings?.whatsappNumber ?? null;
+  const businessPhoneLabel = formatBusinessPhone(whatsappNumber);
+  const addressParts = parseBusinessAddress(businessSettings?.contactAddress);
 
   const formattedOrderRef = useMemo(() => {
     if (!orderId) return null;
@@ -177,27 +186,16 @@ export default function CheckoutPage() {
     }
   };
 
-  const attemptOpenWhatsApp = () => {
-    if (!whatsappUrl) return;
+  const handleContinueShopping = () => {
+    navigate(continueShoppingPath);
+  };
 
-    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const handleGoHome = () => {
+    navigate('/');
+  };
 
-    if (mobile) {
-      // Direct location change — never blocked by Safari on mobile.
-      // wa.me handles the app/web fallback natively on iOS/Android.
-      window.location.href = whatsappUrl;
-      setWhatsAppOpenStatus('opened');
-    } else {
-      const win = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-      if (win) {
-        win.opener = null;
-        setWhatsAppOpenStatus('opened');
-        toast.success('Abriendo WhatsApp Web...');
-      } else {
-        setWhatsAppOpenStatus('failed');
-        toast.error('No se pudo abrir WhatsApp');
-      }
-    }
+  const handleStartAnotherOrder = () => {
+    navigate(continueShoppingPath);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -241,16 +239,11 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Open a blank desktop tab NOW, inside the user-gesture chain, before any await.
-    // Browsers revoke the user-gesture token after the first await, so popup blockers would
-    // kill window.open if called later. We navigate the blank tab to WhatsApp after the order
-    // is created successfully.
-    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    let desktopWin: Window | null = null;
-    if (!isMobileDevice) {
-      desktopWin = window.open('', '_blank');
-      // Null out opener in the new tab for security (cross-origin protection)
-      if (desktopWin) desktopWin.opener = null;
+    if (!whatsappNumber) {
+      const message = 'El número de WhatsApp no está configurado. Intenta nuevamente en unos minutos.';
+      setSubmitError(message);
+      toast.error(message);
+      return;
     }
 
     setOrderStatus('submitting');
@@ -335,11 +328,10 @@ export default function CheckoutPage() {
         );
         toast.error('Error al crear el pedido. Intenta de nuevo.');
         setOrderStatus('idle');
-        desktopWin?.close();
         return;
       }
 
-      const phone = whatsappNumber || '573215667170';
+      const phone = whatsappNumber;
       // CHANGE 3 — pass paymentMethod to WhatsApp message generator
       const message = generateWhatsAppMessage(cart.items, finalOrderTotal, {
         name: form.name,
@@ -371,22 +363,12 @@ export default function CheckoutPage() {
       setOrderStatus('created');
 
       if (detectedPlatform === 'desktop') {
-        if (desktopWin) {
-          desktopWin.location.href = url;
-          setWhatsAppOpenStatus('opened');
-          toast.success('WhatsApp Web se abrió en una nueva pestaña.');
-        } else {
-          // window.open was blocked even before awaits (aggressive popup blocker)
-          setWhatsAppOpenStatus('failed');
-          toast.error('Pedido creado. Abre WhatsApp con el botón de abajo.');
-        }
+        openWhatsAppHandoff(phone, message);
+        toast.success('WhatsApp Web se abrió en una nueva pestaña.');
       } else {
-        desktopWin?.close(); // close blank tab if somehow opened on mobile
-        setWhatsAppOpenStatus('idle');
         toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
       }
     } catch (err) {
-      desktopWin?.close();
       console.error('Unexpected error:', err);
       setSubmitError('Ocurrió un error inesperado al crear tu pedido.');
       toast.error('Error inesperado. Intenta de nuevo.');
@@ -415,10 +397,13 @@ export default function CheckoutPage() {
           </div>
           <h2 className="text-2xl font-bold mb-2">Tu carrito está vacío</h2>
           <p className="text-muted-foreground mb-8">Elige tus platos favoritos y empieza a armar tu orden.</p>
-          <div className="flex gap-3 justify-center flex-wrap">
-            <Button onClick={() => navigate('/')} className="btn-ohana">
+          <div className="flex flex-col gap-3 justify-center sm:flex-row">
+            <Button onClick={handleContinueShopping} className="btn-ohana w-full sm:w-auto">
               <ShoppingCart className="w-4 h-4 mr-2" />
-              Ver Menú
+              Seguir comprando
+            </Button>
+            <Button onClick={handleGoHome} variant="outline" className="w-full sm:w-auto">
+              Volver al inicio
             </Button>
           </div>
         </div>
@@ -452,12 +437,17 @@ export default function CheckoutPage() {
 
           {/* Status message */}
           <p className="text-muted-foreground text-sm">
-            {whatsAppOpenStatus === 'opened' && platform === 'desktop'
+            {platform === 'desktop'
               ? 'WhatsApp Web se abrió en una nueva pestaña. Envía el mensaje para confirmar tu pedido.'
-              : whatsAppOpenStatus === 'opened'
-              ? 'Abriendo WhatsApp...'
               : 'Toca el botón para enviar tu pedido por WhatsApp.'}
           </p>
+
+          <div className="rounded-2xl border bg-card/60 px-4 py-3 text-left text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Siguiente paso</p>
+            <p>
+              Tu pedido ya fue creado. Solo falta enviar el mensaje en WhatsApp para confirmarlo con el equipo de Ohana.
+            </p>
+          </div>
 
           {/* Primary CTA */}
           {platform === 'mobile' ? (
@@ -475,7 +465,7 @@ export default function CheckoutPage() {
             </a>
           ) : (
             <Button
-              onClick={attemptOpenWhatsApp}
+              onClick={() => openWhatsAppHandoff(whatsappNumber!, whatsappMessage)}
               className="w-full h-12 rounded-full text-base font-semibold"
               style={{ backgroundColor: '#25D366', color: 'white' }}
             >
@@ -484,36 +474,39 @@ export default function CheckoutPage() {
             </Button>
           )}
 
-          {/* Fallback — only show if opening failed */}
-          {whatsAppOpenStatus === 'failed' && (
-            <div className="space-y-2">
-              <p className="text-sm text-destructive">
-                No se pudo abrir WhatsApp automáticamente.
-              </p>
-              <Button variant="outline" className="w-full" asChild>
-                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Enlace directo
-                </a>
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full"
-                onClick={handleCopyMessage}
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Copiar mensaje
-              </Button>
-            </div>
-          )}
-
-          {/* Back to menu */}
+          {/* Fallback — always visible for edge cases */}
           <Button
-            variant="ghost"
-            onClick={() => navigate('/')}
-            className="w-full text-muted-foreground hover:text-brand"
+            variant="outline"
+            className="w-full"
+            onClick={handleCopyMessage}
           >
-            ← Volver al menú
+            <Copy className="w-4 h-4 mr-2" />
+            Copiar mensaje
+          </Button>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Button
+              variant="outline"
+              onClick={handleGoHome}
+              className="w-full"
+            >
+              Volver al inicio
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleStartAnotherOrder}
+              className="w-full"
+            >
+              Hacer otro pedido
+            </Button>
+          </div>
+
+          <Button
+            variant="outline"
+            onClick={() => navigate('/')}
+            className="w-full"
+          >
+            Seguir comprando →
           </Button>
 
         </div>
@@ -932,15 +925,26 @@ export default function CheckoutPage() {
 
                 {/* CHANGE 4 — Seguir comprando */}
                 <div className="mt-4 pt-4 border-t border-border/40">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/')}
-                    className="w-full text-muted-foreground hover:text-brand text-xs"
-                  >
-                    ← Seguir comprando
-                  </Button>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleContinueShopping}
+                      className="w-full"
+                    >
+                      Seguir comprando
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleGoHome}
+                      className="w-full text-muted-foreground hover:text-brand"
+                    >
+                      Volver al inicio
+                    </Button>
+                  </div>
                 </div>
               </AnimatedElement>
             </div>
@@ -993,14 +997,14 @@ export default function CheckoutPage() {
                 3. Domicilios y Tiempos de Entrega
               </h3>
               <p>
-                Los tiempos de entrega son estimados (35-50 minutos) y pueden
+                Los tiempos de entrega son estimados ({businessSettings?.deliveryEta ?? 'según configuración vigente'}) y pueden
                 variar según la demanda, condiciones de tráfico y zona de entrega.
                 Ohana Bowls no se hace responsable por demoras ocasionadas por
                 factores externos.
               </p>
               <p>
                 El servicio de domicilio está disponible únicamente en las zonas
-                habilitadas de Manizales. El costo varía según el barrio
+                habilitadas{addressParts.addressLocality ? ` de ${addressParts.addressLocality}` : ''}. El costo varía según el barrio
                 seleccionado.
               </p>
             </section>
@@ -1043,7 +1047,7 @@ export default function CheckoutPage() {
                 Sus datos no serán compartidos con terceros sin su consentimiento
                 expreso. Usted tiene derecho a conocer, actualizar, rectificar y
                 suprimir sus datos personales en cualquier momento contactándonos
-                a través de WhatsApp al número +57 321 5667170.
+                a través de WhatsApp al número {businessPhoneLabel ?? 'configurado en el panel administrativo'}.
               </p>
             </section>
 
@@ -1056,14 +1060,14 @@ export default function CheckoutPage() {
                 de sus datos personales, comuníquese con nosotros:
               </p>
               <p className="font-medium text-foreground">
-                Ohana Bowls — c.c Cable Plaza Piso 4 Terraza, Manizales, Caldas<br/>
-                WhatsApp: +57 321 5667170<br/>
-                Instagram: @bowlsohana
+                {businessSettings?.contactAddress ? <>Ohana Bowls — {businessSettings.contactAddress}<br/></> : null}
+                {businessPhoneLabel ? <>WhatsApp: {businessPhoneLabel}<br/></> : null}
+                {businessSettings?.instagramHandle ? <>Instagram: {businessSettings.instagramHandle}</> : null}
               </p>
             </section>
 
             <p className="text-xs text-muted-foreground/70 pt-2 border-t border-border/40">
-              Última actualización: marzo 2026 · Manizales, Colombia
+              Última actualización: marzo 2026{addressParts.addressLocality ? ` · ${addressParts.addressLocality}, Colombia` : ''}
             </p>
           </div>
         </DialogContent>

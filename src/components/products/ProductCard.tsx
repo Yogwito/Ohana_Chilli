@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Plus, Check, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import ProductImage from '@/components/products/ProductImage';
 import { Product, Brand } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
@@ -40,7 +40,6 @@ export default function ProductCard({ product, variant = 'default', categoryName
   const { addProduct } = useCart();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [added, setAdded] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
 
   const descriptionText = product.description.trim();
   const ingredientsText = useMemo(() => {
@@ -73,11 +72,16 @@ export default function ProductCard({ product, variant = 'default', categoryName
       >
         <div
           className={cn(
-            'w-12 h-12 rounded-lg flex items-center justify-center shrink-0 text-2xl font-black opacity-60',
-            'bg-ohana/10 text-ohana',
+            'w-12 shrink-0 overflow-hidden rounded-lg',
           )}
         >
-          {product.name.charAt(0)}
+          <ProductImage
+            product={product}
+            ratio={1}
+            className="rounded-lg"
+            imageClassName="group-hover:scale-105"
+            fallbackClassName="rounded-lg"
+          />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold tracking-tight truncate">{product.name}</p>
@@ -103,24 +107,11 @@ export default function ProductCard({ product, variant = 'default', categoryName
           'group flex flex-col rounded-2xl overflow-hidden border border-border/60 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-brand/20',
         )}
       >
-        {/* Image or muted fallback */}
-        {product.imageUrl ? (
-          <div className="relative aspect-[4/3] overflow-hidden bg-brand-muted">
-            {!imageLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              loading="lazy"
-              onLoad={() => setImageLoaded(true)}
-              className={cn(
-                'w-full h-full object-cover transition-all duration-300 group-hover:scale-105',
-                imageLoaded ? 'opacity-100' : 'opacity-0',
-              )}
-            />
-          </div>
-        ) : (
-          <div className="h-16 bg-brand-muted" />
-        )}
+        <ProductImage
+          product={product}
+          ratio={4 / 3}
+          imageClassName="group-hover:scale-105"
+        />
 
         <div className="flex flex-col flex-1 p-4 gap-2">
           {/* Name */}

@@ -1,8 +1,19 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Phone, Clock, Instagram, Facebook } from 'lucide-react';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
+import {
+  buildBusinessWhatsAppUrl,
+  formatBusinessPhone,
+  parseBusinessAddress,
+} from '@/domain/businessSettings';
+import { useBusinessSettings } from '@/hooks/use-catalog';
 
 export default function Footer() {
+  const { data: businessSettings } = useBusinessSettings();
+  const whatsappLabel = formatBusinessPhone(businessSettings?.whatsappNumber);
+  const whatsappHref = buildBusinessWhatsAppUrl(businessSettings?.whatsappNumber);
+  const address = parseBusinessAddress(businessSettings?.contactAddress);
+
   return (
     <footer className="bg-zinc-900 dark:bg-zinc-950 text-zinc-400">
       {/* Brand gradient separator */}
@@ -16,7 +27,7 @@ export default function Footer() {
               Ohana Bowls
             </span>
             <p className="text-zinc-500 text-sm leading-relaxed mt-4">
-              Bowls frescos y personalizables en Manizales.
+              Bowls frescos y personalizables{address.addressLocality ? ` en ${address.addressLocality}` : ''}.
             </p>
           </AnimatedElement>
 
@@ -25,7 +36,7 @@ export default function Footer() {
             <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Enlaces</h4>
             <nav className="flex flex-col gap-2">
               {[
-                { to: '/ohana', label: 'Menú' },
+                { to: '/', label: 'Menú' },
                 { to: '/bebidas', label: 'Bebidas' },
                 { to: '/nosotros', label: 'Nosotros' },
               ].map(({ to, label }) => (
@@ -44,22 +55,33 @@ export default function Footer() {
           <AnimatedElement animation="fade-up" delay={150}>
             <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Contacto</h4>
             <div className="flex flex-col gap-3">
-              <a
-                href="https://maps.app.goo.gl/9cjJJnHzF415GcWBA?g_st=ic"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-2 text-zinc-400 hover:text-white text-sm transition-colors hover:translate-x-0.5"
-              >
-                <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>c.c Cable Plaza Piso 4 Terraza, Manizales, Caldas</span>
-              </a>
-              <a
-                href="tel:+573215667170"
-                className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors hover:translate-x-0.5"
-              >
-                <Phone className="h-4 w-4 shrink-0" />
-                <span>+57 321 5667170</span>
-              </a>
+              {businessSettings?.contactAddress && businessSettings.contactMapsUrl ? (
+                <a
+                  href={businessSettings.contactMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2 text-zinc-400 hover:text-white text-sm transition-colors hover:translate-x-0.5"
+                >
+                  <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{businessSettings.contactAddress}</span>
+                </a>
+              ) : businessSettings?.contactAddress ? (
+                <div className="flex items-start gap-2 text-zinc-400 text-sm">
+                  <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{businessSettings.contactAddress}</span>
+                </div>
+              ) : null}
+              {whatsappLabel && whatsappHref ? (
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors hover:translate-x-0.5"
+                >
+                  <Phone className="h-4 w-4 shrink-0" />
+                  <span>{whatsappLabel}</span>
+                </a>
+              ) : null}
             </div>
           </AnimatedElement>
 
@@ -67,35 +89,43 @@ export default function Footer() {
           <AnimatedElement animation="fade-up" delay={225}>
             <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Horario</h4>
             <div className="flex flex-col gap-2 text-sm text-zinc-500">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0" />
-                <span>Lun - Vie: 11:00 - 21:00</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0" />
-                <span>Sáb - Dom: 11:00 - 21:00</span>
-              </div>
+              {businessSettings?.hoursWeekday ? (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0" />
+                  <span>Lun - Vie: {businessSettings.hoursWeekday}</span>
+                </div>
+              ) : null}
+              {businessSettings?.hoursWeekend ? (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0" />
+                  <span>Sáb - Dom: {businessSettings.hoursWeekend}</span>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex gap-3 mt-6">
-              <a
-                href="https://www.instagram.com/bowlsohana?igsh=a2lhejY1emxoN2Uy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 p-2 text-zinc-400 hover:text-white transition-colors"
-                aria-label="Instagram"
-              >
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a
-                href="https://www.facebook.com/share/1FMJDYhpdD/?mibextid=wwXIfr"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 p-2 text-zinc-400 hover:text-white transition-colors"
-                aria-label="Facebook"
-              >
-                <Facebook className="h-5 w-5" />
-              </a>
+              {businessSettings?.instagramUrl ? (
+                <a
+                  href={businessSettings.instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 p-2 text-zinc-400 hover:text-white transition-colors"
+                  aria-label="Instagram"
+                >
+                  <Instagram className="h-5 w-5" />
+                </a>
+              ) : null}
+              {businessSettings?.facebookUrl ? (
+                <a
+                  href={businessSettings.facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 p-2 text-zinc-400 hover:text-white transition-colors"
+                  aria-label="Facebook"
+                >
+                  <Facebook className="h-5 w-5" />
+                </a>
+              ) : null}
             </div>
           </AnimatedElement>
         </div>
@@ -104,7 +134,9 @@ export default function Footer() {
           <p className="text-sm text-zinc-600">
             © {new Date().getFullYear()} Ohana Bowls. Todos los derechos reservados.
           </p>
-          <p className="text-xs text-zinc-700 mt-1">Hecho con ♥ en Manizales</p>
+          <p className="text-xs text-zinc-700 mt-1">
+            Hecho con ♥{address.addressLocality ? ` en ${address.addressLocality}` : ''}
+          </p>
           <div className="mt-4">
             <Link
               to="/admin/login"

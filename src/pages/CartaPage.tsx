@@ -1,8 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Search, Leaf, Coffee, MapPin, Phone, Clock, Instagram, MessageCircle, ChevronDown, Star, Plus } from 'lucide-react';
-import { useProducts, useCategories, useBowlRules, useIngredients, useBeverages, useBeverageCategories } from '@/hooks/use-catalog';
+import {
+  buildBusinessWhatsAppUrl,
+  formatBusinessPhone,
+} from '@/domain/businessSettings';
+import { useProducts, useCategories, useBowlRules, useIngredients, useBeverages, useBeverageCategories, useBusinessSettings } from '@/hooks/use-catalog';
 import { useCart } from '@/context/CartContext';
 import { formatPrice } from '@/domain/formatPrice';
+import ProductImage from '@/components/products/ProductImage';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import SEOHead from '@/components/SEOHead';
@@ -27,6 +32,14 @@ function MenuItemCard({ product, categoryName }: { product: Product; categoryNam
     <article className="group relative flex flex-col rounded-2xl border bg-card p-4 gap-2 transition-all duration-200 hover:shadow-lg border-ohana/10 hover:border-ohana/30">
       {/* top accent line */}
       <div className="absolute top-0 left-4 right-4 h-0.5 rounded-b-full bg-gradient-to-r from-ohana/60 to-ohana-dark/60" />
+
+      <div className="overflow-hidden rounded-xl">
+        <ProductImage
+          product={product}
+          ratio={16 / 10}
+          imageClassName="group-hover:scale-105"
+        />
+      </div>
 
       {/* name + price */}
       <div className="flex items-start justify-between gap-3">
@@ -199,10 +212,13 @@ export default function CartaPage() {
   const { data: ingredients = [] } = useIngredients();
   const { data: beverages = [], isLoading: loadingBeverages } = useBeverages();
   const { data: beverageCategories = [] } = useBeverageCategories();
+  const { data: businessSettings } = useBusinessSettings();
 
   const isLoading = loadingOhana;
   const allProducts = ohanaProducts;
   const categories = ohanaCategories;
+  const whatsappHref = buildBusinessWhatsAppUrl(businessSettings?.whatsappNumber, 'Hola! Quiero hacer un pedido en Ohana Bowls.');
+  const businessPhone = formatBusinessPhone(businessSettings?.whatsappNumber);
 
   // Filter by search
   const filtered = useMemo(() => {
@@ -370,6 +386,13 @@ export default function CartaPage() {
                 Pedir por WhatsApp
               </a>
             </Button>
+            {whatsappHref ? (
+              <Button asChild size="lg" variant="outline" className="rounded-xl min-h-[48px] px-6">
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                  Contacto directo
+                </a>
+              </Button>
+            ) : null}
           </div>
         </section>
 
@@ -381,29 +404,40 @@ export default function CartaPage() {
               <Phone className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
               <div>
                 <p className="font-medium text-foreground">WhatsApp</p>
-                <p>+57 300 000 0000</p>
+                <p>{businessPhone ?? 'Configura el WhatsApp en admin'}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
               <div>
                 <p className="font-medium text-foreground">Dirección</p>
-                <p>Calle 00 #00-00, Ciudad</p>
+                <p>{businessSettings?.contactAddress ?? 'Configura la dirección en admin'}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <Clock className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
               <div>
                 <p className="font-medium text-foreground">Horarios</p>
-                <p>Lun–Vie: 11:00–21:00</p>
-                <p>Sáb–Dom: 11:00–21:00</p>
+                {businessSettings?.hoursWeekday ? <p>Lun–Vie: {businessSettings.hoursWeekday}</p> : null}
+                {businessSettings?.hoursWeekend ? <p>Sáb–Dom: {businessSettings.hoursWeekend}</p> : null}
               </div>
             </div>
             <div className="flex items-start gap-3">
               <Instagram className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
               <div>
                 <p className="font-medium text-foreground">Redes</p>
-                <a href="#" className="hover:text-foreground transition-colors">@bowlsohana</a>
+                {businessSettings?.instagramUrl ? (
+                  <a
+                    href={businessSettings.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-foreground transition-colors"
+                  >
+                    {businessSettings.instagramHandle ?? businessSettings.instagramUrl}
+                  </a>
+                ) : (
+                  <span>Configura Instagram en admin</span>
+                )}
               </div>
             </div>
           </div>
