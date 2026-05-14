@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Ohana & Chilli — Project Guide
 
 ## Project Overview
@@ -23,20 +27,23 @@ Single-page web app serving two Colombian food brands — **Ohana** (healthy bow
 ```bash
 npm run dev          # start dev server
 npm run build        # production build
+npm run build:dev    # build in development mode (unminified)
 npm run test         # run tests once
 npm run test:watch   # watch mode
 npm run lint         # eslint
 ```
 
+Run a single test file: `npx vitest run src/test/bowl-pricing.test.ts`
+
 ## Routes
 
 | Path | Component | Notes |
 |---|---|---|
-| `/` | HomePage | Public landing |
-| `/ohana` | OhanaPage | Ohana menu + BowlBuilder |
-| `/chilli` | ChilliPage | Chilli menu |
+| `/` | OhanaPage | Main landing — Ohana menu + BowlBuilder |
+| `/ohana` | — | Redirects to `/` |
+| `/chilli` | — | Redirects to `/` |
+| `/carta` | — | Redirects to `/` |
 | `/bebidas` | BeveragesPage | Drinks (cross-brand) |
-| `/carta` | CartaPage | Full combined menu |
 | `/checkout` | CheckoutPage | Order form → WhatsApp |
 | `/pedidos` | OrdersPage | Admin-only order list |
 | `/nosotros` | AboutPage | About page |
@@ -44,7 +51,7 @@ npm run lint         # eslint
 | `/admin` | AdminPage | Admin panel (auth-guarded) |
 | `/admin/login` | AdminLoginPage | Supabase auth login |
 
-Admin routes render without `<Layout>`.
+Admin routes (`/admin`, `/admin/login`) render without `<Layout>`. All public routes are lazy-loaded via `React.lazy` + `Suspense`.
 
 ## Database Tables (Supabase)
 
@@ -101,23 +108,38 @@ All Supabase reads use React Query via hooks in `src/hooks/use-catalog.ts`:
 - `useIngredients()`, `useBowlRules()`
 - `useActiveDeliveryZones()` — refetches every 30s, staleTime: 0 (important for live fee accuracy)
 - `useWhatsAppNumber()` — stale 1 hour
+- `useBusinessSettings()` — typed wrapper around the `settings` table; covers phone, hours, social links, etc.
+
+### Cross-Tab Cache Sync
+`src/hooks/use-catalog-sync.ts` keeps React Query caches in sync across browser tabs when the admin makes changes. After any admin mutation, call `useCatalogMutationSync()` with the affected table names — it invalidates/refetches locally and broadcasts via `BroadcastChannel` (falling back to `localStorage` storage events for same-origin tabs). `CatalogSyncBridge` in `App.tsx` wires up the listener side automatically.
 
 ## Important Files
 
 ```
 src/
-  App.tsx                    # Routes definition
+  App.tsx                    # Routes definition + CatalogSyncBridge
   types/index.ts             # All shared TypeScript types
   config/bowlIngredients.ts  # Static bowl config (sizes + ingredients) — ONLY used by BowlBuilder UI
   context/CartContext.tsx    # Cart state, localStorage persistence
-  hooks/use-catalog.ts       # All Supabase data hooks
-  hooks/use-admin-auth.ts    # Admin authentication hook
+  hooks/
+    use-catalog.ts           # All Supabase data hooks
+    use-catalog-sync.ts      # Cross-tab React Query cache invalidation
+    use-admin-auth.ts        # Admin authentication hook
   domain/
     bowlPricing.ts           # Bowl price calculation
     bowlSummary.ts           # Bowl → readable string / WhatsApp text
+    cartCatalogSync.ts       # reconcileCartWithCatalog() — re-prices cart items against live catalog
+    businessSettings.ts      # BusinessSettings type + mapBusinessSettings() + formatting helpers
+    productImages.ts         # resolveProductImageUrl() — validates/normalizes product image URLs
     deliveryZones.ts         # Zone name normalization
     formatPrice.ts           # COP price display
     whatsapp.ts              # WhatsApp URL + message builder
+  components/
+    admin/                   # AnalyticsAdmin, PromotionsAdmin
+    cart/                    # CartDrawer
+    layout/                  # Layout, Navbar, Footer, PageHero, ErrorBoundary
+    ohana/                   # BowlBuilder, PromotionsSection
+    products/                # ProductCard, ProductImage
   integrations/supabase/
     client.ts                # Supabase client instance
     types.ts                 # Auto-generated DB types
@@ -129,7 +151,7 @@ src/
 
 1. **BowlBuilder uses static config, not Supabase**: `src/config/bowlIngredients.ts` has hardcoded ingredients and prices. Changes in the DB `ingredients` / `bowl_rules` tables won't reflect in the BowlBuilder without updating this file or migrating it to `useBowlRules()` / `useIngredients()`.
 
-2. **Duplicate orders views**: `/pedidos` (OrdersPage) and the "Pedidos" tab in AdminPage both show orders but are separate components with different features. OrdersPage shows all orders and is accessible to any admin; AdminPage tab also lets you update order status.
+2. **Duplicate orders views**: `/pedidos` (OrdersPage) and the "Pedidos" tab in AdminPage both show orders but are separate components with different features. OrdersPage is accessible via the public Layout; AdminPage tab also lets you update order status.
 
 3. **WhatsApp handoff in embedded contexts**: The `openWhatsAppHandoff()` function detects if running in an iframe/preview and falls back gracefully. Test checkout on real devices, not previews.
 
