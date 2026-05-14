@@ -42,8 +42,6 @@ interface StepConfig {
   plural: string;
   min: number;
   max: number;
-  /** When set, the +/- counter is per-ingredient (capped at perItemMax) instead of per-total. */
-  perItemMax?: number;
   /** When true, the step can be skipped without selecting anything. */
   optional?: boolean;
 }
@@ -67,16 +65,10 @@ function updateIngredientSelection(
   setSelectedItems: Dispatch<SetStateAction<Ingredient[]>>,
   action: 'add' | 'remove',
   max: number,
-  perItemMax?: number,
 ) {
   setSelectedItems((previousItems) => {
     if (action === 'add') {
-      if (perItemMax !== undefined) {
-        const itemCount = previousItems.filter((i) => i.id === ingredient.id).length;
-        if (itemCount >= perItemMax) return previousItems;
-      } else {
-        if (previousItems.length >= max) return previousItems;
-      }
+      if (previousItems.length >= max) return previousItems;
       return [...previousItems, ingredient];
     }
 
@@ -106,10 +98,6 @@ function getStepHint(config: StepConfig, currentCount: number) {
 
   if (remainingRequired > 0) {
     return `Te faltan ${formatStepQuantity(remainingRequired, config.singular, config.plural)} para continuar.`;
-  }
-
-  if (config.perItemMax !== undefined) {
-    return `Incluidos listos. Puedes agregar hasta ${config.perItemMax} de cada uno — los extras tienen costo adicional.`;
   }
 
   if (currentCount === config.max) {
@@ -187,12 +175,11 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       acompanantes: {
         label: 'Acomp.',
         title: 'Elige tus acompañantes',
-        subtitle: `Selecciona los incluidos (${selectedSize.maxAcompanantes}). Puedes pedir hasta 3 de cada uno — los marcados como extra suman ${formatPrice(EXTRA_TOPPING_PRICE)} c/u.`,
+        subtitle: `Selecciona los incluidos (${selectedSize.maxAcompanantes}). Los marcados como extra suman ${formatPrice(EXTRA_TOPPING_PRICE)} c/u.`,
         singular: 'acompañante',
         plural: 'acompañantes',
         min: selectedSize.maxAcompanantes,
         max: selectedSize.maxAcompanantes,
-        perItemMax: 3,
       },
       salsas: {
         label: 'Salsas',
@@ -376,9 +363,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     current: number;
     config: StepConfig;
   }) => {
-    // When perItemMax is set the total can exceed max (extras are allowed), so only
-    // check the lower bound for the "complete" colour.
-    const isComplete = current >= config.min && (config.perItemMax !== undefined || current <= config.max);
+    const isComplete = current >= config.min && current <= config.max;
 
     return (
       <div
@@ -398,19 +383,17 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     max,
     onAdd,
     onRemove,
-    perItemMax,
   }: {
     ingredient: Ingredient;
     count: number;
     max: number;
     onAdd: () => void;
     onRemove: () => void;
-    perItemMax?: number;
   }) => {
     const charge = getIngredientExtraCharge(ingredient);
     const isIncluded = charge === 0;
-    const isAddDisabled = max <= 0 || (perItemMax !== undefined ? count >= perItemMax : currentSelectionCount >= max);
-    const isMaxedForNewSelection = perItemMax !== undefined ? count >= perItemMax : currentSelectionCount >= max;
+    const isAddDisabled = max <= 0 || currentSelectionCount >= max;
+    const isMaxedForNewSelection = currentSelectionCount >= max;
 
     return (
       <div
@@ -514,8 +497,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               ingredient={item}
               count={getIngredientCount(selectedItems, item.id)}
               max={config.max}
-              perItemMax={config.perItemMax}
-              onAdd={() => updateIngredientSelection(item, setSelectedItems, 'add', config.max, config.perItemMax)}
+              onAdd={() => updateIngredientSelection(item, setSelectedItems, 'add', config.max)}
               onRemove={() => updateIngredientSelection(item, setSelectedItems, 'remove', config.max)}
             />
           ))}

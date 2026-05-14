@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BowlBuilder from '@/components/ohana/BowlBuilder';
 import type { BowlSizeRule, Ingredient } from '@/types';
 
@@ -50,7 +50,7 @@ describe('BowlBuilder', () => {
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
-  it('allows repeated selections, skipping optional steps, and preserves the final bowl payload', () => {
+  it('allows repeated selections, skipping optional steps, and preserves the final bowl payload', async () => {
     render(<BowlBuilder />);
 
     fireEvent.click(screen.getByRole('button', { name: /Pequeño/i }));
@@ -63,6 +63,9 @@ describe('BowlBuilder', () => {
     expect(screen.getAllByText(/Pollo x2/i).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: /^Siguiente$/i }));
 
+    const addAcompananteButton = screen.getByRole('button', { name: /Agregar Ma[ií]z/i });
+    fireEvent.click(addAcompananteButton);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Agregar Ma[ií]z/i })).toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: /Agregar Ma[ií]z/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Siguiente$/i }));
 
@@ -86,6 +89,8 @@ describe('BowlBuilder', () => {
     expect(savedBowl.proteins).toHaveLength(2);
     expect(savedBowl.proteins[0].id).toBe('protein-pollo');
     expect(savedBowl.proteins[1].id).toBe('protein-pollo');
+    expect(savedBowl.acompanantes).toHaveLength(1);
+    expect(savedBowl.acompanantes[0].id).toBe('acomp-maiz');
     expect(savedBowl.sauces).toEqual([]);
     expect(savedBowl.complementos).toEqual([]);
   });
