@@ -35,3 +35,13 @@ Recent commits use short, focused subjects such as `Bowl builder` and `whatsapp 
 - screenshots for UI changes
 - notes for new env vars, Supabase migrations, or CSV/data updates
 - the commands you ran (`npm run lint`, `npm test`, `npm run build`)
+
+## Gitflow Branching
+Use Gitflow consistently for ongoing work:
+- `main`: production-ready branch. Only merge tested release or hotfix work here, then deploy from this branch.
+- `develop`: integration branch for completed work before release. Feature branches should merge here first.
+- `feature/<short-name>`: new features or non-urgent fixes. Branch from `develop`, then merge back into `develop`.
+- `release/<version-or-date>`: final stabilization before production. Branch from `develop`, test and fix release-only issues, then merge into both `main` and `develop`.
+- `hotfix/<short-name>`: urgent production fixes. Branch from `main`, then merge into both `main` and `develop`.
+
+Do not commit routine development directly to `main`. Keep branch names lowercase, hyphen-separated, and focused on one change.
