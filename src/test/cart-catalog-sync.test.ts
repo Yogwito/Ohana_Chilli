@@ -19,8 +19,15 @@ describe('cart catalog sync', () => {
             categoryId: 'cat-1',
           },
           quantity: 2,
-          unitPrice: 23000,
-          totalPrice: 46000,
+          customizations: {
+            removedIngredients: ['Tomate'],
+            extras: [{ id: 'tocineta', name: 'Tocineta', price: 5000 }],
+            note: 'sin mucha salsa',
+            extraTotal: 5000,
+          },
+          notes: 'sin mucha salsa',
+          unitPrice: 28000,
+          totalPrice: 56000,
         },
         {
           id: 'item-bowl',
@@ -64,8 +71,8 @@ describe('cart catalog sync', () => {
           totalPrice: 1000,
         },
       ],
-      subtotal: 70900,
-      total: 70900,
+      subtotal: 80900,
+      total: 80900,
     };
 
     const nextState = reconcileCartWithCatalog(state, {
@@ -100,10 +107,11 @@ describe('cart catalog sync', () => {
 
     expect(nextState.items).toHaveLength(2);
     expect(nextState.items[0].product?.name).toBe('Bowl actualizado');
-    expect(nextState.items[0].unitPrice).toBe(27000);
-    expect(nextState.items[0].totalPrice).toBe(54000);
+    expect(nextState.items[0].customizations?.extras[0].name).toBe('Tocineta');
+    expect(nextState.items[0].unitPrice).toBe(32000);
+    expect(nextState.items[0].totalPrice).toBe(64000);
     expect(nextState.items[1].unitPrice).toBe(29900);
-    expect(nextState.subtotal).toBe(83900);
-    expect(nextState.total).toBe(83900);
+    expect(nextState.subtotal).toBe(93900);
+    expect(nextState.total).toBe(93900);
   });
 });

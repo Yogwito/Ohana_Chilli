@@ -7,6 +7,7 @@ import { Minus, Plus, Trash2, ShoppingBag, Leaf } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
+import { formatProductCustomizationLines } from '@/domain/productCustomizations';
 
 interface CartDrawerProps {
   open: boolean;
@@ -69,66 +70,81 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
           <>
             <ScrollArea className="-mx-6 flex-1 px-6">
               <div className="space-y-4 py-4">
-                {cart.items.map((item, index) => (
-                  <AnimatedElement
-                    key={item.id}
-                    animation="fade-up"
-                    delay={Math.min(index * 75, 300) as 0 | 75 | 150 | 225 | 300}
-                    className="flex gap-3 rounded-lg bg-muted/50 p-3"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ohana/10">
-                      <Leaf className="h-5 w-5 text-ohana" />
-                    </div>
+                {cart.items.map((item, index) => {
+                  const customizationLines = item.type === 'product'
+                    ? formatProductCustomizationLines(item.customizations)
+                    : [];
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="rounded px-1.5 py-0.5 text-2xs font-medium badge-ohana">
-                            Ohana
-                          </span>
-                          <h4 className="mt-1 text-sm font-medium">
-                            {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
-                          </h4>
-                          {item.type === 'custom-bowl' && item.customBowl && (
-                            <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
-                              {formatBowlSummary(item.customBowl)}
-                            </p>
-                          )}
-                          {item.notes && <p className="mt-0.5 text-xs italic text-muted-foreground">Nota: {item.notes}</p>}
-                        </div>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                          aria-label="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                  return (
+                    <AnimatedElement
+                      key={item.id}
+                      animation="fade-up"
+                      delay={Math.min(index * 75, 300) as 0 | 75 | 150 | 225 | 300}
+                      className="flex gap-3 rounded-lg bg-muted/50 p-3"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ohana/10">
+                        <Leaf className="h-5 w-5 text-ohana" />
                       </div>
 
-                      <div className="mt-2 flex items-center justify-between">
-                        <div className="flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="rounded px-1.5 py-0.5 text-2xs font-medium badge-ohana">
+                              Ohana
+                            </span>
+                            <h4 className="mt-1 text-sm font-medium">
+                              {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
+                            </h4>
+                            {item.type === 'custom-bowl' && item.customBowl && (
+                              <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
+                                {formatBowlSummary(item.customBowl)}
+                              </p>
+                            )}
+                            {customizationLines.length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {customizationLines.map((line) => (
+                                  <p key={line} className="text-xs text-muted-foreground">{line}</p>
+                                ))}
+                              </div>
+                            )}
+                            {item.notes && customizationLines.length === 0 && (
+                              <p className="mt-0.5 text-xs italic text-muted-foreground">Nota: {item.notes}</p>
+                            )}
+                          </div>
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
-                            aria-label="Reducir cantidad"
+                            onClick={() => removeItem(item.id)}
+                            className="p-1 text-muted-foreground transition-colors hover:text-destructive"
+                            aria-label="Eliminar"
                           >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
-                            aria-label="Aumentar cantidad"
-                          >
-                            <Plus className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
 
-                        <span className="font-semibold">{formatPrice(item.totalPrice)}</span>
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                              aria-label="Reducir cantidad"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                              aria-label="Aumentar cantidad"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+
+                          <span className="font-semibold">{formatPrice(item.totalPrice)}</span>
+                        </div>
                       </div>
-                    </div>
-                  </AnimatedElement>
-                ))}
+                    </AnimatedElement>
+                  );
+                })}
               </div>
             </ScrollArea>
 
