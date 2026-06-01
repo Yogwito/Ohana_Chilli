@@ -135,4 +135,4 @@ export interface Order {
 }
 
 // Bowl Builder Step
-export type BowlBuilderStep = 'size' | 'bases' | 'proteins' | 'acompanantes' | 'salsas' | 'complementos' | 'summary';
+export type BowlBuilderStep = 'size' | 'bases' | 'proteins' | 'acompanantes' | 'salsas' | 'complementos' | 'upsell' | 'summary';
