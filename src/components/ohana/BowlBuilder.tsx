@@ -1180,7 +1180,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           })() : null}
 
           {currentStep === 'complementos' && currentStepConfig ? (() => {
-            const EXTRA_COMP_PRICE = 2000;
+            const EXTRA_COMP_PRICE = 500;
             const SUGGESTED_COMPLEMENTOS = ['Ajonjolí', 'Maní', 'Choclitos triturados'];
             const maxComplementos = selectedSize?.maxComplementos ?? currentStepConfig.max;
             const freeComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) === 0);
