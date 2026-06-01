@@ -147,6 +147,24 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const [notes, setNotes] = useState('');
   const [stepVisible, setStepVisible] = useState(false);
 
+  // Extra proteins (premium slot → selector de proteína incluida)
+  const [extraProteinSelections, setExtraProteinSelections] = useState<Array<{
+    uid: string;
+    proteinName: string;
+    charge: number;
+    premiumProteinId: string;
+  }>>([]);
+  const [proteinSelectorOpen, setProteinSelectorOpen] = useState<string | null>(null);
+
+  const makeExtraProteinIngredient = (extra: { uid: string; proteinName: string; charge: number }): Ingredient => ({
+    id: extra.uid,
+    name: `Proteína extra: ${extra.proteinName} (+${formatPrice(extra.charge)})`,
+    type: 'protein' as Ingredient['type'],
+    price: extra.charge,
+    isVegan: false,
+    isGlutenFree: false,
+  });
+
   const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
 
   useEffect(() => {
@@ -218,7 +236,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     return {
       size: selectedSize,
       bases: selectedBases,
-      proteins: selectedProteins,
+      proteins: [...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)],
       acompanantes: selectedAcompanantes,
       sauces: selectedSauces,
       complementos: selectedComplementos,
@@ -230,6 +248,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     selectedBases,
     selectedComplementos,
     selectedProteins,
+    extraProteinSelections,
     selectedSauces,
     selectedSize,
   ]);
@@ -259,7 +278,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
     return [
       { label: 'Base', value: formatGroupedIngredients(selectedBases) },
-      { label: 'Proteínas', value: formatGroupedIngredients(selectedProteins) },
+      { label: 'Proteínas', value: formatGroupedIngredients([...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)]) },
       { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
       { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
       { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
@@ -320,6 +339,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedAcompanantes([]);
     setSelectedSauces([]);
     setSelectedComplementos([]);
+    setExtraProteinSelections([]);
     setNotes('');
     setCurrentStep('size');
   };
@@ -330,6 +350,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedAcompanantes([]);
     setSelectedSauces([]);
     setSelectedComplementos([]);
+    setExtraProteinSelections([]);
     setNotes('');
   };
 
@@ -697,7 +718,6 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           {currentStep === 'proteins' && currentStepConfig ? (() => {
             const includedProteins = proteinOptions.filter(p => getIngredientExtraCharge(p) === 0);
             const premiumProteins = proteinOptions.filter(p => getIngredientExtraCharge(p) > 0);
-            const premiumMax = currentStepConfig.max + 3;
             return (
               <div className="animate-slide-in">
                 {/* Header */}
@@ -745,9 +765,31 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   </div>
                 )}
 
+                {/* Extra protein chips */}
+                {extraProteinSelections.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {extraProteinSelections.map(extra => (
+                      <span
+                        key={extra.uid}
+                        className="inline-flex items-center gap-1.5 bg-brand/10 border border-brand/30 rounded-full px-3 py-1 text-xs"
+                      >
+                        {extra.proteinName} +{formatPrice(extra.charge)}
+                        <button
+                          type="button"
+                          onClick={() => setExtraProteinSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                          className="text-muted-foreground hover:text-foreground leading-none"
+                          aria-label="Quitar proteína extra"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Premium proteins sell-up */}
                 {premiumProteins.length > 0 && (
-                  <div className="mt-6">
+                  <div className="mt-6 relative">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="h-px flex-1 bg-border/50" />
                       <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
@@ -757,16 +799,15 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
                       {premiumProteins.map((protein) => {
-                        const itemCount = getIngredientCount(selectedProteins, protein.id);
+                        const extrasForThis = extraProteinSelections.filter(e => e.premiumProteinId === protein.id);
+                        const count = extrasForThis.length;
                         const charge = getIngredientExtraCharge(protein);
-                        const isAddDisabled = itemCount >= 3 || currentSelectionCount >= premiumMax;
                         return (
                           <div
                             key={protein.id}
                             className={cn(
                               'rounded-2xl border border-dashed border-brand/40 bg-card p-4 shadow-sm transition-all duration-200',
-                              itemCount > 0 && 'border-primary bg-primary/5 shadow-md shadow-primary/10',
-                              isAddDisabled && itemCount === 0 && 'opacity-60',
+                              count > 0 && 'border-primary bg-primary/5 shadow-md shadow-primary/10',
                             )}
                           >
                             <div className="flex items-start justify-between gap-3">
@@ -778,31 +819,32 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                               </div>
                               <span className={cn(
                                 'inline-flex min-w-[2rem] items-center justify-center rounded-full border px-2 py-1 text-xs font-semibold transition-colors',
-                                itemCount > 0 ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-muted/50 text-muted-foreground',
+                                count > 0 ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-muted/50 text-muted-foreground',
                               )}>
-                                x{itemCount}
+                                x{count}
                               </span>
                             </div>
                             <div className="mt-4 flex items-center justify-between gap-3">
                               <p className="text-xs text-muted-foreground">
-                                {itemCount > 0 ? formatStepQuantity(itemCount, 'selección', 'selecciones') : 'Extra disponible'}
+                                {count > 0 ? formatStepQuantity(count, 'selección', 'selecciones') : 'Extra disponible'}
                               </p>
                               <div className="flex items-center gap-2">
                                 <Button
                                   type="button" variant="outline" size="icon"
-                                  onClick={() => updateIngredientSelection(protein, setSelectedProteins, 'remove', premiumMax)}
-                                  disabled={itemCount === 0}
+                                  onClick={() => {
+                                    const lastIdx = [...extraProteinSelections].reverse().findIndex(e => e.premiumProteinId === protein.id);
+                                    if (lastIdx === -1) return;
+                                    const actualIdx = extraProteinSelections.length - 1 - lastIdx;
+                                    setExtraProteinSelections(prev => prev.filter((_, i) => i !== actualIdx));
+                                  }}
+                                  disabled={count === 0}
                                   aria-label={`Quitar ${protein.name}`}
                                 >
                                   <Minus className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   type="button" variant="outline" size="icon"
-                                  onClick={() => {
-                                    if (isAddDisabled) return;
-                                    updateIngredientSelection(protein, setSelectedProteins, 'add', premiumMax);
-                                  }}
-                                  disabled={isAddDisabled}
+                                  onClick={() => setProteinSelectorOpen(protein.id)}
                                   aria-label={`Agregar ${protein.name}`}
                                 >
                                   <Plus className="h-4 w-4" />
@@ -813,6 +855,48 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                         );
                       })}
                     </div>
+
+                    {/* Inline protein selector */}
+                    {proteinSelectorOpen !== null && (() => {
+                      const activePremium = premiumProteins.find(p => p.id === proteinSelectorOpen);
+                      if (!activePremium) return null;
+                      const charge = getIngredientExtraCharge(activePremium);
+                      return (
+                        <div className="absolute inset-x-0 top-0 z-10 bg-background border border-border rounded-xl shadow-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm font-semibold">¿Cuál proteína extra quieres agregar?</p>
+                            <button
+                              type="button"
+                              onClick={() => setProteinSelectorOpen(null)}
+                              className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                              aria-label="Cerrar"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {includedProteins.map(p => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
+                                onClick={() => {
+                                  setExtraProteinSelections(prev => [...prev, {
+                                    uid: `extra-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                    proteinName: p.name,
+                                    charge,
+                                    premiumProteinId: activePremium.id,
+                                  }]);
+                                  setProteinSelectorOpen(null);
+                                }}
+                              >
+                                {p.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
