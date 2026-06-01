@@ -14,10 +14,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import {
-  BUSINESS_SETTING_DEFINITIONS,
-  type BusinessSettingKey,
-} from '@/domain/businessSettings';
 import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deliveryZones';
 import { formatPrice } from '@/domain/formatPrice';
 import {
@@ -27,6 +23,7 @@ import {
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 import PromotionsAdmin from '@/components/admin/PromotionsAdmin';
 import ProductsAdmin from '@/components/admin/ProductsAdmin';
+import SettingsAdminComponent from '@/components/admin/SettingsAdmin';
 
 // ─── Types ───────────────────────────────────────────────
 interface IngredientRow {
@@ -139,7 +136,7 @@ export default function AdminPage() {
             <TabsTrigger value="ingredients" className="flex items-center gap-1"><Salad className="w-4 h-4" />Ingredientes</TabsTrigger>
             <TabsTrigger value="bowl_rules" className="flex items-center gap-1"><Ruler className="w-4 h-4" />Bowl Rules</TabsTrigger>
             <TabsTrigger value="delivery_zones" className="flex items-center gap-1"><Truck className="w-4 h-4" />Domicilios</TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1"><Settings className="w-4 h-4" />Config</TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-1"><Settings className="w-4 h-4" />Configuración</TabsTrigger>
             <TabsTrigger value="promotions" className="flex items-center gap-1">🏷️ Promociones</TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-1"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
           </TabsList>
@@ -150,7 +147,7 @@ export default function AdminPage() {
           <TabsContent value="ingredients"><IngredientsAdmin /></TabsContent>
           <TabsContent value="bowl_rules"><BowlRulesAdmin /></TabsContent>
           <TabsContent value="delivery_zones"><DeliveryZonesAdmin /></TabsContent>
-          <TabsContent value="settings"><SettingsAdmin /></TabsContent>
+          <TabsContent value="settings"><SettingsAdminComponent /></TabsContent>
           <TabsContent value="promotions"><PromotionsAdmin /></TabsContent>
           <TabsContent value="analytics"><AnalyticsAdmin /></TabsContent>
         </Tabs>
@@ -924,80 +921,3 @@ function DeliveryZonesAdmin() {
   );
 }
 
-function SettingsAdmin() {
-  const syncCatalog = useCatalogMutationSync();
-  const [settingsForm, setSettingsForm] = useState<Record<BusinessSettingKey, string>>(
-    () => Object.fromEntries(
-      BUSINESS_SETTING_DEFINITIONS.map((setting) => [setting.key, '']),
-    ) as Record<BusinessSettingKey, string>,
-  );
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const keys = BUSINESS_SETTING_DEFINITIONS.map((setting) => setting.key);
-
-    supabase
-      .from('settings')
-      .select('key,value')
-      .in('key', keys)
-      .then(({ data, error }) => {
-        if (error) {
-          toast.error('Error al cargar configuración');
-          setLoading(false);
-          return;
-        }
-
-        const nextSettings = Object.fromEntries(
-          BUSINESS_SETTING_DEFINITIONS.map((setting) => [setting.key, '']),
-        ) as Record<BusinessSettingKey, string>;
-
-        (data ?? []).forEach((row) => {
-          if (row.key in nextSettings) {
-            nextSettings[row.key as BusinessSettingKey] = row.value ?? '';
-          }
-        });
-
-        setSettingsForm(nextSettings);
-        setLoading(false);
-      });
-  }, []);
-
-  const save = async () => {
-    const { error } = await supabase
-      .from('settings')
-      .upsert(
-        BUSINESS_SETTING_DEFINITIONS.map((setting) => ({
-          key: setting.key,
-          value: settingsForm[setting.key].trim(),
-        })),
-        { onConflict: 'key' },
-      );
-    if (error) { toast.error('Error al actualizar configuración'); return; }
-    await syncCatalog(['settings']);
-    toast.success('Configuración actualizada');
-  };
-
-  if (loading) return <Skeleton className="h-24" />;
-
-  return (
-    <div className="max-w-3xl space-y-6">
-      <h2 className="text-xl font-bold">Configuración</h2>
-      <div className="bg-card border rounded-xl p-6 space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          {BUSINESS_SETTING_DEFINITIONS.map((setting) => (
-            <div key={setting.key} className={setting.key === 'contact_address' ? 'md:col-span-2' : ''}>
-              <Label>{setting.label}</Label>
-              <Input
-                value={settingsForm[setting.key]}
-                onChange={(event) => setSettingsForm((prev) => ({ ...prev, [setting.key]: event.target.value }))}
-                placeholder={setting.placeholder}
-              />
-              <p className="text-xs text-muted-foreground mt-1">{setting.description}</p>
-            </div>
-          ))}
-        </div>
-        <Button onClick={save} className="btn-ohana"><Save className="w-4 h-4 mr-2" />Guardar</Button>
-      </div>
-    </div>
-  );
-}
