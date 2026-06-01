@@ -199,6 +199,22 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     isGlutenFree: false,
   });
 
+  const [extraSauceSelections, setExtraSauceSelections] = useState<Array<{
+    uid: string;
+    sauceName: string;
+    sauceId: string;
+    charge: number;
+  }>>([]);
+
+  const makeExtraSauceIngredient = (extra: { uid: string; sauceName: string; charge: number }): Ingredient => ({
+    id: extra.uid,
+    name: `Salsa extra: ${extra.sauceName} (+${formatPrice(extra.charge)})`,
+    type: 'sauce' as Ingredient['type'],
+    price: extra.charge,
+    isVegan: false,
+    isGlutenFree: false,
+  });
+
   const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
 
   useEffect(() => {
@@ -272,7 +288,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       bases: selectedBases,
       proteins: [...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)],
       acompanantes: [...selectedAcompanantes, ...extraAcompananteSelections.map(makeExtraAcompananteIngredient)],
-      sauces: selectedSauces,
+      sauces: [...selectedSauces, ...extraSauceSelections.map(makeExtraSauceIngredient)],
       complementos: [...selectedComplementos, ...extraComplementoSelections.map(makeExtraComplementoIngredient)],
       notes: notes || undefined,
     };
@@ -285,6 +301,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     extraProteinSelections,
     extraAcompananteSelections,
     extraComplementoSelections,
+    extraSauceSelections,
     selectedSauces,
     selectedSize,
   ]);
@@ -316,10 +333,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       { label: 'Base', value: formatGroupedIngredients(selectedBases) },
       { label: 'Proteínas', value: formatGroupedIngredients([...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)]) },
       { label: 'Acompañantes', value: formatGroupedIngredients([...selectedAcompanantes, ...extraAcompananteSelections.map(makeExtraAcompananteIngredient)]) },
-      { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
+      { label: 'Salsas', value: formatGroupedIngredients([...selectedSauces, ...extraSauceSelections.map(makeExtraSauceIngredient)]) },
       { label: 'Complementos', value: formatGroupedIngredients([...selectedComplementos, ...extraComplementoSelections.map(makeExtraComplementoIngredient)]) },
     ];
-  }, [selectedAcompanantes, selectedBases, selectedComplementos, selectedProteins, selectedSauces, selectedSize]);
+  }, [selectedAcompanantes, selectedBases, selectedComplementos, selectedProteins, selectedSauces, extraSauceSelections, selectedSize]);
 
   const currentSelectionCount = useMemo(() => {
     switch (currentStep) {
@@ -378,6 +395,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setExtraProteinSelections([]);
     setExtraAcompananteSelections([]);
     setExtraComplementoSelections([]);
+    setExtraSauceSelections([]);
     setNotes('');
     setCurrentStep('size');
   };
@@ -391,6 +409,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setExtraProteinSelections([]);
     setExtraAcompananteSelections([]);
     setExtraComplementoSelections([]);
+    setExtraSauceSelections([]);
     setNotes('');
   };
 
@@ -1082,12 +1101,15 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           })() : null}
 
           {currentStep === 'salsas' && currentStepConfig ? (() => {
+            const EXTRA_SAUCE_PRICE = 2000;
             const SUGGESTED_SAUCES = ['Ohana Chipotle', 'Mayo Cilantro', 'BBQ Honey'];
-            // Filter by ID — already-selected sauces don't appear as suggestions
+            const maxSauces = selectedSize?.maxSauces ?? currentStepConfig.max;
+            // Exclude already-selected and already-extra sauces from suggestions
             const selectedSauceIds = new Set(selectedSauces.map(s => s.id));
+            const extraSauceIds = new Set(extraSauceSelections.map(e => e.sauceId));
             const sauceSuggestions = SUGGESTED_SAUCES
               .map(name => sauceOptions.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((s): s is Ingredient => s !== undefined && !selectedSauceIds.has(s.id))
+              .filter((s): s is Ingredient => s !== undefined && !selectedSauceIds.has(s.id) && !extraSauceIds.has(s.id))
               .slice(0, 3);
             return (
               <>
@@ -1097,6 +1119,30 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   setSelectedItems={setSelectedSauces}
                   config={currentStepConfig}
                 />
+
+                {/* Extra sauce chips */}
+                {extraSauceSelections.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Salsas extra añadidas</p>
+                    <div className="flex flex-wrap gap-2">
+                      {extraSauceSelections.map(extra => (
+                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                          <span className="font-semibold">{extra.sauceName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraSauceSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar salsa extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {sauceSuggestions.length > 0 && (
                   <div className="mt-5">
                     <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
@@ -1106,9 +1152,19 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           key={sauce.id}
                           type="button"
                           onClick={() => {
-                            // bowl_rules doesn't define sauce limits — add directly without max gate.
-                            // Duplicates are prevented by the selectedSauceIds filter above.
-                            setSelectedSauces(prev => [...prev, sauce]);
+                            if (selectedSauces.length < maxSauces) {
+                              // Free slot available — add as included sauce
+                              setSelectedSauces(prev => [...prev, sauce]);
+                            } else {
+                              // Beyond free slots — add as paid extra
+                              const charge = (sauce.price ?? 0) > 0 ? sauce.price! : EXTRA_SAUCE_PRICE;
+                              setExtraSauceSelections(prev => [...prev, {
+                                uid: `extra-sauce-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                sauceName: sauce.name,
+                                sauceId: sauce.id,
+                                charge,
+                              }]);
+                            }
                           }}
                           className="rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
                         >
