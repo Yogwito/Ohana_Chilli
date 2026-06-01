@@ -137,12 +137,9 @@ export default function Footer() {
           <p className="text-xs text-zinc-700 mt-1">
             Hecho con ♥{address.addressLocality ? ` en ${address.addressLocality}` : ''}
           </p>
-          <div className="mt-4">
-            <Link
-              to="/admin/login"
-              className="text-xs text-zinc-800 dark:text-zinc-700 hover:text-zinc-400 dark:hover:text-zinc-500 transition-colors"
-            >
-              Admin
+          <div className="mt-6 text-center">
+            <Link to="/admin" className="text-[10px] text-white/15 hover:text-white/30 transition-colors select-none">
+              ·
             </Link>
           </div>
         </AnimatedElement>
