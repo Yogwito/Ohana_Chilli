@@ -343,3 +343,21 @@ export function useBusinessSettings() {
     ...liveCatalogQueryOptions,
   });
 }
+
+export function useProductDefaultIngredients(productId: string | null) {
+  return useQuery({
+    queryKey: ['product-default-ingredients', productId],
+    queryFn: async () => {
+      if (!productId) return [];
+      const { data, error } = await supabase
+        .from('product_default_ingredients')
+        .select('*')
+        .eq('product_id', productId)
+        .order('sort_order');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!productId,
+    staleTime: 1000 * 60 * 10,
+  });
+}

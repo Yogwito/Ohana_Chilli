@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus, Check, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductImage from '@/components/products/ProductImage';
+import ProductCustomizer from '@/components/products/ProductCustomizer';
 import { Product, Brand } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
@@ -40,6 +41,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
   const { addProduct } = useCart();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [added, setAdded] = useState(false);
+  const [removedIngredients, setRemovedIngredients] = useState<string[]>([]);
 
   const descriptionText = product.description.trim();
   const ingredientsText = useMemo(() => {
@@ -53,7 +55,10 @@ export default function ProductCard({ product, variant = 'default', categoryName
   const resolvedCategoryName = categoryName ?? humanizeCategoryId(product.categoryId);
 
   const handleAddToCart = () => {
-    addProduct(product);
+    const notes = removedIngredients.length > 0
+      ? `Sin: ${removedIngredients.join(', ')}`
+      : undefined;
+    addProduct(product, 1, notes);
     trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: product.price });
     toast.success(`${product.name} agregado`, { description: formatPrice(product.price) });
     setAdded(true);
@@ -133,6 +138,8 @@ export default function ProductCard({ product, variant = 'default', categoryName
               Ver más
             </button>
           )}
+
+          <ProductCustomizer productId={product.id} onChange={setRemovedIngredients} />
 
           {/* Price row + add button */}
           <div className="flex items-center justify-between mt-auto pt-2">
