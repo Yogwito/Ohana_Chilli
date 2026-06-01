@@ -276,7 +276,7 @@ export default function OhanaPage() {
             {/* Right: decorative circle */}
             <div className="hidden sm:flex w-32 h-32 shrink-0 rounded-full bg-white/15 items-center justify-center">
               <img
-                src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers.jpg"
+                src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
                 alt="Bowls Lovers"
                 className="w-36 h-36 object-contain drop-shadow-md rounded-full"
               />
