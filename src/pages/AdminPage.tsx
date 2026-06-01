@@ -75,10 +75,40 @@ export default function AdminPage() {
   const { user, isAdmin, loading: authLoading, signOut } = useAdminAuth();
 
   useEffect(() => {
-    if (!authLoading && (!user || !isAdmin)) navigate('/admin/login');
-  }, [authLoading, user, isAdmin, navigate]);
+    if (!authLoading && !user) navigate('/admin/login', { replace: true });
+  }, [authLoading, user, navigate]);
 
-  if (authLoading || !isAdmin) {
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><Skeleton className="h-12 w-48" /></div>;
+  }
+
+  if (user && !isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+        <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+          <h1 className="text-xl font-bold">Acceso no autorizado</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tu sesión está activa, pero no tiene permisos de administrador.
+          </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Volver al inicio
+            </Button>
+            <Button
+              onClick={async () => {
+                await signOut();
+                navigate('/admin/login', { replace: true });
+              }}
+            >
+              Cerrar sesión
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
     return <div className="min-h-screen flex items-center justify-center"><Skeleton className="h-12 w-48" /></div>;
   }
 
