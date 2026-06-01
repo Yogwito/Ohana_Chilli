@@ -129,41 +129,40 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
         ref={ref}
         style={{ transitionDelay: `${Math.min(index % 4 * 60, 240)}ms` }}
         className={cn(
-          'group flex items-start justify-between gap-4 py-4 border-b border-border/10',
-          'hover:bg-muted/30 dark:hover:bg-white/5 px-2 rounded-lg cursor-pointer',
-          'transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-sm',
+          'group flex items-center gap-3 p-3 rounded-2xl border-b border-border/50 last:border-0',
+          'hover:bg-accent/50 cursor-pointer transition-colors duration-150',
           isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4',
         )}
       >
         {/* Left: text */}
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-base text-foreground">{product.name}</p>
+          <p className="font-bold text-sm sm:text-base text-foreground">{product.name}</p>
           {product.description?.trim() && (
-            <p className="text-sm text-muted-foreground line-clamp-2 mt-1 max-w-sm leading-relaxed">
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
               {product.description.trim()}
             </p>
           )}
-          <p className="font-bold text-lg text-brand mt-3">
+          <p className="text-sm font-bold text-brand mt-1">
             {formatCOP(product.price)}
           </p>
         </div>
 
         {/* Right: image with add button */}
-        <div className="relative w-24 shrink-0 overflow-hidden rounded-xl">
+        <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 overflow-hidden rounded-2xl shadow-md">
           <ProductImage
             product={product}
-            ratio={4 / 3}
+            ratio={1}
             imageClassName="group-hover:scale-105"
-            className="rounded-xl"
-            fallbackClassName="rounded-xl bg-gradient-to-br from-brand/30 to-brand-dark/50"
+            className="rounded-2xl"
+            fallbackClassName="rounded-2xl bg-gradient-to-br from-brand/30 to-brand-dark/50"
           />
 
           {/* Floating add button */}
           <button
             onClick={handleAddClick}
             className={cn(
-              'absolute bottom-2 right-2 w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-brand text-white shadow-md',
-              'flex items-center justify-center hover:bg-brand-dark active:scale-90 transition-all duration-200',
+              'absolute bottom-2 right-2 w-9 h-9 rounded-full bg-brand text-white shadow-md',
+              'flex items-center justify-center hover:bg-brand/90 hover:shadow-lg active:scale-90 transition-all duration-150',
               added && 'scale-110 bg-brand-dark',
             )}
             aria-label="Agregar al carrito"
@@ -295,16 +294,16 @@ export default function OhanaPage() {
       <div>
         {/* Hero strip */}
         <div
-          className="hero-grain relative w-full overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #8CC878 0%, #4a9e3f 50%, #2d6e28 100%)' }}
+          className="hero-grain relative w-full overflow-hidden min-h-[420px] sm:min-h-[480px] flex items-center"
+          style={{ background: 'linear-gradient(135deg, #5a9e45 0%, #8CC878 50%, #a8d87a 100%)' }}
         >
           <div className="container max-w-4xl flex items-center justify-between gap-6 px-4 py-8 md:py-14">
             {/* Left: copy + CTAs */}
             <div className="flex flex-col gap-3 max-w-xs">
-              <span className="inline-flex w-fit items-center rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white">
+              <span className="inline-flex w-fit items-center rounded-full backdrop-blur-sm bg-white/20 border border-white/30 px-3 py-1 text-xs font-medium text-white">
                 🌿 Comida real. Sabor real.
               </span>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-normal text-white leading-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-white leading-tight">
                 Eat Healthy, Live Happy
               </h1>
               <p className="text-sm sm:text-base text-white/85">
@@ -313,7 +312,7 @@ export default function OhanaPage() {
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <button
                   onClick={() => scrollToSection(BOWL_BUILDER_ID)}
-                  className="rounded-full bg-white px-4 py-2 sm:px-5 text-sm font-semibold text-brand-dark hover:bg-white/90 transition-colors"
+                  className="rounded-full bg-white px-4 py-2 sm:px-5 text-sm font-semibold text-brand-dark shadow-lg hover:bg-white/90 hover:shadow-xl transition-all duration-200 active:scale-95"
                 >
                   Arma tu Bowl
                 </button>
@@ -322,7 +321,7 @@ export default function OhanaPage() {
                     const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
                     scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
                   }}
-                  className="rounded-full border border-white px-4 py-2 sm:px-5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                  className="rounded-full border-2 border-white/70 px-4 py-2 sm:px-5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
                 >
                   Ver menú
                 </button>
@@ -333,7 +332,7 @@ export default function OhanaPage() {
               <img
                 src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
                 alt="Bowls Lovers"
-                className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-md rounded-full"
+                className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-2xl rounded-full rotate-3 hover:rotate-0 transition-transform duration-300"
               />
             </div>
           </div>
@@ -445,7 +444,7 @@ export default function OhanaPage() {
       </div>
 
       {/* ── SECTION 3: Sticky category tabs ────────────────────────────── */}
-      <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/40">
+      <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm">
         <div className="container max-w-4xl">
           <div className="flex items-center gap-2">
             {/* Left: action icons (visual only) */}
@@ -529,7 +528,7 @@ export default function OhanaPage() {
                   <AnimatedElement animation="fade-up">
                     <div className="py-3 mb-2">
                       <div className="flex items-center gap-3">
-                        <h2 className="font-display font-bold text-2xl text-foreground dark:text-white">
+                        <h2 className="font-display font-bold text-xl sm:text-2xl tracking-tight text-foreground dark:text-white">
                           {cat.name}
                         </h2>
                         {isBowlBuilder && (
@@ -538,7 +537,7 @@ export default function OhanaPage() {
                           </span>
                         )}
                       </div>
-                      <div className="mt-1.5 h-[3px] w-9 rounded-full bg-brand" />
+                      <div className="mt-1 h-[3px] w-8 rounded-full bg-brand mb-4" />
                     </div>
                   </AnimatedElement>
 

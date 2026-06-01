@@ -64,19 +64,22 @@ function PromotionCard({ promo }: { promo: Promotion }) {
     <div
       className={cn(
         'bg-card rounded-2xl overflow-hidden border border-border/50',
-        'shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5',
+        'shadow-md hover:shadow-xl transition-shadow duration-200',
         'flex flex-col',
       )}
     >
       {/* Image */}
       <div className="relative overflow-hidden">
         {promo.image_url ? (
-          <img
-            src={promo.image_url}
-            alt={promo.title}
-            className="w-full h-36 object-cover rounded-t-xl"
-            loading="lazy"
-          />
+          <>
+            <img
+              src={promo.image_url}
+              alt={promo.title}
+              className="w-full h-36 object-cover rounded-t-xl"
+              loading="lazy"
+            />
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/30 to-transparent rounded-t-none" />
+          </>
         ) : (
           <div className="w-full h-36 bg-brand/20 rounded-t-xl flex items-center justify-center">
             <span className="text-4xl" aria-hidden="true">🏷️</span>
@@ -84,7 +87,7 @@ function PromotionCard({ promo }: { promo: Promotion }) {
         )}
         {/* Discount chip */}
         {discountLabel && promo.discount_type !== 'label' && (
-          <span className="absolute top-2.5 left-2.5 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+          <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
             {discountLabel}
           </span>
         )}

@@ -539,10 +539,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     return (
       <div
         className={cn(
-          'rounded-2xl border bg-card p-3 sm:p-4 shadow-sm transition-all duration-200',
+          'rounded-2xl border bg-card p-3 sm:p-4 shadow-sm transition-all duration-150',
           count > 0
-            ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
-            : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
+            ? 'border-brand bg-brand/5 shadow-sm'
+            : 'border-border/60 hover:border-brand/40 hover:shadow-md',
           isMaxedForNewSelection && 'opacity-60',
         )}
       >
@@ -555,11 +555,11 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           </div>
           <span
             className={cn(
-              'inline-flex min-w-[2rem] items-center justify-center rounded-full border px-2 py-1 text-xs font-semibold transition-colors',
-              count > 0 ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-muted/50 text-muted-foreground',
+              'inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold transition-colors shadow-sm',
+              count > 0 ? 'bg-brand text-white' : 'border border-border bg-muted/50 text-muted-foreground',
             )}
           >
-            x{count}
+            {count}
           </span>
         </div>
 
@@ -578,7 +578,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               size="icon"
               onClick={onRemove}
               disabled={count === 0}
-              className="min-h-[44px] min-w-[44px]"
+              className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full border border-border hover:border-brand hover:text-brand transition-colors"
               aria-label={`Quitar ${ingredient.name}`}
             >
               <Minus className="h-4 w-4" />
@@ -589,7 +589,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               size="icon"
               onClick={onAdd}
               disabled={isAddDisabled}
-              className="min-h-[44px] min-w-[44px]"
+              className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full border border-border hover:border-brand hover:text-brand transition-colors"
               aria-label={`Agregar ${ingredient.name}`}
             >
               <Plus className="h-4 w-4" />
@@ -880,7 +880,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                       {extraProteinSelections.map(extra => (
                         <span
                           key={extra.uid}
-                          className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2"
+                          className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5"
                         >
                           <span className="font-semibold">{extra.proteinName}</span>
                           <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
@@ -1042,7 +1042,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                     <p className="text-sm font-semibold text-foreground mb-2">✅ Acompañantes extra añadidos</p>
                     <div className="flex flex-wrap gap-2">
                       {extraAcompananteSelections.map(extra => (
-                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                        <span key={extra.uid} className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5">
                           <span className="font-semibold">{extra.acompName}</span>
                           <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
                           <button
@@ -1174,7 +1174,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                     <p className="text-sm font-semibold text-foreground mb-2">✅ Salsas extra añadidas</p>
                     <div className="flex flex-wrap gap-2">
                       {extraSauceSelections.map(extra => (
-                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                        <span key={extra.uid} className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5">
                           <span className="font-semibold">{extra.sauceName}</span>
                           <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
                           <button
@@ -1254,7 +1254,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                     <p className="text-sm font-semibold text-foreground mb-2">✅ Complementos extra añadidos</p>
                     <div className="flex flex-wrap gap-2">
                       {extraComplementoSelections.map(extra => (
-                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                        <span key={extra.uid} className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5">
                           <span className="font-semibold">{extra.compName}</span>
                           <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
                           <button
@@ -1577,7 +1577,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
           {/* Full panel: always on sm+, toggleable on mobile */}
           <div className={cn(
-            'rounded-2xl border bg-card p-4',
+            'rounded-2xl border border-border/60 bg-card p-4 shadow-sm',
             'hidden sm:block',
             bowlExpanded && '!block max-h-48 overflow-y-auto',
           )}>
@@ -1629,13 +1629,13 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               <Button
                 onClick={goNext}
                 disabled={!canProceed}
-                className={cn('btn-ohana gap-2 min-h-[44px]', !canProceed && 'opacity-50')}
+                className={cn('btn-ohana gap-2 min-h-[44px] rounded-2xl px-6 py-3 font-semibold shadow-md hover:shadow-lg hover:bg-brand/90 active:scale-95 transition-all', !canProceed && 'opacity-50')}
               >
                 {getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
                 <ChevronRight className="h-4 w-4" />
               </Button>
               {(currentStepConfig?.optional && currentSelectionCount === 0) || currentStep === 'upsell' ? (
-                <Button variant="ghost" size="sm" onClick={goNext} className="text-muted-foreground min-h-[44px] min-w-[44px]">
+                <Button variant="ghost" size="sm" onClick={goNext} className="text-muted-foreground min-h-[44px] min-w-[44px] hover:text-foreground text-sm underline-offset-2 hover:underline">
                   Saltar este paso →
                 </Button>
               ) : null}

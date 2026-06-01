@@ -117,7 +117,7 @@ export default function Navbar() {
               {itemCount > 0 && (
                 <span
                   className={cn(
-                    'absolute -top-1 -right-1 h-5 w-5 rounded-full bg-brand-dark text-[10px] font-bold text-white flex items-center justify-center transition-transform duration-200',
+                    'absolute -top-1 -right-1 h-5 w-5 rounded-full bg-brand text-[10px] font-bold text-white flex items-center justify-center shadow-sm transition-transform duration-200',
                     badgeAnimating && 'scale-125',
                   )}
                 >
