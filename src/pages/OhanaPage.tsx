@@ -277,7 +277,7 @@ export default function OhanaPage() {
               <img
                 src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
                 alt="Bowls Lovers"
-                className="w-36 h-36 object-contain drop-shadow-md rounded-full"
+                className="w-56 h-56 object-contain drop-shadow-md rounded-full"
               />
             </div>
           </div>
