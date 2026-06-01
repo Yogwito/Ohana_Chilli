@@ -1,4 +1,5 @@
 import { calculateBowlPrice } from '@/domain/bowlPricing';
+import { calculateProductUnitPrice, normalizeProductCustomization } from '@/domain/productCustomizations';
 import type { BowlSizeRule, CartItem, CartState, CustomBowl, Ingredient, Product } from '@/types';
 
 export interface CatalogSnapshot {
@@ -61,12 +62,14 @@ function reconcileCartItem(
     const currentProduct = item.product?.id ? productsById.get(item.product.id) : null;
     if (!currentProduct) return null;
 
-    const unitPrice = currentProduct.price;
+    const customizations = normalizeProductCustomization(item.customizations);
+    const unitPrice = calculateProductUnitPrice(currentProduct.price, customizations);
 
     return {
       ...item,
       brand: currentProduct.brand,
       product: currentProduct,
+      customizations,
       unitPrice,
       totalPrice: unitPrice * item.quantity,
     };

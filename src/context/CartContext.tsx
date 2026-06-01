@@ -1,8 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { CartItem, CartState, Product, CustomBowl, Brand } from '@/types';
+import { CartItem, CartState, Product, CustomBowl, Brand, ProductCustomization } from '@/types';
 import { reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
 import { calculateBowlPrice } from '@/domain/bowlPricing';
+import {
+  calculateProductUnitPrice,
+  getProductCustomizationKey,
+  normalizeProductCustomization,
+} from '@/domain/productCustomizations';
 import { useBowlRules, useIngredients, useProducts } from '@/hooks/use-catalog';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -11,12 +16,24 @@ import { toast } from 'sonner';
 const CART_VERSION = 'cart:v3';
 const CART_STORAGE_KEY = 'ohana-bowls-cart';
 
+const productCustomizationSchema = z.object({
+  removedIngredients: z.array(z.string()),
+  extras: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    price: z.number(),
+  })),
+  note: z.string(),
+  extraTotal: z.number(),
+});
+
 const cartItemSchema = z.object({
   id: z.string(),
   brand: z.enum(['ohana']),
   type: z.enum(['product', 'custom-bowl']),
   product: z.any().optional().nullable(),
   customBowl: z.any().optional().nullable(),
+  customizations: productCustomizationSchema.optional().nullable(),
   quantity: z.number().int().positive(),
   notes: z.string().optional().nullable(),
   unitPrice: z.number(),
@@ -32,7 +49,7 @@ const cartStateSchema = z.object({
 
 // ─── Actions ─────────────────────────────────────────────
 type CartAction =
-  | { type: 'ADD_PRODUCT'; payload: { product: Product; quantity: number; notes?: string } }
+  | { type: 'ADD_PRODUCT'; payload: { product: Product; quantity: number; notes?: string; customizations?: ProductCustomization } }
   | { type: 'ADD_CUSTOM_BOWL'; payload: { customBowl: CustomBowl; notes?: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
   | { type: 'REMOVE_ITEM'; payload: { itemId: string } }
@@ -49,12 +66,26 @@ const calculateTotals = (items: CartItem[]) => {
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+function getProductNotesKey(customizations: ProductCustomization | undefined, notes: string | null | undefined) {
+  return customizations?.note || notes?.trim() || '';
+}
+
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
     case 'ADD_PRODUCT': {
       const { product, quantity, notes } = action.payload;
+      const customizations = normalizeProductCustomization(action.payload.customizations);
+      const customizationKey = getProductCustomizationKey(customizations);
+      const normalizedNotes = getProductNotesKey(customizations, notes);
+      const unitPrice = calculateProductUnitPrice(product.price, customizations);
       const existingIndex = state.items.findIndex(
-        item => item.type === 'product' && item.product?.id === product.id && item.notes === notes
+        item => {
+          if (item.type !== 'product' || item.product?.id !== product.id) return false;
+
+          const itemCustomizations = normalizeProductCustomization(item.customizations);
+          return getProductCustomizationKey(itemCustomizations) === customizationKey
+            && getProductNotesKey(itemCustomizations, item.notes) === normalizedNotes;
+        }
       );
       let newItems: CartItem[];
       if (existingIndex >= 0) {
@@ -67,8 +98,9 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         });
       } else {
         newItems = [...state.items, {
-          id: generateId(), brand: product.brand, type: 'product', product, quantity, notes,
-          unitPrice: product.price, totalPrice: product.price * quantity,
+          id: generateId(), brand: product.brand, type: 'product', product, quantity,
+          customizations, notes: normalizedNotes || undefined,
+          unitPrice, totalPrice: unitPrice * quantity,
         }];
       }
       return { items: newItems, ...calculateTotals(newItems) };
@@ -114,7 +146,7 @@ interface CartStateContextType {
 }
 
 interface CartActionsContextType {
-  addProduct: (product: Product, quantity?: number, notes?: string) => void;
+  addProduct: (product: Product, quantity?: number, notes?: string, customizations?: ProductCustomization) => void;
   addCustomBowl: (customBowl: CustomBowl, notes?: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   removeItem: (itemId: string) => void;
@@ -170,8 +202,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   }, [bowlRules, catalogReady, ingredients, products]);
 
-  const addProduct = useCallback((product: Product, quantity = 1, notes?: string) => {
-    dispatch({ type: 'ADD_PRODUCT', payload: { product, quantity, notes } });
+  const addProduct = useCallback((product: Product, quantity = 1, notes?: string, customizations?: ProductCustomization) => {
+    dispatch({ type: 'ADD_PRODUCT', payload: { product, quantity, notes, customizations } });
   }, []);
 
   const addCustomBowl = useCallback((customBowl: CustomBowl, notes?: string) => {

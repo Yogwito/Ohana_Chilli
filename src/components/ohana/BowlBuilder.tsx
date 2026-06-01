@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useIngredients, useBowlRules } from '@/hooks/use-catalog';
+import { useIngredients, useBowlRules, useProducts } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useCart } from '@/context/CartContext';
@@ -13,10 +13,10 @@ import {
   getBowlChargeLines,
   getIngredientExtraCharge,
 } from '@/domain/bowlPricing';
-import { formatGroupedIngredients, getBowlSummaryRows } from '@/domain/bowlSummary';
+import { formatGroupedIngredients } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
-import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient } from '@/types';
+import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient, Product } from '@/types';
 
 const steps: { id: BowlBuilderStep; label: string }[] = [
   { id: 'size', label: 'Tamaño' },
@@ -25,10 +25,11 @@ const steps: { id: BowlBuilderStep; label: string }[] = [
   { id: 'acompanantes', label: 'Acompañantes' },
   { id: 'salsas', label: 'Salsas' },
   { id: 'complementos', label: 'Complementos' },
+  { id: 'upsell', label: 'Extras' },
   { id: 'summary', label: 'Resumen' },
 ];
 
-type SelectionStep = Exclude<BowlBuilderStep, 'size' | 'summary'>;
+type SelectionStep = Exclude<BowlBuilderStep, 'size' | 'summary' | 'upsell'>;
 
 interface BowlBuilderProps {
   onComplete?: () => void;
@@ -115,13 +116,14 @@ function getStepHint(config: StepConfig, currentCount: number) {
 
 function getStepNextLabel(currentStep: BowlBuilderStep, canProceed: boolean, isOptionalBlank: boolean) {
   if (currentStep === 'summary') return 'Agregar al carrito';
+  if (currentStep === 'upsell') return 'Continuar';
   if (!canProceed) return 'Siguiente';
   if (isOptionalBlank) return 'Omitir';
   return 'Siguiente';
 }
 
 export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
-  const { addCustomBowl } = useCart();
+  const { addCustomBowl, addProduct, cart } = useCart();
 
   const builderRef = useRef<HTMLDivElement>(null);
   const scrollToBuilder = () => {
@@ -129,6 +131,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   };
 
   const { data: bowlSizes = [], isLoading: sizesLoading, error: sizesError } = useBowlRules();
+  const { data: bebidasOptions = [], isLoading: bebidasLoading } = useProducts({ categoryId: 'ohana-bebidas' });
   const { data: baseOptions = [], isLoading: basesLoading, error: basesError } = useIngredients('base');
   const { data: proteinOptions = [], isLoading: proteinsLoading, error: proteinsError } = useIngredients('protein');
   const { data: acompananteOptions = [], isLoading: acompLoading, error: acompError } = useIngredients('acompanante');
@@ -160,6 +163,57 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     id: extra.uid,
     name: `Proteína extra: ${extra.proteinName} (+${formatPrice(extra.charge)})`,
     type: 'protein' as Ingredient['type'],
+    price: extra.charge,
+    isVegan: false,
+    isGlutenFree: false,
+  });
+
+  const [extraAcompananteSelections, setExtraAcompananteSelections] = useState<Array<{
+    uid: string;
+    acompName: string;
+    charge: number;
+    premiumAcompId: string;
+  }>>([]);
+  const [acompSelectorOpen, setAcompSelectorOpen] = useState<string | null>(null);
+
+  const makeExtraAcompananteIngredient = (extra: { uid: string; acompName: string; charge: number }): Ingredient => ({
+    id: extra.uid,
+    name: `Acompañante extra: ${extra.acompName} (+${formatPrice(extra.charge)})`,
+    type: 'acompanante' as Ingredient['type'],
+    price: extra.charge,
+    isVegan: false,
+    isGlutenFree: false,
+  });
+
+  const [extraComplementoSelections, setExtraComplementoSelections] = useState<Array<{
+    uid: string;
+    compName: string;
+    compId: string;
+    charge: number;
+    premiumCompId: string;
+  }>>([]);
+  const [compSelectorOpen, setCompSelectorOpen] = useState<string | null>(null);
+
+  const makeExtraComplementoIngredient = (extra: { uid: string; compName: string; charge: number }): Ingredient => ({
+    id: extra.uid,
+    name: `Complemento extra: ${extra.compName} (+${formatPrice(extra.charge)})`,
+    type: 'topping' as Ingredient['type'],
+    price: extra.charge,
+    isVegan: false,
+    isGlutenFree: false,
+  });
+
+  const [extraSauceSelections, setExtraSauceSelections] = useState<Array<{
+    uid: string;
+    sauceName: string;
+    sauceId: string;
+    charge: number;
+  }>>([]);
+
+  const makeExtraSauceIngredient = (extra: { uid: string; sauceName: string; charge: number }): Ingredient => ({
+    id: extra.uid,
+    name: `Salsa extra: ${extra.sauceName} (+${formatPrice(extra.charge)})`,
+    type: 'sauce' as Ingredient['type'],
     price: extra.charge,
     isVegan: false,
     isGlutenFree: false,
@@ -237,9 +291,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       size: selectedSize,
       bases: selectedBases,
       proteins: [...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)],
-      acompanantes: selectedAcompanantes,
-      sauces: selectedSauces,
-      complementos: selectedComplementos,
+      acompanantes: [...selectedAcompanantes, ...extraAcompananteSelections.map(makeExtraAcompananteIngredient)],
+      sauces: [...selectedSauces, ...extraSauceSelections.map(makeExtraSauceIngredient)],
+      complementos: [...selectedComplementos, ...extraComplementoSelections.map(makeExtraComplementoIngredient)],
       notes: notes || undefined,
     };
   }, [
@@ -249,6 +303,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     selectedComplementos,
     selectedProteins,
     extraProteinSelections,
+    extraAcompananteSelections,
+    extraComplementoSelections,
+    extraSauceSelections,
     selectedSauces,
     selectedSize,
   ]);
@@ -269,16 +326,47 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   }, [previewBowl]);
 
   const summaryRows = useMemo(() => {
-    if (!previewBowl) return [];
-    return getBowlSummaryRows(previewBowl);
-  }, [previewBowl]);
+    if (!selectedSize) return [];
+
+    const rows = [
+      { label: 'Base', value: formatGroupedIngredients(selectedBases) },
+      { label: 'Proteínas', value: formatGroupedIngredients(selectedProteins) },
+      { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
+      { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
+      { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
+    ];
+
+    const extraLines = [
+      ...extraProteinSelections.map(e => `Proteína extra: ${e.proteinName} (+${formatPrice(e.charge)})`),
+      ...extraAcompananteSelections.map(e => `Acompañante extra: ${e.acompName} (+${formatPrice(e.charge)})`),
+      ...extraSauceSelections.map(e => `Salsa extra: ${e.sauceName} (+${formatPrice(e.charge)})`),
+      ...extraComplementoSelections.map(e => `Complemento extra: ${e.compName} (+${formatPrice(e.charge)})`),
+    ];
+
+    if (extraLines.length > 0) {
+      rows.push({ label: 'Cargos extra', value: extraLines.join(', ') });
+    }
+
+    return rows;
+  }, [
+    selectedSize,
+    selectedBases,
+    selectedProteins,
+    selectedAcompanantes,
+    selectedSauces,
+    selectedComplementos,
+    extraProteinSelections,
+    extraAcompananteSelections,
+    extraSauceSelections,
+    extraComplementoSelections,
+  ]);
 
   const liveSummaryRows = useMemo(() => {
     if (!selectedSize) return [];
 
     return [
       { label: 'Base', value: formatGroupedIngredients(selectedBases) },
-      { label: 'Proteínas', value: formatGroupedIngredients([...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)]) },
+      { label: 'Proteínas', value: formatGroupedIngredients(selectedProteins) },
       { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
       { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
       { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
@@ -304,7 +392,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
   const totalAccompaniments = selectedAcompanantes.length;
 
-  const currentStepConfig = currentStep !== 'size' && currentStep !== 'summary' && stepConfigs ? stepConfigs[currentStep] : null;
+  const currentStepConfig = currentStep !== 'size' && currentStep !== 'summary' && currentStep !== 'upsell' && stepConfigs ? stepConfigs[currentStep] : null;
 
   const isStepComplete = (step: BowlBuilderStep) => {
     if (!selectedSize && step !== 'size') return false;
@@ -322,6 +410,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         return selectedSauces.length >= (stepConfigs?.salsas.min ?? 0);
       case 'complementos':
         return selectedComplementos.length >= (stepConfigs?.complementos.min ?? 0);
+      case 'upsell':
+        return true;
       case 'summary':
         return true;
       default:
@@ -340,6 +430,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedSauces([]);
     setSelectedComplementos([]);
     setExtraProteinSelections([]);
+    setExtraAcompananteSelections([]);
+    setExtraComplementoSelections([]);
+    setExtraSauceSelections([]);
     setNotes('');
     setCurrentStep('size');
   };
@@ -351,6 +444,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedSauces([]);
     setSelectedComplementos([]);
     setExtraProteinSelections([]);
+    setExtraAcompananteSelections([]);
+    setExtraComplementoSelections([]);
+    setExtraSauceSelections([]);
     setNotes('');
   };
 
@@ -767,23 +863,27 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
                 {/* Extra protein chips */}
                 {extraProteinSelections.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {extraProteinSelections.map(extra => (
-                      <span
-                        key={extra.uid}
-                        className="inline-flex items-center gap-1.5 bg-brand/10 border border-brand/30 rounded-full px-3 py-1 text-xs"
-                      >
-                        {extra.proteinName} +{formatPrice(extra.charge)}
-                        <button
-                          type="button"
-                          onClick={() => setExtraProteinSelections(prev => prev.filter(e => e.uid !== extra.uid))}
-                          className="text-muted-foreground hover:text-foreground leading-none"
-                          aria-label="Quitar proteína extra"
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Proteínas extra añadidas</p>
+                    <div className="flex flex-wrap gap-2">
+                      {extraProteinSelections.map(extra => (
+                        <span
+                          key={extra.uid}
+                          className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2"
                         >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
+                          <span className="font-semibold">{extra.proteinName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraProteinSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar proteína extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -904,29 +1004,57 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           })() : null}
 
           {currentStep === 'acompanantes' && currentStepConfig ? (() => {
+            const freeAcomp = acompananteOptions.filter(a => getIngredientExtraCharge(a) === 0);
+            const premiumAcomp = acompananteOptions.filter(a => getIngredientExtraCharge(a) > 0);
             const SUGGESTED_ACOMP = ['Guacamole', 'Queso rallado', 'Pico de gallo'];
             const selectedNames = selectedAcompanantes.map(a => a.name.toLowerCase());
-            const suggestions = SUGGESTED_ACOMP
+            const freeSuggestions = SUGGESTED_ACOMP
               .filter(name => !selectedNames.includes(name.toLowerCase()))
-              .map(name => acompananteOptions.find(a => a.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((a): a is Ingredient => a !== undefined)
-              .slice(0, 3);
+              .map(name => freeAcomp.find(a => a.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((a): a is Ingredient => a !== undefined);
             const isTotalFull = totalAccompaniments >= (selectedSize?.maxAcompanantes ?? 0);
+            const hasUpsellSection = freeSuggestions.length > 0 || premiumAcomp.length > 0;
             return (
               <>
                 <StepPicker
-                  items={acompananteOptions}
+                  items={freeAcomp}
                   selectedItems={selectedAcompanantes}
                   setSelectedItems={setSelectedAcompanantes}
                   config={currentStepConfig}
                   totalCount={totalAccompaniments}
                   totalMax={selectedSize?.maxAcompanantes}
                 />
-                {suggestions.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-xs text-muted-foreground mb-2">⭐ Otros también añaden</p>
+
+                {/* Extra acompañante chips */}
+                {extraAcompananteSelections.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Acompañantes extra añadidos</p>
                     <div className="flex flex-wrap gap-2">
-                      {suggestions.map(ingredient => (
+                      {extraAcompananteSelections.map(extra => (
+                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                          <span className="font-semibold">{extra.acompName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraAcompananteSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar acompañante extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Unified upsell section */}
+                {hasUpsellSection && (
+                  <div className="mt-5 relative">
+                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Free suggestions */}
+                      {freeSuggestions.map(ingredient => (
                         <button
                           key={ingredient.id}
                           type="button"
@@ -936,16 +1064,73 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           }}
                           disabled={isTotalFull}
                           className={cn(
-                            'rounded-full border border-brand/30 bg-brand/5 text-xs px-3 py-1 transition-colors',
-                            isTotalFull
-                              ? 'opacity-40 cursor-not-allowed'
-                              : 'cursor-pointer hover:bg-brand/15',
+                            'rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 transition-colors',
+                            isTotalFull ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-brand/15',
                           )}
                         >
                           {ingredient.name}
                         </button>
                       ))}
+                      {/* Premium acompañantes */}
+                      {premiumAcomp.map(premium => {
+                        const charge = getIngredientExtraCharge(premium);
+                        return (
+                          <button
+                            key={premium.id}
+                            type="button"
+                            onClick={() => setAcompSelectorOpen(premium.id)}
+                            className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
+                          >
+                            {premium.name}
+                            <span className="text-xs bg-brand/10 text-brand rounded-full px-2 ml-1">
+                              +{formatPrice(charge)}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
+
+                    {/* Inline acompañante selector */}
+                    {acompSelectorOpen !== null && (() => {
+                      const activePremium = premiumAcomp.find(p => p.id === acompSelectorOpen);
+                      if (!activePremium) return null;
+                      const charge = getIngredientExtraCharge(activePremium);
+                      return (
+                        <div className="absolute inset-x-0 top-0 z-10 bg-background border border-border rounded-xl shadow-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm font-semibold">¿Qué acompañante extra quieres?</p>
+                            <button
+                              type="button"
+                              onClick={() => setAcompSelectorOpen(null)}
+                              className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                              aria-label="Cerrar"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {freeAcomp.map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
+                                onClick={() => {
+                                  setExtraAcompananteSelections(prev => [...prev, {
+                                    uid: `extra-acomp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                    acompName: a.name,
+                                    charge,
+                                    premiumAcompId: activePremium.id,
+                                  }]);
+                                  setAcompSelectorOpen(null);
+                                }}
+                              >
+                                {a.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </>
@@ -953,14 +1138,16 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           })() : null}
 
           {currentStep === 'salsas' && currentStepConfig ? (() => {
+            const EXTRA_SAUCE_PRICE = 2000;
             const SUGGESTED_SAUCES = ['Ohana Chipotle', 'Mayo Cilantro', 'BBQ Honey'];
-            const selectedSauceNames = selectedSauces.map(s => s.name.toLowerCase());
+            const maxSauces = selectedSize?.maxSauces ?? currentStepConfig.max;
+            // Exclude already-selected and already-extra sauces from suggestions
+            const selectedSauceIds = new Set(selectedSauces.map(s => s.id));
+            const extraSauceIds = new Set(extraSauceSelections.map(e => e.sauceId));
             const sauceSuggestions = SUGGESTED_SAUCES
-              .filter(name => !selectedSauceNames.includes(name.toLowerCase()))
               .map(name => sauceOptions.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((s): s is Ingredient => s !== undefined)
+              .filter((s): s is Ingredient => s !== undefined && !selectedSauceIds.has(s.id) && !extraSauceIds.has(s.id))
               .slice(0, 3);
-            const isSaucesFull = selectedSauces.length >= currentStepConfig.max;
             return (
               <>
                 <StepPicker
@@ -969,25 +1156,54 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   setSelectedItems={setSelectedSauces}
                   config={currentStepConfig}
                 />
+
+                {/* Extra sauce chips */}
+                {extraSauceSelections.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Salsas extra añadidas</p>
+                    <div className="flex flex-wrap gap-2">
+                      {extraSauceSelections.map(extra => (
+                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                          <span className="font-semibold">{extra.sauceName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraSauceSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar salsa extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {sauceSuggestions.length > 0 && (
                   <div className="mt-5">
-                    <p className="text-xs text-muted-foreground mb-2">⭐ Otros también añaden</p>
+                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
                     <div className="flex flex-wrap gap-2">
                       {sauceSuggestions.map(sauce => (
                         <button
                           key={sauce.id}
                           type="button"
                           onClick={() => {
-                            if (isSaucesFull) return;
-                            updateIngredientSelection(sauce, setSelectedSauces, 'add', currentStepConfig.max);
+                            if (selectedSauces.length < maxSauces) {
+                              // Free slot available — add as included sauce
+                              setSelectedSauces(prev => [...prev, sauce]);
+                            } else {
+                              // Beyond free slots — add as paid extra
+                              const charge = (sauce.price ?? 0) > 0 ? sauce.price! : EXTRA_SAUCE_PRICE;
+                              setExtraSauceSelections(prev => [...prev, {
+                                uid: `extra-sauce-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                sauceName: sauce.name,
+                                sauceId: sauce.id,
+                                charge,
+                              }]);
+                            }
                           }}
-                          disabled={isSaucesFull}
-                          className={cn(
-                            'rounded-full border border-brand/30 bg-brand/5 text-xs px-3 py-1 transition-colors',
-                            isSaucesFull
-                              ? 'opacity-40 cursor-not-allowed'
-                              : 'cursor-pointer hover:bg-brand/15',
-                          )}
+                          className="rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
                         >
                           {sauce.name}
                         </button>
@@ -999,14 +1215,270 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             );
           })() : null}
 
-          {currentStep === 'complementos' && currentStepConfig ? (
-            <StepPicker
-              items={complementoOptions}
-              selectedItems={selectedComplementos}
-              setSelectedItems={setSelectedComplementos}
-              config={currentStepConfig}
-            />
-          ) : null}
+          {currentStep === 'complementos' && currentStepConfig ? (() => {
+            const EXTRA_COMP_PRICE = 500;
+            const SUGGESTED_COMPLEMENTOS = ['Ajonjolí', 'Maní', 'Choclitos triturados'];
+            const maxComplementos = selectedSize?.maxComplementos ?? currentStepConfig.max;
+            const freeComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) === 0);
+            const premiumComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) > 0);
+            const selectedCompIds = new Set(selectedComplementos.map(c => c.id));
+            const extraCompIds = new Set(extraComplementoSelections.map(e => e.compId));
+            const compSuggestions = SUGGESTED_COMPLEMENTOS
+              .map(name => freeComplementos.find(c => c.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((c): c is Ingredient => c !== undefined && !selectedCompIds.has(c.id) && !extraCompIds.has(c.id))
+              .slice(0, 3);
+            const hasUpsellSection = compSuggestions.length > 0 || premiumComplementos.length > 0;
+            return (
+              <>
+                <StepPicker
+                  items={freeComplementos}
+                  selectedItems={selectedComplementos}
+                  setSelectedItems={setSelectedComplementos}
+                  config={currentStepConfig}
+                />
+
+                {/* Extra complemento chips */}
+                {extraComplementoSelections.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Complementos extra añadidos</p>
+                    <div className="flex flex-wrap gap-2">
+                      {extraComplementoSelections.map(extra => (
+                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                          <span className="font-semibold">{extra.compName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraComplementoSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar complemento extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Unified upsell: free suggestions + premium chips */}
+                {hasUpsellSection && (
+                  <div className="mt-5">
+                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Free suggestions with sauces router pattern */}
+                      {compSuggestions.map(comp => (
+                        <button
+                          key={comp.id}
+                          type="button"
+                          onClick={() => {
+                            if (selectedComplementos.length < maxComplementos) {
+                              setSelectedComplementos(prev => [...prev, comp]);
+                            } else {
+                              const charge = (comp.price ?? 0) > 0 ? comp.price! : EXTRA_COMP_PRICE;
+                              setExtraComplementoSelections(prev => [...prev, {
+                                uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                compName: comp.name,
+                                compId: comp.id,
+                                charge,
+                                premiumCompId: '',
+                              }]);
+                            }
+                          }}
+                          className="rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
+                        >
+                          {comp.name}
+                        </button>
+                      ))}
+                      {/* Premium chips with selector */}
+                      {premiumComplementos.map(premium => {
+                        const charge = getIngredientExtraCharge(premium);
+                        return (
+                          <button
+                            key={premium.id}
+                            type="button"
+                            onClick={() => setCompSelectorOpen(prev => prev === premium.id ? null : premium.id)}
+                            className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
+                          >
+                            {premium.name}
+                            <span className="text-xs bg-brand/10 text-brand rounded-full px-2 ml-1">
+                              +{formatPrice(charge)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Inline complemento selector — rendered below as regular block */}
+                {compSelectorOpen !== null && (() => {
+                  const activePremium = premiumComplementos.find(p => p.id === compSelectorOpen);
+                  if (!activePremium) return null;
+                  const charge = getIngredientExtraCharge(activePremium);
+                  return (
+                    <div className="mt-3 bg-background border border-border rounded-xl shadow-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-semibold">¿Qué complemento extra quieres?</p>
+                        <button
+                          type="button"
+                          onClick={() => setCompSelectorOpen(null)}
+                          className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                          aria-label="Cerrar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {freeComplementos.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
+                            onClick={() => {
+                              setExtraComplementoSelections(prev => [...prev, {
+                                uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                compName: c.name,
+                                compId: c.id,
+                                charge,
+                                premiumCompId: activePremium.id,
+                              }]);
+                              setCompSelectorOpen(null);
+                            }}
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            );
+          })() : null}
+
+          {currentStep === 'upsell' ? (() => {
+            const UPSELL_INGREDIENTS = ['Guacamole', 'Queso rallado', 'Tocineta', 'Queso frito', 'Papa Francesa'];
+            const allIngredients = [...acompananteOptions, ...complementoOptions];
+            const upsellIngredients = UPSELL_INGREDIENTS
+              .map(name => allIngredients.find(i => i.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((i): i is Ingredient => i !== undefined);
+
+            const isInBowl = (ing: Ingredient) =>
+              selectedAcompanantes.some(a => a.id === ing.id) ||
+              selectedComplementos.some(c => c.id === ing.id) ||
+              extraAcompananteSelections.some(e => e.acompName === ing.name) ||
+              extraComplementoSelections.some(e => e.compName === ing.name);
+
+            const addUpsellIngredient = (ing: Ingredient) => {
+              if (isInBowl(ing)) return;
+              const charge = getIngredientExtraCharge(ing);
+              if (ing.type === 'acompanante') {
+                const maxAcomp = selectedSize?.maxAcompanantes ?? 0;
+                if (charge === 0 && selectedAcompanantes.length < maxAcomp) {
+                  setSelectedAcompanantes(prev => [...prev, ing]);
+                } else {
+                  setExtraAcompananteSelections(prev => [...prev, {
+                    uid: `extra-acomp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    acompName: ing.name,
+                    charge: charge > 0 ? charge : 2000,
+                    premiumAcompId: '',
+                  }]);
+                }
+              } else {
+                const maxComp = selectedSize?.maxComplementos ?? 0;
+                if (charge === 0 && selectedComplementos.length < maxComp) {
+                  setSelectedComplementos(prev => [...prev, ing]);
+                } else {
+                  setExtraComplementoSelections(prev => [...prev, {
+                    uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    compName: ing.name,
+                    compId: ing.id,
+                    charge: charge > 0 ? charge : 500,
+                    premiumCompId: '',
+                  }]);
+                }
+              }
+            };
+
+            return (
+              <div className="animate-slide-in space-y-8">
+                {/* Sección 1: Bebidas */}
+                <div>
+                  <p className="text-lg font-semibold mb-4">🥤 ¿Le sumamos una bebida?</p>
+                  {bebidasLoading ? (
+                    <div className="flex gap-3">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="shrink-0 w-32 space-y-2">
+                          <div className="w-full h-20 bg-muted rounded-lg animate-pulse" />
+                          <div className="h-3 bg-muted rounded w-3/4 animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : bebidasOptions.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible">
+                      {bebidasOptions.slice(0, 6).map((drink: Product) => {
+                        const inCart = cart.items.some(item => item.type === 'product' && item.product?.id === drink.id);
+                        return (
+                          <div key={drink.id} className="snap-start shrink-0 w-32 md:w-auto">
+                            {drink.imageUrl ? (
+                              <img src={drink.imageUrl} alt={drink.name} className="w-full h-20 object-cover rounded-lg" />
+                            ) : (
+                              <div className="w-full h-20 bg-brand/20 rounded-lg" />
+                            )}
+                            <p className="text-xs font-semibold line-clamp-1 mt-1">{drink.name}</p>
+                            <p className="text-xs text-brand font-bold">{formatPrice(drink.price)}</p>
+                            <button
+                              type="button"
+                              disabled={inCart}
+                              onClick={() => { if (!inCart) addProduct(drink); }}
+                              className={cn(
+                                'text-white text-xs rounded-lg py-1.5 w-full mt-1 transition-colors',
+                                inCart ? 'bg-brand/40 cursor-not-allowed' : 'bg-brand hover:bg-brand/90',
+                              )}
+                            >
+                              {inCart ? '✓ Añadido' : '+ Agregar'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Sección 2: Ingredientes adicionales */}
+                {upsellIngredients.length > 0 && (
+                  <div>
+                    <p className="text-lg font-semibold mb-4">🍟 ¿Algo más para tu bowl?</p>
+                    <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible">
+                      {upsellIngredients.map(ing => {
+                        const inBowl = isInBowl(ing);
+                        const charge = getIngredientExtraCharge(ing);
+                        return (
+                          <div key={ing.id} className="snap-start shrink-0 w-32 md:w-auto rounded-2xl border bg-card p-3">
+                            <p className="text-xs font-semibold line-clamp-1">{ing.name}</p>
+                            <p className="text-xs text-brand font-bold mt-0.5">
+                              {charge > 0 ? `+${formatPrice(charge)}` : 'Incluido'}
+                            </p>
+                            <button
+                              type="button"
+                              disabled={inBowl}
+                              onClick={() => addUpsellIngredient(ing)}
+                              className={cn(
+                                'text-white text-xs rounded-lg py-1.5 w-full mt-2 transition-colors',
+                                inBowl ? 'bg-brand/40 cursor-not-allowed' : 'bg-brand hover:bg-brand/90',
+                              )}
+                            >
+                              {inBowl ? '✓ En tu bowl' : '+ Agregar'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })() : null}
 
           {currentStep === 'summary' && selectedSize ? (
             <div className="space-y-6">
@@ -1130,7 +1602,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                 {getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              {currentStepConfig?.optional && currentSelectionCount === 0 ? (
+              {(currentStepConfig?.optional && currentSelectionCount === 0) || currentStep === 'upsell' ? (
                 <Button variant="ghost" size="sm" onClick={goNext} className="text-muted-foreground">
                   Saltar este paso →
                 </Button>

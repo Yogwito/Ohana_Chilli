@@ -42,6 +42,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatBusinessPhone, parseBusinessAddress } from '@/domain/businessSettings';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
+import { formatProductCustomizationLines } from '@/domain/productCustomizations';
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
 import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
@@ -299,7 +300,11 @@ export default function CheckoutPage() {
                 complementos: item.customBowl.complementos?.map((c) => c.name),
                 notes: item.notes,
               }
-            : { product_id: item.product?.id, notes: item.notes },
+            : {
+                product_id: item.product?.id,
+                notes: item.notes,
+                customizations: item.customizations ?? null,
+              },
       }));
 
       // Use SECURITY DEFINER RPC — bypasses RLS so anon users can insert orders.
@@ -838,55 +843,71 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="space-y-4 mb-6">
-                  {cart.items.map((item) => (
-                    <div key={item.id} className="group flex gap-3">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-ohana/10">
-                        <Leaf className="h-4 w-4 text-ohana" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-1">
-                          <p className="font-medium text-sm leading-tight">
-                            {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.id)}
-                            className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                            aria-label="Eliminar producto"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                  {cart.items.map((item) => {
+                    const customizationLines = item.type === 'product'
+                      ? formatProductCustomizationLines(item.customizations)
+                      : [];
+
+                    return (
+                      <div key={item.id} className="group flex gap-3">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-ohana/10">
+                          <Leaf className="h-4 w-4 text-ohana" />
                         </div>
-                        {item.type === 'custom-bowl' && item.customBowl && (
-                          <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
-                            {formatBowlSummary(item.customBowl)}
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between mt-2">
-                          <div className="flex items-center gap-1 border rounded-full px-1 py-0.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="font-medium text-sm leading-tight">
+                              {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
+                            </p>
                             <button
                               type="button"
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
-                              aria-label="Reducir cantidad"
+                              onClick={() => removeItem(item.id)}
+                              className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                              aria-label="Eliminar producto"
                             >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="w-5 text-center text-xs font-medium">{item.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
-                              aria-label="Aumentar cantidad"
-                            >
-                              <Plus className="h-3 w-3" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
-                          <span className="font-semibold text-sm">{formatPrice(item.totalPrice)}</span>
+                          {item.type === 'custom-bowl' && item.customBowl && (
+                            <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
+                              {formatBowlSummary(item.customBowl)}
+                            </p>
+                          )}
+                          {customizationLines.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {customizationLines.map((line) => (
+                                <p key={line} className="text-xs text-muted-foreground">{line}</p>
+                              ))}
+                            </div>
+                          )}
+                          {item.notes && customizationLines.length === 0 && (
+                            <p className="mt-1 text-xs text-muted-foreground">Nota: {item.notes}</p>
+                          )}
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center gap-1 border rounded-full px-1 py-0.5">
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
+                                aria-label="Reducir cantidad"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-5 text-center text-xs font-medium">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
+                                aria-label="Aumentar cantidad"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <span className="font-semibold text-sm">{formatPrice(item.totalPrice)}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="border-t pt-4 space-y-2">

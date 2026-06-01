@@ -65,6 +65,20 @@ export interface Modifier {
   productId: string;
 }
 
+// Product customization for non-Bowl Builder products
+export interface ProductCustomizationExtra {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface ProductCustomization {
+  removedIngredients: string[];
+  extras: ProductCustomizationExtra[];
+  note: string;
+  extraTotal: number;
+}
+
 // Custom Bowl Type
 export interface CustomBowl {
   size: BowlSizeRule;
@@ -83,6 +97,7 @@ export interface CartItem {
   type: 'product' | 'custom-bowl';
   product?: Product;
   customBowl?: CustomBowl;
+  customizations?: ProductCustomization;
   modifiers?: Modifier[];
   quantity: number;
   notes?: string;
@@ -135,4 +150,4 @@ export interface Order {
 }
 
 // Bowl Builder Step
-export type BowlBuilderStep = 'size' | 'bases' | 'proteins' | 'acompanantes' | 'salsas' | 'complementos' | 'summary';
+export type BowlBuilderStep = 'size' | 'bases' | 'proteins' | 'acompanantes' | 'salsas' | 'complementos' | 'upsell' | 'summary';
