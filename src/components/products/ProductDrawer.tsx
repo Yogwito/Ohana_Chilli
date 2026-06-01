@@ -39,6 +39,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
 
   const removableIngredients = ingredients.filter(i => i.is_removable && !i.is_extra);
   const extraIngredients = ingredients.filter(i => i.is_extra);
+  const hasConfiguredIngredients = ingredients.length > 0;
 
   const toggleRemoved = (name: string) => {
     setRemoved(prev =>
@@ -78,6 +79,11 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
     onClose();
   };
 
+  const handleAddWithoutConfiguredIngredients = () => {
+    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0 });
+    onClose();
+  };
+
   return (
     <Sheet open={open} onOpenChange={open => { if (!open) onClose(); }}>
       <SheetContent
@@ -113,12 +119,14 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
             </div>
 
             {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-4 w-40 rounded" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-8 w-20 rounded-full" />
-                  <Skeleton className="h-8 w-24 rounded-full" />
-                  <Skeleton className="h-8 w-16 rounded-full" />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-44 rounded" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-36 rounded" />
+                  <Skeleton className="h-20 w-full rounded-xl" />
                 </div>
               </div>
             ) : (
@@ -217,20 +225,40 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
             <span className="text-sm text-muted-foreground">Total</span>
             <span className="text-lg font-bold text-brand">{formatPrice(totalPrice)}</span>
           </div>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
-          >
-            Agregar al carrito · {formatPrice(totalPrice)}
-          </button>
-          <button
-            type="button"
-            onClick={handleAddWithoutChanges}
-            className="text-sm text-muted-foreground underline text-center w-full cursor-pointer hover:text-foreground transition-colors"
-          >
-            Agregar sin cambios →
-          </button>
+          {isLoading ? (
+            <button
+              type="button"
+              disabled
+              className="w-full bg-muted text-muted-foreground py-3 rounded-xl font-semibold text-sm cursor-not-allowed"
+            >
+              Cargando opciones...
+            </button>
+          ) : hasConfiguredIngredients ? (
+            <>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
+              >
+                Agregar al carrito · {formatPrice(totalPrice)}
+              </button>
+              <button
+                type="button"
+                onClick={handleAddWithoutChanges}
+                className="text-sm text-muted-foreground underline text-center w-full cursor-pointer hover:text-foreground transition-colors"
+              >
+                Agregar sin cambios →
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleAddWithoutConfiguredIngredients}
+              className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
+            >
+              Agregar sin cambios →
+            </button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

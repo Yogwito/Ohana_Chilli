@@ -5,7 +5,6 @@ import ProductImage from '@/components/products/ProductImage';
 import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
 import { Product, Brand } from '@/types';
 import { useCart } from '@/context/CartContext';
-import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics';
@@ -21,6 +20,11 @@ interface ProductCardProps {
 const BRAND_LABEL: Record<Brand, string> = {
   ohana: 'Ohana',
 };
+
+const NON_CUSTOMIZABLE_CATEGORIES = [
+  'ohana-bebidas',
+  'chilli-adicionales',
+];
 
 const CATEGORY_TOKEN_LABELS: Record<string, string> = {
   premade: 'Preparados', custom: 'Personalizados', bowls: 'Bowls', bowl: 'Bowl',
@@ -44,10 +48,6 @@ export default function ProductCard({ product, variant = 'default', categoryName
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [added, setAdded] = useState(false);
 
-  // Preload to know if drawer should open or direct add
-  const { data: defaultIngredients = [], isLoading: ingredientsLoading } = useProductDefaultIngredients(product.id);
-  const hasCustomization = !ingredientsLoading && defaultIngredients.length > 0;
-
   const descriptionText = product.description.trim();
   const ingredientsText = useMemo(() => {
     if (!product.ingredients || product.ingredients.length === 0) return '';
@@ -68,10 +68,10 @@ export default function ProductCard({ product, variant = 'default', categoryName
   };
 
   const handleAddClick = () => {
-    if (hasCustomization) {
-      setDrawerOpen(true);
-    } else {
+    if (NON_CUSTOMIZABLE_CATEGORIES.includes(product.categoryId ?? '')) {
       handleAddDirect();
+    } else {
+      setDrawerOpen(true);
     }
   };
 
