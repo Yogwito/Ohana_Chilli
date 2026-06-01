@@ -694,34 +694,226 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             />
           ) : null}
 
-          {currentStep === 'proteins' && currentStepConfig ? (
-            <StepPicker
-              items={proteinOptions}
-              selectedItems={selectedProteins}
-              setSelectedItems={setSelectedProteins}
-              config={currentStepConfig}
-            />
-          ) : null}
+          {currentStep === 'proteins' && currentStepConfig ? (() => {
+            const includedProteins = proteinOptions.filter(p => getIngredientExtraCharge(p) === 0);
+            const premiumProteins = proteinOptions.filter(p => getIngredientExtraCharge(p) > 0);
+            const premiumMax = currentStepConfig.max + 3;
+            return (
+              <div className="animate-slide-in">
+                {/* Header */}
+                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <div>
+                      <h3 className="text-xl font-semibold">{currentStepConfig.title}</h3>
+                      <p className="text-sm text-muted-foreground">{currentStepConfig.subtitle}</p>
+                    </div>
+                    <div className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                      <p>{getStepHint(currentStepConfig, selectedProteins.length)}</p>
+                      <p className="mt-2 font-medium text-foreground">
+                        Selección actual: {formatGroupedIngredients(selectedProteins)}
+                      </p>
+                    </div>
+                  </div>
+                  <CounterBadge current={selectedProteins.length} config={currentStepConfig} />
+                </div>
 
-          {currentStep === 'acompanantes' && currentStepConfig ? (
-            <StepPicker
-              items={acompananteOptions}
-              selectedItems={selectedAcompanantes}
-              setSelectedItems={setSelectedAcompanantes}
-              config={currentStepConfig}
-              totalCount={totalAccompaniments}
-              totalMax={selectedSize?.maxAcompanantes}
-            />
-          ) : null}
+                {/* Included proteins */}
+                {includedProteins.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+                    No hay proteínas disponibles en esta sección por ahora.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                    {includedProteins.map((protein) => {
+                      const itemCount = getIngredientCount(selectedProteins, protein.id);
+                      const effectivePerItemMax = currentStepConfig.perItemMax ?? currentStepConfig.max;
+                      return (
+                        <IngredientCard
+                          key={protein.id}
+                          ingredient={protein}
+                          count={itemCount}
+                          max={currentStepConfig.max}
+                          perItemMax={currentStepConfig.perItemMax}
+                          onAdd={() => {
+                            if (itemCount >= effectivePerItemMax) return;
+                            updateIngredientSelection(protein, setSelectedProteins, 'add', currentStepConfig.max);
+                          }}
+                          onRemove={() => updateIngredientSelection(protein, setSelectedProteins, 'remove', currentStepConfig.max)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
 
-          {currentStep === 'salsas' && currentStepConfig ? (
-            <StepPicker
-              items={sauceOptions}
-              selectedItems={selectedSauces}
-              setSelectedItems={setSelectedSauces}
-              config={currentStepConfig}
-            />
-          ) : null}
+                {/* Premium proteins sell-up */}
+                {premiumProteins.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-px flex-1 bg-border/50" />
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                        También puedes agregar
+                      </span>
+                      <div className="h-px flex-1 bg-border/50" />
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                      {premiumProteins.map((protein) => {
+                        const itemCount = getIngredientCount(selectedProteins, protein.id);
+                        const charge = getIngredientExtraCharge(protein);
+                        const isAddDisabled = itemCount >= 3 || currentSelectionCount >= premiumMax;
+                        return (
+                          <div
+                            key={protein.id}
+                            className={cn(
+                              'rounded-2xl border border-dashed border-brand/40 bg-card p-4 shadow-sm transition-all duration-200',
+                              itemCount > 0 && 'border-primary bg-primary/5 shadow-md shadow-primary/10',
+                              isAddDisabled && itemCount === 0 && 'opacity-60',
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1">
+                                <p className="text-sm font-semibold text-foreground">{protein.name}</p>
+                                <span className="inline-block text-xs bg-brand/10 text-brand rounded-full px-2 py-0.5">
+                                  + {formatPrice(charge)}
+                                </span>
+                              </div>
+                              <span className={cn(
+                                'inline-flex min-w-[2rem] items-center justify-center rounded-full border px-2 py-1 text-xs font-semibold transition-colors',
+                                itemCount > 0 ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-muted/50 text-muted-foreground',
+                              )}>
+                                x{itemCount}
+                              </span>
+                            </div>
+                            <div className="mt-4 flex items-center justify-between gap-3">
+                              <p className="text-xs text-muted-foreground">
+                                {itemCount > 0 ? formatStepQuantity(itemCount, 'selección', 'selecciones') : 'Extra disponible'}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button" variant="outline" size="icon"
+                                  onClick={() => updateIngredientSelection(protein, setSelectedProteins, 'remove', premiumMax)}
+                                  disabled={itemCount === 0}
+                                  aria-label={`Quitar ${protein.name}`}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button" variant="outline" size="icon"
+                                  onClick={() => {
+                                    if (isAddDisabled) return;
+                                    updateIngredientSelection(protein, setSelectedProteins, 'add', premiumMax);
+                                  }}
+                                  disabled={isAddDisabled}
+                                  aria-label={`Agregar ${protein.name}`}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })() : null}
+
+          {currentStep === 'acompanantes' && currentStepConfig ? (() => {
+            const SUGGESTED_ACOMP = ['Guacamole', 'Queso rallado', 'Pico de gallo'];
+            const selectedNames = selectedAcompanantes.map(a => a.name.toLowerCase());
+            const suggestions = SUGGESTED_ACOMP
+              .filter(name => !selectedNames.includes(name.toLowerCase()))
+              .map(name => acompananteOptions.find(a => a.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((a): a is Ingredient => a !== undefined)
+              .slice(0, 3);
+            const isTotalFull = totalAccompaniments >= (selectedSize?.maxAcompanantes ?? 0);
+            return (
+              <>
+                <StepPicker
+                  items={acompananteOptions}
+                  selectedItems={selectedAcompanantes}
+                  setSelectedItems={setSelectedAcompanantes}
+                  config={currentStepConfig}
+                  totalCount={totalAccompaniments}
+                  totalMax={selectedSize?.maxAcompanantes}
+                />
+                {suggestions.length > 0 && (
+                  <div className="mt-5">
+                    <p className="text-xs text-muted-foreground mb-2">⭐ Otros también añaden</p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestions.map(ingredient => (
+                        <button
+                          key={ingredient.id}
+                          type="button"
+                          onClick={() => {
+                            if (isTotalFull) return;
+                            updateIngredientSelection(ingredient, setSelectedAcompanantes, 'add', currentStepConfig.max);
+                          }}
+                          disabled={isTotalFull}
+                          className={cn(
+                            'rounded-full border border-brand/30 bg-brand/5 text-xs px-3 py-1 transition-colors',
+                            isTotalFull
+                              ? 'opacity-40 cursor-not-allowed'
+                              : 'cursor-pointer hover:bg-brand/15',
+                          )}
+                        >
+                          {ingredient.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })() : null}
+
+          {currentStep === 'salsas' && currentStepConfig ? (() => {
+            const SUGGESTED_SAUCES = ['Ohana Chipotle', 'Mayo Cilantro', 'BBQ Honey'];
+            const selectedSauceNames = selectedSauces.map(s => s.name.toLowerCase());
+            const sauceSuggestions = SUGGESTED_SAUCES
+              .filter(name => !selectedSauceNames.includes(name.toLowerCase()))
+              .map(name => sauceOptions.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((s): s is Ingredient => s !== undefined)
+              .slice(0, 3);
+            const isSaucesFull = selectedSauces.length >= currentStepConfig.max;
+            return (
+              <>
+                <StepPicker
+                  items={sauceOptions}
+                  selectedItems={selectedSauces}
+                  setSelectedItems={setSelectedSauces}
+                  config={currentStepConfig}
+                />
+                {sauceSuggestions.length > 0 && (
+                  <div className="mt-5">
+                    <p className="text-xs text-muted-foreground mb-2">⭐ Otros también añaden</p>
+                    <div className="flex flex-wrap gap-2">
+                      {sauceSuggestions.map(sauce => (
+                        <button
+                          key={sauce.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSaucesFull) return;
+                            updateIngredientSelection(sauce, setSelectedSauces, 'add', currentStepConfig.max);
+                          }}
+                          disabled={isSaucesFull}
+                          className={cn(
+                            'rounded-full border border-brand/30 bg-brand/5 text-xs px-3 py-1 transition-colors',
+                            isSaucesFull
+                              ? 'opacity-40 cursor-not-allowed'
+                              : 'cursor-pointer hover:bg-brand/15',
+                          )}
+                        >
+                          {sauce.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })() : null}
 
           {currentStep === 'complementos' && currentStepConfig ? (
             <StepPicker
