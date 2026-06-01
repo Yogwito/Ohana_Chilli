@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { House, UtensilsCrossed, ShoppingCart, Info } from 'lucide-react';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import ClosedBanner from './ClosedBanner';
 import RestaurantSchema from '@/components/RestaurantSchema';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="flex flex-col min-h-screen">
       <RestaurantSchema />
+      <ClosedBanner />
       <Navbar />
       <main className="flex-1 pb-16 md:pb-0">{children}</main>
       <Footer />
