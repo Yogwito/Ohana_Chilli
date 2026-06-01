@@ -9,11 +9,17 @@ import SEOHead from '@/components/SEOHead';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import ProductImage from '@/components/products/ProductImage';
+import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
 import {
   buildBusinessWhatsAppUrl,
   formatCompactHours,
   isBusinessOpenNow,
 } from '@/domain/businessSettings';
+import {
+  calculateProductUnitPrice,
+  isProductCustomizable,
+  normalizeProductCustomization,
+} from '@/domain/productCustomizations';
 import { useBusinessSettings, useProducts, useCategories } from '@/hooks/use-catalog';
 import { useCart } from '@/context/CartContext';
 import { trackEvent } from '@/lib/analytics';
@@ -58,13 +64,23 @@ function ProductRowSkeleton() {
 
 // ─── Product row (La Cocina style: text left, image right) ───────────────────
 
-function ProductRow({ product, index = 0 }: { product: Product; index?: number }) {
+function ProductRow({ product, category, index = 0 }: { product: Product; category?: Category; index?: number }) {
   const { ref, isVisible } = useIntersection({ threshold: 0.05 });
   const { addProduct } = useCart();
   const [added, setAdded] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const handleAdd = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const productWithCategory = useMemo(
+    () => ({
+      ...product,
+      categorySlug: category?.slug,
+      categoryName: category?.name,
+      category,
+    }),
+    [category, product],
+  );
+
+  const handleAddDirect = () => {
     addProduct(product);
     trackEvent({
       type: 'add_to_cart',
@@ -78,57 +94,94 @@ function ProductRow({ product, index = 0 }: { product: Product; index?: number }
     setTimeout(() => setAdded(false), 800);
   };
 
+  const handleAddClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (isProductCustomizable(productWithCategory)) {
+      setDrawerOpen(true);
+      return;
+    }
+
+    handleAddDirect();
+  };
+
+  const handleDrawerConfirm = (config: ProductConfig) => {
+    const customizations = normalizeProductCustomization(config);
+    const unitPrice = calculateProductUnitPrice(product.price, customizations);
+    const notes = customizations?.note || undefined;
+
+    addProduct(product, 1, notes, customizations);
+    trackEvent({
+      type: 'add_to_cart',
+      productId: product.id,
+      productName: product.name,
+      brand: product.brand,
+      priceCents: unitPrice,
+    });
+    toast.success(`${product.name} agregado`, { description: formatCOP(unitPrice) });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 800);
+  };
+
   return (
-    <div
-      ref={ref}
-      style={{ transitionDelay: `${Math.min(index % 4 * 60, 240)}ms` }}
-      className={cn(
-        'group flex items-start justify-between gap-4 py-4 border-b border-border/10',
-        'hover:bg-muted/30 dark:hover:bg-white/5 px-2 rounded-lg cursor-pointer',
-        'transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-sm',
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4',
-      )}
-    >
-      {/* Left: text */}
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-base text-foreground">{product.name}</p>
-        {product.description?.trim() && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mt-1 max-w-sm leading-relaxed">
-            {product.description.trim()}
-          </p>
+    <>
+      <div
+        ref={ref}
+        style={{ transitionDelay: `${Math.min(index % 4 * 60, 240)}ms` }}
+        className={cn(
+          'group flex items-start justify-between gap-4 py-4 border-b border-border/10',
+          'hover:bg-muted/30 dark:hover:bg-white/5 px-2 rounded-lg cursor-pointer',
+          'transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-sm',
+          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4',
         )}
-        <p className="font-bold text-lg text-brand mt-3">
-          {formatCOP(product.price)}
-        </p>
-      </div>
-
-      {/* Right: image with add button */}
-      <div className="relative w-24 shrink-0 overflow-hidden rounded-xl">
-        <ProductImage
-          product={product}
-          ratio={4 / 3}
-          imageClassName="group-hover:scale-105"
-          className="rounded-xl"
-          fallbackClassName="rounded-xl bg-gradient-to-br from-brand/30 to-brand-dark/50"
-        />
-
-        {/* Floating add button */}
-        <button
-          onClick={handleAdd}
-          className={cn(
-            'absolute bottom-2 right-2 w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-brand text-white shadow-md',
-            'flex items-center justify-center hover:bg-brand-dark active:scale-90 transition-all duration-200',
-            added && 'scale-110 bg-brand-dark',
+      >
+        {/* Left: text */}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-base text-foreground">{product.name}</p>
+          {product.description?.trim() && (
+            <p className="text-sm text-muted-foreground line-clamp-2 mt-1 max-w-sm leading-relaxed">
+              {product.description.trim()}
+            </p>
           )}
-          aria-label="Agregar al carrito"
-        >
-          {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-        </button>
+          <p className="font-bold text-lg text-brand mt-3">
+            {formatCOP(product.price)}
+          </p>
+        </div>
+
+        {/* Right: image with add button */}
+        <div className="relative w-24 shrink-0 overflow-hidden rounded-xl">
+          <ProductImage
+            product={product}
+            ratio={4 / 3}
+            imageClassName="group-hover:scale-105"
+            className="rounded-xl"
+            fallbackClassName="rounded-xl bg-gradient-to-br from-brand/30 to-brand-dark/50"
+          />
+
+          {/* Floating add button */}
+          <button
+            onClick={handleAddClick}
+            className={cn(
+              'absolute bottom-2 right-2 w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-brand text-white shadow-md',
+              'flex items-center justify-center hover:bg-brand-dark active:scale-90 transition-all duration-200',
+              added && 'scale-110 bg-brand-dark',
+            )}
+            aria-label="Agregar al carrito"
+          >
+            {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
-    </div>
+
+      <ProductDrawer
+        product={product}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onConfirm={handleDrawerConfirm}
+      />
+    </>
   );
 }
-
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function OhanaPage() {
@@ -503,7 +556,7 @@ export default function OhanaPage() {
                     <div>
                       {isLoading
                         ? [1, 2, 3].map((i) => <ProductRowSkeleton key={i} />)
-                        : products.map((p, idx) => <ProductRow key={p.id} product={p} index={idx} />)
+                        : products.map((p, idx) => <ProductRow key={p.id} product={p} category={cat} index={idx} />)
                       }
                     </div>
                   )}

@@ -10,7 +10,11 @@ import { cn } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatPrice } from '@/domain/formatPrice';
-import { calculateProductUnitPrice, normalizeProductCustomization } from '@/domain/productCustomizations';
+import {
+  calculateProductUnitPrice,
+  isProductCustomizable as resolveProductCustomizable,
+  normalizeProductCustomization,
+} from '@/domain/productCustomizations';
 
 interface ProductCardProps {
   product: Product;
@@ -21,11 +25,6 @@ interface ProductCardProps {
 const BRAND_LABEL: Record<Brand, string> = {
   ohana: 'Ohana',
 };
-
-const NON_CUSTOMIZABLE_CATEGORIES = [
-  'ohana-bebidas',
-  'chilli-adicionales',
-];
 
 const CATEGORY_TOKEN_LABELS: Record<string, string> = {
   premade: 'Preparados', custom: 'Personalizados', bowls: 'Bowls', bowl: 'Bowl',
@@ -41,6 +40,10 @@ function humanizeCategoryId(categoryId: string): string {
     .split('-').filter(Boolean).filter((t) => t !== 'ohana' && t !== 'chilli');
   if (tokens.length === 0) return 'Menú';
   return tokens.map((t) => CATEGORY_TOKEN_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
+}
+
+function isProductCustomizable(product: Product): boolean {
+  return resolveProductCustomizable(product);
 }
 
 export default function ProductCard({ product, variant = 'default', categoryName }: ProductCardProps) {
@@ -59,6 +62,10 @@ export default function ProductCard({ product, variant = 'default', categoryName
   const shouldShowMore =
     descriptionText.length > 120 || ingredientsText.length > 90 || (product.ingredients?.length ?? 0) > 5;
   const resolvedCategoryName = categoryName ?? humanizeCategoryId(product.categoryId);
+  const productWithCategory = useMemo(
+    () => ({ ...product, categoryName: resolvedCategoryName }),
+    [product, resolvedCategoryName],
+  );
 
   const handleAddDirect = () => {
     addProduct(product);
@@ -69,11 +76,12 @@ export default function ProductCard({ product, variant = 'default', categoryName
   };
 
   const handleAddClick = () => {
-    if (NON_CUSTOMIZABLE_CATEGORIES.includes(product.categoryId ?? '')) {
-      handleAddDirect();
-    } else {
+    if (isProductCustomizable(productWithCategory)) {
       setDrawerOpen(true);
+      return;
     }
+
+    handleAddDirect();
   };
 
   const handleDrawerConfirm = (config: ProductConfig) => {
@@ -112,7 +120,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
           <p className="text-sm font-bold text-ohana-dark">{formatPrice(product.price)}</p>
         </div>
         <Button
-          onClick={handleAddDirect}
+          onClick={handleAddClick}
           size="icon"
           className="rounded-full h-8 w-8 shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
         >

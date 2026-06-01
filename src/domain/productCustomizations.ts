@@ -1,8 +1,89 @@
-import type { ProductCustomization, ProductCustomizationExtra } from '@/types';
+import type { Product, ProductCustomization, ProductCustomizationExtra } from '@/types';
 import { formatPrice } from './formatPrice';
+
+type ProductCategoryMetadata = Product & {
+  category_id?: string | null;
+  categorySlug?: string | null;
+  category_slug?: string | null;
+  categoryName?: string | null;
+  category_name?: string | null;
+  category?: {
+    slug?: string | null;
+    name?: string | null;
+  } | null;
+};
+
+const BEVERAGE_CATEGORY_TERMS = new Set([
+  'agua',
+  'aguas',
+  'bebida',
+  'bebidas',
+  'cafe',
+  'cafes',
+  'gaseosa',
+  'gaseosas',
+  'jugo',
+  'jugos',
+  'limonada',
+  'limonadas',
+  'soda',
+  'sodas',
+  'te',
+]);
+
+const SIMPLE_ADDON_CATEGORY_TERMS = new Set([
+  'adicional',
+  'adicionales',
+  'acompanante',
+  'acompanantes',
+  'extra',
+  'extras',
+]);
 
 function normalizeText(value: string | null | undefined) {
   return value?.trim() ?? '';
+}
+
+function normalizeCategorySignal(value: string | null | undefined) {
+  return normalizeText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function getCategoryTerms(value: string | null | undefined) {
+  const normalized = normalizeCategorySignal(value);
+  return normalized ? normalized.split('-').filter(Boolean) : [];
+}
+
+function hasAnyCategoryTerm(value: string | null | undefined, terms: Set<string>) {
+  return getCategoryTerms(value).some((term) => terms.has(term));
+}
+
+export function isProductCustomizable(product: Product): boolean {
+  const metadata = product as ProductCategoryMetadata;
+  const categorySignals = [
+    metadata.categorySlug,
+    metadata.category_slug,
+    metadata.category?.slug,
+    metadata.categoryName,
+    metadata.category_name,
+    metadata.category?.name,
+    metadata.categoryId,
+    metadata.category_id,
+  ];
+
+  if (categorySignals.some((signal) => hasAnyCategoryTerm(signal, BEVERAGE_CATEGORY_TERMS))) {
+    return false;
+  }
+
+  if (categorySignals.some((signal) => hasAnyCategoryTerm(signal, SIMPLE_ADDON_CATEGORY_TERMS))) {
+    return false;
+  }
+
+  return true;
 }
 
 function normalizeExtra(extra: ProductCustomizationExtra) {
