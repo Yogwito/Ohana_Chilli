@@ -1083,13 +1083,13 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
           {currentStep === 'salsas' && currentStepConfig ? (() => {
             const SUGGESTED_SAUCES = ['Ohana Chipotle', 'Mayo Cilantro', 'BBQ Honey'];
-            const selectedSauceNames = selectedSauces.map(s => s.name.toLowerCase());
+            // Track selected sauce IDs to avoid suggesting already-selected ones
+            const selectedSauceIds = new Set(selectedSauces.map(s => s.id));
             const sauceSuggestions = SUGGESTED_SAUCES
-              .filter(name => !selectedSauceNames.includes(name.toLowerCase()))
               .map(name => sauceOptions.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((s): s is Ingredient => s !== undefined)
+              .filter((s): s is Ingredient => s !== undefined && !selectedSauceIds.has(s.id))
               .slice(0, 3);
-            const isSaucesFull = selectedSauces.length >= currentStepConfig.max;
+            const saucesAtLimit = selectedSauces.length >= currentStepConfig.max;
             return (
               <>
                 <StepPicker
@@ -1107,13 +1107,12 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           key={sauce.id}
                           type="button"
                           onClick={() => {
-                            if (isSaucesFull) return;
+                            if (saucesAtLimit) return;
                             updateIngredientSelection(sauce, setSelectedSauces, 'add', currentStepConfig.max);
                           }}
-                          disabled={isSaucesFull}
                           className={cn(
                             'rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 transition-colors',
-                            isSaucesFull ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-brand/15',
+                            saucesAtLimit ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-brand/15',
                           )}
                         >
                           {sauce.name}
@@ -1163,7 +1162,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
                 {/* Premium complementos upsell */}
                 {premiumComplementos.length > 0 && (
-                  <div className="mt-5 relative">
+                  <div className="mt-5">
                     <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
                     <div className="flex flex-wrap gap-2">
                       {premiumComplementos.map(premium => {
@@ -1172,7 +1171,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           <button
                             key={premium.id}
                             type="button"
-                            onClick={() => setCompSelectorOpen(premium.id)}
+                            onClick={() => setCompSelectorOpen(prev => prev === premium.id ? null : premium.id)}
                             className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
                           >
                             {premium.name}
@@ -1183,50 +1182,50 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                         );
                       })}
                     </div>
-
-                    {/* Inline complemento selector */}
-                    {compSelectorOpen !== null && (() => {
-                      const activePremium = premiumComplementos.find(p => p.id === compSelectorOpen);
-                      if (!activePremium) return null;
-                      const charge = getIngredientExtraCharge(activePremium);
-                      return (
-                        <div className="absolute inset-x-0 top-0 z-10 bg-background border border-border rounded-xl shadow-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-semibold">¿Qué complemento extra quieres?</p>
-                            <button
-                              type="button"
-                              onClick={() => setCompSelectorOpen(null)}
-                              className="text-muted-foreground hover:text-foreground text-lg leading-none"
-                              aria-label="Cerrar"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {freeComplementos.map(c => (
-                              <button
-                                key={c.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
-                                onClick={() => {
-                                  setExtraComplementoSelections(prev => [...prev, {
-                                    uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                                    compName: c.name,
-                                    charge,
-                                    premiumCompId: activePremium.id,
-                                  }]);
-                                  setCompSelectorOpen(null);
-                                }}
-                              >
-                                {c.name}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 )}
+
+                {/* Inline complemento selector — rendered below as regular block */}
+                {compSelectorOpen !== null && (() => {
+                  const activePremium = premiumComplementos.find(p => p.id === compSelectorOpen);
+                  if (!activePremium) return null;
+                  const charge = getIngredientExtraCharge(activePremium);
+                  return (
+                    <div className="mt-3 bg-background border border-border rounded-xl shadow-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-semibold">¿Qué complemento extra quieres?</p>
+                        <button
+                          type="button"
+                          onClick={() => setCompSelectorOpen(null)}
+                          className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                          aria-label="Cerrar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {freeComplementos.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
+                            onClick={() => {
+                              setExtraComplementoSelections(prev => [...prev, {
+                                uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                compName: c.name,
+                                charge,
+                                premiumCompId: activePremium.id,
+                              }]);
+                              setCompSelectorOpen(null);
+                            }}
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             );
           })() : null}
