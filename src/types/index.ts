@@ -117,10 +117,15 @@ export interface Promotion {
   id: string;
   title: string;
   description?: string;
+  type: 'informative' | 'combo';
   discount_type: 'percentage' | 'fixed' | 'label';
   discount_value: number;
   badge_text?: string;
   image_url?: string;
+  price_cents?: number;
+  cta_text?: string;
+  cta_url?: string;
+  days_of_week?: number[];
   is_active: boolean;
   starts_at?: string;
   ends_at?: string;
