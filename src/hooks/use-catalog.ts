@@ -344,6 +344,26 @@ export function useBusinessSettings() {
   });
 }
 
+export function useBannerSettings() {
+  return useQuery({
+    queryKey: ['banner-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', ['banner_enabled', 'banner_message', 'banner_color']);
+      if (error) throw error;
+      const map = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
+      return {
+        enabled: map['banner_enabled'] === 'true',
+        message: map['banner_message'] ?? 'Estamos cerrados por ahora.',
+        color: map['banner_color'] ?? 'warning',
+      };
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
 export function useProductDefaultIngredients(productId: string | null) {
   return useQuery({
     queryKey: ['product-default-ingredients', productId],

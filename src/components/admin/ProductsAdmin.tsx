@@ -10,10 +10,17 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
+
+interface UnsplashPhoto {
+  id: string;
+  urls: { small: string; regular: string };
+  alt_description: string | null;
+}
 
 interface ProductRow {
   id: string;
@@ -61,6 +68,12 @@ export default function ProductsAdmin() {
   const [imgPreviewError, setImgPreviewError] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [imageTab, setImageTab] = useState<'url' | 'upload' | 'unsplash'>('url');
+  const [uploading, setUploading] = useState(false);
+  const [unsplashQuery, setUnsplashQuery] = useState('');
+  const [unsplashResults, setUnsplashResults] = useState<UnsplashPhoto[]>([]);
+  const [unsplashLoading, setUnsplashLoading] = useState(false);
+
   const [catDialogOpen, setCatDialogOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [savingCat, setSavingCat] = useState(false);
@@ -78,10 +91,18 @@ export default function ProductsAdmin() {
 
   useEffect(() => { fetchProducts(); }, []);
 
+  const resetImageState = () => {
+    setImageTab('url');
+    setUnsplashQuery('');
+    setUnsplashResults([]);
+    setUnsplashLoading(false);
+  };
+
   const openNew = () => {
     setEditingProduct(null);
     setForm({ name: '', price_cents: 0, image_url: '', is_active: true, category_id: '' });
     setImgPreviewError(false);
+    resetImageState();
     setSheetOpen(true);
   };
 
@@ -95,7 +116,40 @@ export default function ProductsAdmin() {
       category_id: p.category_id,
     });
     setImgPreviewError(false);
+    resetImageState();
     setSheetOpen(true);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const ext = file.name.split('.').pop();
+    const prefix = editingProduct?.id ?? `new-${Date.now()}`;
+    const path = `${prefix}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(path, file, { upsert: true });
+    if (error) { toast.error('Error al subir imagen'); setUploading(false); return; }
+    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    setForm(f => ({ ...f, image_url: data.publicUrl }));
+    setImgPreviewError(false);
+    setUploading(false);
+  };
+
+  const searchUnsplash = async () => {
+    if (!unsplashQuery.trim()) return;
+    setUnsplashLoading(true);
+    try {
+      const res = await fetch(
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(unsplashQuery)}&per_page=6&client_id=UNSPLASH_API_KEY`,
+      );
+      const json = await res.json();
+      setUnsplashResults(json.results ?? []);
+    } catch {
+      toast.error('Error al buscar en Unsplash');
+    }
+    setUnsplashLoading(false);
   };
 
   const save = async () => {
@@ -287,17 +341,77 @@ export default function ProductsAdmin() {
               </Select>
             </div>
             <div>
-              <Label>URL de imagen</Label>
-              <Input
-                value={form.image_url}
-                onChange={e => { setForm(f => ({ ...f, image_url: e.target.value })); setImgPreviewError(false); }}
-                placeholder="https://..."
-              />
+              <Label>Imagen</Label>
+              <Tabs value={imageTab} onValueChange={(v) => setImageTab(v as typeof imageTab)} className="mt-2">
+                <TabsList className="w-full">
+                  <TabsTrigger value="url" className="flex-1">URL</TabsTrigger>
+                  <TabsTrigger value="upload" className="flex-1">Subir archivo</TabsTrigger>
+                  <TabsTrigger value="unsplash" className="flex-1">Unsplash</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="url" className="mt-2">
+                  <Input
+                    value={form.image_url}
+                    onChange={e => { setForm(f => ({ ...f, image_url: e.target.value })); setImgPreviewError(false); }}
+                    placeholder="https://..."
+                  />
+                </TabsContent>
+
+                <TabsContent value="upload" className="mt-2 space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer disabled:opacity-50"
+                  />
+                  {uploading && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Subiendo imagen...</p>
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary animate-pulse rounded-full w-2/3" />
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="unsplash" className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={unsplashQuery}
+                      onChange={e => setUnsplashQuery(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && searchUnsplash()}
+                      placeholder="ej: healthy bowl"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={searchUnsplash} disabled={unsplashLoading}>
+                      {unsplashLoading ? '...' : 'Buscar'}
+                    </Button>
+                  </div>
+                  {unsplashResults.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {unsplashResults.map(photo => (
+                        <button
+                          key={photo.id}
+                          type="button"
+                          onClick={() => { setForm(f => ({ ...f, image_url: photo.urls.regular })); setImgPreviewError(false); }}
+                          className={cn(
+                            'relative overflow-hidden rounded-md aspect-square ring-2 transition-all',
+                            form.image_url === photo.urls.regular ? 'ring-primary' : 'ring-transparent hover:ring-primary/50',
+                          )}
+                        >
+                          <img src={photo.urls.small} alt={photo.alt_description ?? ''} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+
               {form.image_url && !imgPreviewError && (
                 <img
                   src={form.image_url}
                   alt="Preview"
-                  className="w-full h-32 object-cover rounded mt-2"
+                  className="w-full h-40 object-cover rounded-xl mt-3"
                   onError={() => setImgPreviewError(true)}
                 />
               )}
