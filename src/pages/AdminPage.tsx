@@ -22,19 +22,13 @@ import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deli
 import { formatPrice } from '@/domain/formatPrice';
 import {
   LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
-  Leaf, Search, Truck, Upload, BarChart3, Plus, Tag, Trash2,
+  Search, Truck, Upload, BarChart3, Plus, Tag, Trash2,
 } from 'lucide-react';
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 import PromotionsAdmin from '@/components/admin/PromotionsAdmin';
+import ProductsAdmin from '@/components/admin/ProductsAdmin';
 
 // ─── Types ───────────────────────────────────────────────
-interface ProductRow {
-  id: string; name: string; description: string | null; price_cents: number; brand_id: string;
-  category_id: string; is_active: boolean; is_vegan: boolean | null; is_gluten_free: boolean | null;
-  is_popular: boolean | null; is_new: boolean | null; image_url: string | null;
-  calories: number | null; ingredients_list: string[] | null;
-}
-
 interface IngredientRow {
   id: string; name: string; type: string; price_cents: number; is_active: boolean;
   calories: number | null; is_vegan: boolean | null; is_gluten_free: boolean | null;
@@ -210,182 +204,6 @@ function OrdersAdmin() {
           {order.order_type === 'pickup' && <p className="text-xs text-muted-foreground">🏪 Recoger en sucursal</p>}
           {order.notes && <p className="text-xs text-muted-foreground">📝 {order.notes}</p>}
           <p className="text-xs font-mono text-muted-foreground">ID: {order.id.slice(0, 8)}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Products Admin ──────────────────────────────────────
-function ProductsAdmin() {
-  const syncCatalog = useCatalogMutationSync();
-  const [products, setProducts] = useState<ProductRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<ProductRow>>({});
-  const [newOpen, setNewOpen] = useState(false);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [newForm, setNewForm] = useState({
-    name: '', description: '', price_cents: 0, category_id: '',
-    is_active: true, is_popular: false, is_new: false, is_vegan: false,
-  });
-
-  const fetchProducts = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('products').select('*').order('brand_id').order('name');
-    setProducts((data ?? []) as ProductRow[]);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchProducts();
-    supabase.from('categories').select('id,name').eq('brand_id', 'ohana').order('name').then(({ data }) => {
-      setCategories((data ?? []) as { id: string; name: string }[]);
-    });
-  }, []);
-
-  const startEdit = (p: ProductRow) => {
-    setEditing(p.id);
-    setEditForm({ name: p.name, price_cents: p.price_cents, is_active: p.is_active, description: p.description });
-  };
-
-  const saveEdit = async (id: string) => {
-    const { error } = await supabase.from('products').update(editForm).eq('id', id);
-    if (error) { toast.error('Error al guardar'); return; }
-    await syncCatalog(['products']);
-    toast.success('Producto actualizado');
-    setEditing(null);
-    fetchProducts();
-  };
-
-  const toggleActive = async (id: string, active: boolean) => {
-    const { error } = await supabase.from('products').update({ is_active: active }).eq('id', id);
-    if (error) { toast.error('Error al actualizar el producto'); return; }
-    await syncCatalog(['products']);
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: active } : p));
-    toast.success(active ? 'Producto activado' : 'Producto desactivado');
-  };
-
-  const createProduct = async () => {
-    if (!newForm.name || !newForm.price_cents || !newForm.category_id) {
-      toast.error('Nombre, precio y categoría son requeridos');
-      return;
-    }
-    const { error } = await supabase.from('products').insert({
-      name: newForm.name,
-      description: newForm.description || null,
-      price_cents: newForm.price_cents,
-      brand_id: 'ohana',
-      category_id: newForm.category_id,
-      is_active: newForm.is_active,
-      is_popular: newForm.is_popular,
-      is_new: newForm.is_new,
-      is_vegan: newForm.is_vegan,
-    });
-    if (error) { toast.error('Error al crear producto'); return; }
-    await syncCatalog(['products']);
-    toast.success('Producto creado');
-    setNewOpen(false);
-    setNewForm({ name: '', description: '', price_cents: 0, category_id: '', is_active: true, is_popular: false, is_new: false, is_vegan: false });
-    fetchProducts();
-  };
-
-  if (loading) return <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16" />)}</div>;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Productos ({products.length})</h2>
-        <Button size="sm" onClick={() => setNewOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> Nuevo Producto
-        </Button>
-      </div>
-
-      <Dialog open={newOpen} onOpenChange={setNewOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Nuevo Producto</DialogTitle>
-            <DialogDescription>Agrega un producto al menú de Ohana Bowls</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Nombre *</Label>
-              <Input value={newForm.name} onChange={e => setNewForm(p => ({ ...p, name: e.target.value }))} placeholder="Nombre del producto" />
-            </div>
-            <div>
-              <Label>Descripción</Label>
-              <Textarea value={newForm.description} onChange={e => setNewForm(p => ({ ...p, description: e.target.value }))} rows={2} />
-            </div>
-            <div>
-              <Label>Precio (COP) *</Label>
-              <Input type="number" value={newForm.price_cents || ''} onChange={e => setNewForm(p => ({ ...p, price_cents: Number(e.target.value) }))} placeholder="ej: 27900" />
-            </div>
-            <div>
-              <Label>Categoría *</Label>
-              <Select value={newForm.category_id} onValueChange={v => setNewForm(p => ({ ...p, category_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecciona categoría" /></SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={newForm.is_active} onCheckedChange={v => setNewForm(p => ({ ...p, is_active: !!v }))} />
-                Activo
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={newForm.is_popular} onCheckedChange={v => setNewForm(p => ({ ...p, is_popular: !!v }))} />
-                Popular
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={newForm.is_new} onCheckedChange={v => setNewForm(p => ({ ...p, is_new: !!v }))} />
-                Nuevo
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={newForm.is_vegan} onCheckedChange={v => setNewForm(p => ({ ...p, is_vegan: !!v }))} />
-                Vegano
-              </label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
-            <Button onClick={createProduct} className="btn-ohana">Crear Producto</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {products.map(p => (
-        <div key={p.id} className={`bg-card border rounded-xl p-4 ${!p.is_active ? 'opacity-60' : ''}`}>
-          {editing === p.id ? (
-            <div className="space-y-3">
-              <Input value={editForm.name ?? ''} onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} placeholder="Nombre" />
-              <Input type="number" value={editForm.price_cents ?? 0} onChange={e => setEditForm(prev => ({ ...prev, price_cents: Number(e.target.value) }))} placeholder="Precio (pesos)" />
-              <Input value={editForm.description ?? ''} onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Descripción" />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => saveEdit(p.id)}><Save className="w-3 h-3 mr-1" />Guardar</Button>
-                <Button size="sm" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded flex items-center justify-center shrink-0 bg-ohana/10">
-                  <Leaf className="w-4 h-4 text-ohana" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatPrice(p.price_cents)} • {p.category_id}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Switch checked={p.is_active} onCheckedChange={(v) => toggleActive(p.id, v)} aria-label="Activo" />
-                <Button size="icon" variant="ghost" onClick={() => startEdit(p)} aria-label="Editar producto">
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       ))}
     </div>
