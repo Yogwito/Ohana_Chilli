@@ -165,6 +165,40 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     isGlutenFree: false,
   });
 
+  const [extraAcompananteSelections, setExtraAcompananteSelections] = useState<Array<{
+    uid: string;
+    acompName: string;
+    charge: number;
+    premiumAcompId: string;
+  }>>([]);
+  const [acompSelectorOpen, setAcompSelectorOpen] = useState<string | null>(null);
+
+  const makeExtraAcompananteIngredient = (extra: { uid: string; acompName: string; charge: number }): Ingredient => ({
+    id: extra.uid,
+    name: `Acompañante extra: ${extra.acompName} (+${formatPrice(extra.charge)})`,
+    type: 'acompanante' as Ingredient['type'],
+    price: extra.charge,
+    isVegan: false,
+    isGlutenFree: false,
+  });
+
+  const [extraComplementoSelections, setExtraComplementoSelections] = useState<Array<{
+    uid: string;
+    compName: string;
+    charge: number;
+    premiumCompId: string;
+  }>>([]);
+  const [compSelectorOpen, setCompSelectorOpen] = useState<string | null>(null);
+
+  const makeExtraComplementoIngredient = (extra: { uid: string; compName: string; charge: number }): Ingredient => ({
+    id: extra.uid,
+    name: `Complemento extra: ${extra.compName} (+${formatPrice(extra.charge)})`,
+    type: 'topping' as Ingredient['type'],
+    price: extra.charge,
+    isVegan: false,
+    isGlutenFree: false,
+  });
+
   const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
 
   useEffect(() => {
@@ -237,9 +271,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       size: selectedSize,
       bases: selectedBases,
       proteins: [...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)],
-      acompanantes: selectedAcompanantes,
+      acompanantes: [...selectedAcompanantes, ...extraAcompananteSelections.map(makeExtraAcompananteIngredient)],
       sauces: selectedSauces,
-      complementos: selectedComplementos,
+      complementos: [...selectedComplementos, ...extraComplementoSelections.map(makeExtraComplementoIngredient)],
       notes: notes || undefined,
     };
   }, [
@@ -249,6 +283,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     selectedComplementos,
     selectedProteins,
     extraProteinSelections,
+    extraAcompananteSelections,
+    extraComplementoSelections,
     selectedSauces,
     selectedSize,
   ]);
@@ -279,9 +315,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     return [
       { label: 'Base', value: formatGroupedIngredients(selectedBases) },
       { label: 'Proteínas', value: formatGroupedIngredients([...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)]) },
-      { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
+      { label: 'Acompañantes', value: formatGroupedIngredients([...selectedAcompanantes, ...extraAcompananteSelections.map(makeExtraAcompananteIngredient)]) },
       { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
-      { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
+      { label: 'Complementos', value: formatGroupedIngredients([...selectedComplementos, ...extraComplementoSelections.map(makeExtraComplementoIngredient)]) },
     ];
   }, [selectedAcompanantes, selectedBases, selectedComplementos, selectedProteins, selectedSauces, selectedSize]);
 
@@ -340,6 +376,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedSauces([]);
     setSelectedComplementos([]);
     setExtraProteinSelections([]);
+    setExtraAcompananteSelections([]);
+    setExtraComplementoSelections([]);
     setNotes('');
     setCurrentStep('size');
   };
@@ -351,6 +389,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setSelectedSauces([]);
     setSelectedComplementos([]);
     setExtraProteinSelections([]);
+    setExtraAcompananteSelections([]);
+    setExtraComplementoSelections([]);
     setNotes('');
   };
 
@@ -767,23 +807,27 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
                 {/* Extra protein chips */}
                 {extraProteinSelections.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {extraProteinSelections.map(extra => (
-                      <span
-                        key={extra.uid}
-                        className="inline-flex items-center gap-1.5 bg-brand/10 border border-brand/30 rounded-full px-3 py-1 text-xs"
-                      >
-                        {extra.proteinName} +{formatPrice(extra.charge)}
-                        <button
-                          type="button"
-                          onClick={() => setExtraProteinSelections(prev => prev.filter(e => e.uid !== extra.uid))}
-                          className="text-muted-foreground hover:text-foreground leading-none"
-                          aria-label="Quitar proteína extra"
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Proteínas extra añadidas</p>
+                    <div className="flex flex-wrap gap-2">
+                      {extraProteinSelections.map(extra => (
+                        <span
+                          key={extra.uid}
+                          className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2"
                         >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
+                          <span className="font-semibold">{extra.proteinName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraProteinSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar proteína extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -904,29 +948,57 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           })() : null}
 
           {currentStep === 'acompanantes' && currentStepConfig ? (() => {
+            const freeAcomp = acompananteOptions.filter(a => getIngredientExtraCharge(a) === 0);
+            const premiumAcomp = acompananteOptions.filter(a => getIngredientExtraCharge(a) > 0);
             const SUGGESTED_ACOMP = ['Guacamole', 'Queso rallado', 'Pico de gallo'];
             const selectedNames = selectedAcompanantes.map(a => a.name.toLowerCase());
-            const suggestions = SUGGESTED_ACOMP
+            const freeSuggestions = SUGGESTED_ACOMP
               .filter(name => !selectedNames.includes(name.toLowerCase()))
-              .map(name => acompananteOptions.find(a => a.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((a): a is Ingredient => a !== undefined)
-              .slice(0, 3);
+              .map(name => freeAcomp.find(a => a.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((a): a is Ingredient => a !== undefined);
             const isTotalFull = totalAccompaniments >= (selectedSize?.maxAcompanantes ?? 0);
+            const hasUpsellSection = freeSuggestions.length > 0 || premiumAcomp.length > 0;
             return (
               <>
                 <StepPicker
-                  items={acompananteOptions}
+                  items={freeAcomp}
                   selectedItems={selectedAcompanantes}
                   setSelectedItems={setSelectedAcompanantes}
                   config={currentStepConfig}
                   totalCount={totalAccompaniments}
                   totalMax={selectedSize?.maxAcompanantes}
                 />
-                {suggestions.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-xs text-muted-foreground mb-2">⭐ Otros también añaden</p>
+
+                {/* Extra acompañante chips */}
+                {extraAcompananteSelections.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Acompañantes extra añadidos</p>
                     <div className="flex flex-wrap gap-2">
-                      {suggestions.map(ingredient => (
+                      {extraAcompananteSelections.map(extra => (
+                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                          <span className="font-semibold">{extra.acompName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraAcompananteSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar acompañante extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Unified upsell section */}
+                {hasUpsellSection && (
+                  <div className="mt-5 relative">
+                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Free suggestions */}
+                      {freeSuggestions.map(ingredient => (
                         <button
                           key={ingredient.id}
                           type="button"
@@ -936,16 +1008,73 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           }}
                           disabled={isTotalFull}
                           className={cn(
-                            'rounded-full border border-brand/30 bg-brand/5 text-xs px-3 py-1 transition-colors',
-                            isTotalFull
-                              ? 'opacity-40 cursor-not-allowed'
-                              : 'cursor-pointer hover:bg-brand/15',
+                            'rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 transition-colors',
+                            isTotalFull ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-brand/15',
                           )}
                         >
                           {ingredient.name}
                         </button>
                       ))}
+                      {/* Premium acompañantes */}
+                      {premiumAcomp.map(premium => {
+                        const charge = getIngredientExtraCharge(premium);
+                        return (
+                          <button
+                            key={premium.id}
+                            type="button"
+                            onClick={() => setAcompSelectorOpen(premium.id)}
+                            className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
+                          >
+                            {premium.name}
+                            <span className="text-xs bg-brand/10 text-brand rounded-full px-2 ml-1">
+                              +{formatPrice(charge)}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
+
+                    {/* Inline acompañante selector */}
+                    {acompSelectorOpen !== null && (() => {
+                      const activePremium = premiumAcomp.find(p => p.id === acompSelectorOpen);
+                      if (!activePremium) return null;
+                      const charge = getIngredientExtraCharge(activePremium);
+                      return (
+                        <div className="absolute inset-x-0 top-0 z-10 bg-background border border-border rounded-xl shadow-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm font-semibold">¿Qué acompañante extra quieres?</p>
+                            <button
+                              type="button"
+                              onClick={() => setAcompSelectorOpen(null)}
+                              className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                              aria-label="Cerrar"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {freeAcomp.map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
+                                onClick={() => {
+                                  setExtraAcompananteSelections(prev => [...prev, {
+                                    uid: `extra-acomp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                    acompName: a.name,
+                                    charge,
+                                    premiumAcompId: activePremium.id,
+                                  }]);
+                                  setAcompSelectorOpen(null);
+                                }}
+                              >
+                                {a.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </>
@@ -971,7 +1100,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                 />
                 {sauceSuggestions.length > 0 && (
                   <div className="mt-5">
-                    <p className="text-xs text-muted-foreground mb-2">⭐ Otros también añaden</p>
+                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
                     <div className="flex flex-wrap gap-2">
                       {sauceSuggestions.map(sauce => (
                         <button
@@ -983,10 +1112,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           }}
                           disabled={isSaucesFull}
                           className={cn(
-                            'rounded-full border border-brand/30 bg-brand/5 text-xs px-3 py-1 transition-colors',
-                            isSaucesFull
-                              ? 'opacity-40 cursor-not-allowed'
-                              : 'cursor-pointer hover:bg-brand/15',
+                            'rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 transition-colors',
+                            isSaucesFull ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-brand/15',
                           )}
                         >
                           {sauce.name}
@@ -999,14 +1126,110 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             );
           })() : null}
 
-          {currentStep === 'complementos' && currentStepConfig ? (
-            <StepPicker
-              items={complementoOptions}
-              selectedItems={selectedComplementos}
-              setSelectedItems={setSelectedComplementos}
-              config={currentStepConfig}
-            />
-          ) : null}
+          {currentStep === 'complementos' && currentStepConfig ? (() => {
+            const freeComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) === 0);
+            const premiumComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) > 0);
+            return (
+              <>
+                <StepPicker
+                  items={freeComplementos}
+                  selectedItems={selectedComplementos}
+                  setSelectedItems={setSelectedComplementos}
+                  config={currentStepConfig}
+                />
+
+                {/* Extra complemento chips */}
+                {extraComplementoSelections.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-foreground mb-2">✅ Complementos extra añadidos</p>
+                    <div className="flex flex-wrap gap-2">
+                      {extraComplementoSelections.map(extra => (
+                        <span key={extra.uid} className="inline-flex items-center bg-brand/15 border border-brand/40 rounded-full text-sm px-4 py-2">
+                          <span className="font-semibold">{extra.compName}</span>
+                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraComplementoSelections(prev => prev.filter(e => e.uid !== extra.uid))}
+                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
+                            aria-label="Quitar complemento extra"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Premium complementos upsell */}
+                {premiumComplementos.length > 0 && (
+                  <div className="mt-5 relative">
+                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {premiumComplementos.map(premium => {
+                        const charge = getIngredientExtraCharge(premium);
+                        return (
+                          <button
+                            key={premium.id}
+                            type="button"
+                            onClick={() => setCompSelectorOpen(premium.id)}
+                            className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
+                          >
+                            {premium.name}
+                            <span className="text-xs bg-brand/10 text-brand rounded-full px-2 ml-1">
+                              +{formatPrice(charge)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Inline complemento selector */}
+                    {compSelectorOpen !== null && (() => {
+                      const activePremium = premiumComplementos.find(p => p.id === compSelectorOpen);
+                      if (!activePremium) return null;
+                      const charge = getIngredientExtraCharge(activePremium);
+                      return (
+                        <div className="absolute inset-x-0 top-0 z-10 bg-background border border-border rounded-xl shadow-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm font-semibold">¿Qué complemento extra quieres?</p>
+                            <button
+                              type="button"
+                              onClick={() => setCompSelectorOpen(null)}
+                              className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                              aria-label="Cerrar"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {freeComplementos.map(c => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
+                                onClick={() => {
+                                  setExtraComplementoSelections(prev => [...prev, {
+                                    uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                    compName: c.name,
+                                    charge,
+                                    premiumCompId: activePremium.id,
+                                  }]);
+                                  setCompSelectorOpen(null);
+                                }}
+                              >
+                                {c.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </>
+            );
+          })() : null}
 
           {currentStep === 'summary' && selectedSize ? (
             <div className="space-y-6">
