@@ -320,7 +320,11 @@ export function usePromotions() {
         .eq('is_active', true)
         .order('sort_order');
       if (error) throw error;
-      return (data ?? []) as Promotion[];
+      const today = new Date().getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+      return (data ?? []).filter((p: Promotion) => {
+        if (!p.days_of_week || p.days_of_week.length === 0) return true;
+        return p.days_of_week.includes(today);
+      }) as Promotion[];
     },
     staleTime: 5 * 60 * 1000,
   });

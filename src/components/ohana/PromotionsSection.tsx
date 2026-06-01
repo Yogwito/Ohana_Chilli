@@ -1,8 +1,17 @@
+import { useState } from 'react';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePromotions } from '@/hooks/use-catalog';
+import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
-import type { Promotion } from '@/types';
+import { trackEvent } from '@/lib/analytics';
+import { toast } from 'sonner';
+import { Check, Plus } from 'lucide-react';
+import type { Promotion, Product } from '@/types';
+
+function formatPrice(cents: number): string {
+  return `$ ${cents.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+}
 
 function formatDiscountLabel(promo: Promotion): string | null {
   if (promo.discount_type === 'percentage') return `${promo.discount_value}% OFF`;
@@ -17,9 +26,39 @@ function formatEndDate(endsAt: string): string {
   return new Date(endsAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function promoToProduct(promo: Promotion): Product {
+  return {
+    id: `promo-${promo.id}`,
+    name: promo.title,
+    description: promo.description ?? '',
+    price: promo.price_cents!,
+    brand: 'ohana',
+    categoryId: 'promociones',
+    imageUrl: promo.image_url ?? undefined,
+    isVegan: false,
+    isGlutenFree: false,
+    isPopular: false,
+    isNew: false,
+  };
+}
+
 function PromotionCard({ promo }: { promo: Promotion }) {
+  const { addProduct } = useCart();
+  const [added, setAdded] = useState(false);
+
   const discountLabel = formatDiscountLabel(promo);
   const displayBadge = promo.badge_text ?? discountLabel;
+  const isAddable = promo.type === 'combo' && promo.price_cents != null;
+
+  const handleAddToCart = () => {
+    if (!isAddable) return;
+    const product = promoToProduct(promo);
+    addProduct(product);
+    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: 'ohana', priceCents: product.price });
+    toast.success(`${promo.title} agregado al carrito`);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1200);
+  };
 
   return (
     <div
@@ -72,9 +111,31 @@ function PromotionCard({ promo }: { promo: Promotion }) {
           </p>
         )}
 
-        {promo.cta_text && (
-          <div className="pt-1 mt-auto">
-            {promo.cta_url ? (
+        <div className="pt-1 mt-auto space-y-2">
+          {/* Precio + botón agregar (combos con precio) */}
+          {isAddable && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-lg text-brand">
+                {formatPrice(promo.price_cents!)}
+              </span>
+              <button
+                onClick={handleAddToCart}
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200',
+                  added
+                    ? 'bg-brand-dark text-white scale-95'
+                    : 'bg-brand text-white hover:bg-brand/90 active:scale-95',
+                )}
+              >
+                {added ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {added ? 'Agregado' : 'Agregar'}
+              </button>
+            </div>
+          )}
+
+          {/* CTA link (promociones informativas con cta_url) */}
+          {promo.cta_text && !isAddable && (
+            promo.cta_url ? (
               <a
                 href={promo.cta_url}
                 target="_blank"
@@ -87,9 +148,9 @@ function PromotionCard({ promo }: { promo: Promotion }) {
               <div className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg w-full text-center">
                 {promo.cta_text}
               </div>
-            )}
-          </div>
-        )}
+            )
+          )}
+        </div>
       </div>
     </div>
   );

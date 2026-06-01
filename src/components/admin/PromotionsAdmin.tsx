@@ -26,8 +26,10 @@ interface PromotionRow {
   discount_value: number;
   badge_text: string | null;
   image_url: string | null;
+  price_cents: number | null;
   cta_text: string | null;
   cta_url: string | null;
+  days_of_week: number[] | null;
   is_active: boolean;
   starts_at: string | null;
   ends_at: string | null;
@@ -47,8 +49,10 @@ interface FormState {
   discount_value: string;
   badge_text: string;
   image_url: string;
+  price_cents: string;
   cta_text: string;
   cta_url: string;
+  days_of_week: number[];
   starts_at: string;
   ends_at: string;
   sort_order: string;
@@ -56,6 +60,16 @@ interface FormState {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const DAYS = [
+  { value: 1, label: 'Lun' },
+  { value: 2, label: 'Mar' },
+  { value: 3, label: 'Mié' },
+  { value: 4, label: 'Jue' },
+  { value: 5, label: 'Vie' },
+  { value: 6, label: 'Sáb' },
+  { value: 0, label: 'Dom' },
+];
 
 const EMPTY_FORM: FormState = {
   title: '',
@@ -65,8 +79,10 @@ const EMPTY_FORM: FormState = {
   discount_value: '',
   badge_text: '',
   image_url: '',
+  price_cents: '',
   cta_text: '',
   cta_url: '',
+  days_of_week: [],
   starts_at: '',
   ends_at: '',
   sort_order: '0',
@@ -91,8 +107,10 @@ function rowToForm(row: PromotionRow): FormState {
     discount_value: row.discount_value > 0 ? String(row.discount_value) : '',
     badge_text: row.badge_text ?? '',
     image_url: row.image_url ?? '',
+    price_cents: row.price_cents != null ? String(row.price_cents) : '',
     cta_text: row.cta_text ?? '',
     cta_url: row.cta_url ?? '',
+    days_of_week: row.days_of_week ?? [],
     starts_at: toDatetimeLocal(row.starts_at),
     ends_at: toDatetimeLocal(row.ends_at),
     sort_order: String(row.sort_order),
@@ -109,13 +127,28 @@ function formToPayload(form: FormState) {
     discount_value: form.discount_value !== '' ? Number(form.discount_value) : 0,
     badge_text: form.badge_text.trim() || null,
     image_url: form.image_url.trim() || null,
+    price_cents: form.price_cents !== '' ? Number(form.price_cents) : null,
     cta_text: form.cta_text.trim() || null,
     cta_url: form.cta_url.trim() || null,
+    days_of_week: form.days_of_week.length > 0 ? form.days_of_week : null,
     starts_at: form.starts_at || null,
     ends_at: form.ends_at || null,
     sort_order: form.sort_order !== '' ? Number(form.sort_order) : 0,
     is_active: form.is_active,
   };
+}
+
+function DayBadges({ days }: { days: number[] | null }) {
+  if (!days || days.length === 0) return <span className="text-xs text-muted-foreground">Todos los días</span>;
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {DAYS.filter(d => days.includes(d.value)).map(d => (
+        <span key={d.value} className="text-xs bg-brand/15 text-brand-dark dark:text-brand px-1.5 py-0.5 rounded font-medium">
+          {d.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function PromotionThumbnail({ url, title }: { url: string | null; title: string }) {
@@ -332,6 +365,23 @@ export default function PromotionsAdmin() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Precio combo */}
+            {form.type === 'combo' && (
+              <div>
+                <Label>Precio del combo (COP) *</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.price_cents}
+                  onChange={e => setF('price_cents', e.target.value)}
+                  placeholder="ej: 23900"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Si ingresas un precio, aparecerá el botón "Agregar al carrito" en la promoción.
+                </p>
+              </div>
+            )}
 
             {/* Descuento */}
             <div className="grid grid-cols-2 gap-3">

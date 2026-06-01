@@ -122,8 +122,10 @@ export interface Promotion {
   discount_value: number;
   badge_text?: string;
   image_url?: string;
+  price_cents?: number;
   cta_text?: string;
   cta_url?: string;
+  days_of_week?: number[];
   is_active: boolean;
   starts_at?: string;
   ends_at?: string;
