@@ -23,7 +23,6 @@ import { Product, Category } from '@/types';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 const PromotionsSection = lazy(() => import('@/components/ohana/PromotionsSection'));
-const UpsellSection = lazy(() => import('@/components/ohana/UpsellSection'));
 
 // Virtual bowl-builder tab — always first, regardless of DB order
 const BOWL_BUILDER_ID = 'arma-tu-bowl';
@@ -399,13 +398,6 @@ export default function OhanaPage() {
       <Suspense fallback={null}>
         <PromotionsSection />
       </Suspense>
-
-      {/* ── SECTION 2.5: Upsell ─────────────────────────────────────────── */}
-      <div className="px-4 py-6">
-        <Suspense fallback={null}>
-          <UpsellSection />
-        </Suspense>
-      </div>
 
       {/* ── SECTION 3: Sticky category tabs ────────────────────────────── */}
       <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/40">
