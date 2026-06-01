@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { Plus, Check, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductImage from '@/components/products/ProductImage';
-import ProductCustomizer from '@/components/products/ProductCustomizer';
+import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
 import { Product, Brand } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics';
@@ -40,8 +41,12 @@ function humanizeCategoryId(categoryId: string): string {
 export default function ProductCard({ product, variant = 'default', categoryName }: ProductCardProps) {
   const { addProduct } = useCart();
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [added, setAdded] = useState(false);
-  const [removedIngredients, setRemovedIngredients] = useState<string[]>([]);
+
+  // Preload to know if drawer should open or direct add
+  const { data: defaultIngredients = [], isLoading: ingredientsLoading } = useProductDefaultIngredients(product.id);
+  const hasCustomization = !ingredientsLoading && defaultIngredients.length > 0;
 
   const descriptionText = product.description.trim();
   const ingredientsText = useMemo(() => {
@@ -54,13 +59,43 @@ export default function ProductCard({ product, variant = 'default', categoryName
     descriptionText.length > 120 || ingredientsText.length > 90 || (product.ingredients?.length ?? 0) > 5;
   const resolvedCategoryName = categoryName ?? humanizeCategoryId(product.categoryId);
 
-  const handleAddToCart = () => {
-    const notes = removedIngredients.length > 0
-      ? `Sin: ${removedIngredients.join(', ')}`
-      : undefined;
-    addProduct(product, 1, notes);
+  const handleAddDirect = () => {
+    addProduct(product);
     trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: product.price });
     toast.success(`${product.name} agregado`, { description: formatPrice(product.price) });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 800);
+  };
+
+  const handleAddClick = () => {
+    if (hasCustomization) {
+      setDrawerOpen(true);
+    } else {
+      handleAddDirect();
+    }
+  };
+
+  const handleDrawerConfirm = (config: ProductConfig) => {
+    const parts: string[] = [];
+    if (config.removedIngredients.length > 0) {
+      parts.push(`Sin: ${config.removedIngredients.join(', ')}`);
+    }
+    if (config.extras.length > 0) {
+      parts.push(`Extra: ${config.extras.map(e => e.name).join(', ')}`);
+    }
+    if (config.note.trim()) {
+      parts.push(config.note.trim());
+    }
+    const notes = parts.length > 0 ? parts.join(' | ') : undefined;
+
+    // Price with extras: use a modified price on the product
+    const effectiveProduct = config.extraTotal > 0
+      ? { ...product, price: product.price + config.extraTotal }
+      : product;
+
+    addProduct(effectiveProduct, 1, notes);
+    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: effectiveProduct.price });
+    toast.success(`${product.name} agregado`, { description: formatPrice(effectiveProduct.price) });
     setAdded(true);
     setTimeout(() => setAdded(false), 800);
   };
@@ -75,11 +110,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
           'border-ohana/15 hover:border-ohana/40',
         )}
       >
-        <div
-          className={cn(
-            'w-12 shrink-0 overflow-hidden rounded-lg',
-          )}
-        >
+        <div className="w-12 shrink-0 overflow-hidden rounded-lg">
           <ProductImage
             product={product}
             ratio={1}
@@ -90,12 +121,10 @@ export default function ProductCard({ product, variant = 'default', categoryName
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold tracking-tight truncate">{product.name}</p>
-          <p className="text-sm font-bold text-ohana-dark">
-            {formatPrice(product.price)}
-          </p>
+          <p className="text-sm font-bold text-ohana-dark">{formatPrice(product.price)}</p>
         </div>
         <Button
-          onClick={handleAddToCart}
+          onClick={handleAddDirect}
           size="icon"
           className="rounded-full h-8 w-8 shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
         >
@@ -139,8 +168,6 @@ export default function ProductCard({ product, variant = 'default', categoryName
             </button>
           )}
 
-          <ProductCustomizer productId={product.id} onChange={setRemovedIngredients} />
-
           {/* Price row + add button */}
           <div className="flex items-center justify-between mt-auto pt-2">
             <div className="flex items-center gap-2">
@@ -159,7 +186,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
 
             {/* Desktop: icon button */}
             <Button
-              onClick={handleAddToCart}
+              onClick={handleAddClick}
               size="icon"
               className={cn(
                 'hidden sm:flex h-9 w-9 rounded-full bg-brand text-white hover:bg-brand-dark transition-all duration-200 shrink-0',
@@ -173,7 +200,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
 
           {/* Mobile: full-width button */}
           <Button
-            onClick={handleAddToCart}
+            onClick={handleAddClick}
             className={cn(
               'sm:hidden w-full h-10 rounded-xl font-semibold bg-brand/10 text-brand-dark hover:bg-brand hover:text-white transition-all duration-200',
               added && 'scale-[1.02]',
@@ -185,6 +212,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
         </div>
       </article>
 
+      {/* Details dialog */}
       {shouldShowMore && (
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
           <DialogContent className="sm:max-w-xl">
@@ -211,6 +239,14 @@ export default function ProductCard({ product, variant = 'default', categoryName
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Customization drawer */}
+      <ProductDrawer
+        product={product}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onConfirm={handleDrawerConfirm}
+      />
     </>
   );
 }
