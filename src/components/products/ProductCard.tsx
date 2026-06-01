@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatPrice } from '@/domain/formatPrice';
+import { calculateProductUnitPrice, normalizeProductCustomization } from '@/domain/productCustomizations';
 
 interface ProductCardProps {
   product: Product;
@@ -76,26 +77,13 @@ export default function ProductCard({ product, variant = 'default', categoryName
   };
 
   const handleDrawerConfirm = (config: ProductConfig) => {
-    const parts: string[] = [];
-    if (config.removedIngredients.length > 0) {
-      parts.push(`Sin: ${config.removedIngredients.join(', ')}`);
-    }
-    if (config.extras.length > 0) {
-      parts.push(`Extra: ${config.extras.map(e => e.name).join(', ')}`);
-    }
-    if (config.note.trim()) {
-      parts.push(config.note.trim());
-    }
-    const notes = parts.length > 0 ? parts.join(' | ') : undefined;
+    const customizations = normalizeProductCustomization(config);
+    const unitPrice = calculateProductUnitPrice(product.price, customizations);
+    const notes = customizations?.note || undefined;
 
-    // Price with extras: use a modified price on the product
-    const effectiveProduct = config.extraTotal > 0
-      ? { ...product, price: product.price + config.extraTotal }
-      : product;
-
-    addProduct(effectiveProduct, 1, notes);
-    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: effectiveProduct.price });
-    toast.success(`${product.name} agregado`, { description: formatPrice(effectiveProduct.price) });
+    addProduct(product, 1, notes, customizations);
+    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: unitPrice });
+    toast.success(`${product.name} agregado`, { description: formatPrice(unitPrice) });
     setAdded(true);
     setTimeout(() => setAdded(false), 800);
   };

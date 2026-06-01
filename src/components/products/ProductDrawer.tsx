@@ -5,14 +5,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
-import type { Product } from '@/types';
+import type { Product, ProductCustomization } from '@/types';
 
-export interface ProductConfig {
-  removedIngredients: string[];
-  extras: { name: string; price_cents: number }[];
-  note: string;
-  extraTotal: number;
-}
+export type ProductConfig = ProductCustomization;
 
 interface ProductDrawerProps {
   product: Product | null;
@@ -61,12 +56,13 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
   const extrasSelected = extraIngredients.flatMap(ing => {
     const qty = extraQty[ing.id] ?? 0;
     return Array.from({ length: qty }, () => ({
+      id: ing.id,
       name: ing.ingredient_name,
-      price_cents: ing.extra_price_cents,
+      price: ing.extra_price_cents,
     }));
   });
 
-  const extraTotal = extrasSelected.reduce((s, e) => s + e.price_cents, 0);
+  const extraTotal = extrasSelected.reduce((s, e) => s + e.price, 0);
   const totalPrice = product.price + extraTotal;
 
   const handleConfirm = () => {
@@ -75,7 +71,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
   };
 
   const handleAddWithoutChanges = () => {
-    onConfirm({ removedIngredients: [], extras: [], note: '', extraTotal: 0 });
+    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0 });
     onClose();
   };
 

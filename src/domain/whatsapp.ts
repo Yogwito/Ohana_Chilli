@@ -1,6 +1,7 @@
 import type { CartItem } from '@/types';
 import { formatPrice } from './formatPrice';
 import { formatBowlDetailLines } from './bowlSummary';
+import { formatProductCustomizationLines } from './productCustomizations';
 
 interface OrderInfo {
   name: string;
@@ -45,13 +46,18 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
     const brand = '[Ohana]';
     if (item.type === 'product' && item.product) {
       lines.push(`• ${brand} ${item.quantity}x ${item.product.name} — ${formatPrice(item.totalPrice)}`);
+      formatProductCustomizationLines(item.customizations).forEach((line) => {
+        lines.push(`   ${line}`);
+      });
     } else if (item.type === 'custom-bowl' && item.customBowl) {
       lines.push(`• ${brand} 1x Bowl ${item.customBowl.size.name} — ${formatPrice(item.totalPrice)}`);
       formatBowlDetailLines(item.customBowl).forEach((line) => {
         lines.push(`   ${line}`);
       });
     }
-    if (item.notes) lines.push(`   Nota: ${item.notes}`);
+    if (item.notes && (item.type !== 'product' || !item.customizations)) {
+      lines.push(`   Nota: ${item.notes}`);
+    }
   });
 
   lines.push(SEP);
