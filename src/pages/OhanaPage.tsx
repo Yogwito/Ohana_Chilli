@@ -20,7 +20,7 @@ import {
   isProductCustomizable,
   normalizeProductCustomization,
 } from '@/domain/productCustomizations';
-import { useBusinessSettings, useProducts, useCategories } from '@/hooks/use-catalog';
+import { useBusinessSettings, useProducts, useCategories, usePromotions } from '@/hooks/use-catalog';
 import { useCart } from '@/context/CartContext';
 import { trackEvent } from '@/lib/analytics';
 import { toast } from 'sonner';
@@ -187,6 +187,7 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
 export default function OhanaPage() {
   const location = useLocation();
   const tabsRef = useRef<HTMLDivElement>(null);
+  const promotionsRef = useRef<HTMLDivElement>(null);
   const [activeSlug, setActiveSlug] = useState<string>('arma-tu-bowl');
 
   const [mounted, setMounted] = useState(false);
@@ -195,6 +196,8 @@ export default function OhanaPage() {
   const { data: categories = [], error: categoriesError } = useCategories('ohana');
   const { data: allProducts = [], isLoading, error: productsError } = useProducts({ brandId: 'ohana' });
   const { data: businessSettings } = useBusinessSettings();
+  const { data: activePromotions = [] } = usePromotions();
+  const hasActivePromotions = activePromotions.length > 0;
 
   // Build tab list: virtual bowl builder first, then all DB categories except the bowl-builder one
   const allTabs = useMemo<Category[]>(() => {
@@ -435,9 +438,11 @@ export default function OhanaPage() {
       </div>
 
       {/* ── SECTION 2: Promotions ───────────────────────────────────────── */}
-      <Suspense fallback={null}>
-        <PromotionsSection />
-      </Suspense>
+      <div ref={promotionsRef}>
+        <Suspense fallback={null}>
+          <PromotionsSection />
+        </Suspense>
+      </div>
 
       {/* ── SECTION 3: Sticky category tabs ────────────────────────────── */}
       <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/40">
@@ -465,6 +470,14 @@ export default function OhanaPage() {
               className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-hide py-2"
               style={{ touchAction: 'pan-x' }}
             >
+              {hasActivePromotions && (
+                <button
+                  onClick={() => promotionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium bg-red-500 text-white animate-pulse"
+                >
+                  🔥 Promos
+                </button>
+              )}
               {allTabs.map((cat) => {
                 const isActive = activeSlug === cat.slug;
                 return (

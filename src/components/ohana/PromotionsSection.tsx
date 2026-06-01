@@ -14,10 +14,7 @@ function formatDiscountLabel(promo: Promotion): string | null {
 }
 
 function formatEndDate(endsAt: string): string {
-  return new Date(endsAt).toLocaleDateString('es-CO', {
-    day: 'numeric',
-    month: 'long',
-  });
+  return new Date(endsAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function PromotionCard({ promo }: { promo: Promotion }) {
@@ -29,34 +26,35 @@ function PromotionCard({ promo }: { promo: Promotion }) {
       className={cn(
         'bg-card rounded-2xl overflow-hidden border border-border/50',
         'shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5',
+        'flex flex-col',
       )}
     >
       {/* Image */}
-      <div className="relative aspect-video overflow-hidden">
+      <div className="relative overflow-hidden">
         {promo.image_url ? (
           <img
             src={promo.image_url}
             alt={promo.title}
-            className="w-full h-full object-cover"
+            className="w-full h-36 object-cover rounded-t-xl"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-brand/30 to-brand-dark/50 flex items-center justify-center">
+          <div className="w-full h-36 bg-brand/20 rounded-t-xl flex items-center justify-center">
             <span className="text-4xl" aria-hidden="true">🏷️</span>
           </div>
         )}
-        {/* Discount chip overlaid on image */}
+        {/* Discount chip */}
         {discountLabel && promo.discount_type !== 'label' && (
-          <span className="absolute top-2.5 left-2.5 bg-brand text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+          <span className="absolute top-2.5 left-2.5 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
             {discountLabel}
           </span>
         )}
       </div>
 
       {/* Content */}
-      <div className="p-3.5 space-y-1.5">
+      <div className="p-3.5 space-y-1.5 flex flex-col flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-bold text-lg leading-tight text-foreground">{promo.title}</p>
+          <p className="font-bold text-base leading-tight text-foreground">{promo.title}</p>
           {displayBadge && (
             <span className="shrink-0 bg-brand text-white text-xs px-2 py-0.5 rounded-full whitespace-nowrap">
               {displayBadge}
@@ -65,13 +63,32 @@ function PromotionCard({ promo }: { promo: Promotion }) {
         </div>
 
         {promo.description && (
-          <p className="text-sm text-muted-foreground leading-snug">{promo.description}</p>
+          <p className="text-sm text-muted-foreground leading-snug line-clamp-2">{promo.description}</p>
         )}
 
         {promo.ends_at && (
           <p className="text-xs text-muted-foreground">
-            Válido hasta {formatEndDate(promo.ends_at)}
+            Válido hasta: {formatEndDate(promo.ends_at)}
           </p>
+        )}
+
+        {promo.cta_text && (
+          <div className="pt-1 mt-auto">
+            {promo.cta_url ? (
+              <a
+                href={promo.cta_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg w-full text-center hover:bg-brand/90 transition-colors"
+              >
+                {promo.cta_text}
+              </a>
+            ) : (
+              <div className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg w-full text-center">
+                {promo.cta_text}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -81,7 +98,7 @@ function PromotionCard({ promo }: { promo: Promotion }) {
 function PromotionCardSkeleton() {
   return (
     <div className="bg-card rounded-2xl overflow-hidden border border-border/50 shadow-sm">
-      <Skeleton className="aspect-video w-full" />
+      <Skeleton className="w-full h-36 rounded-t-xl" />
       <div className="p-3.5 space-y-2">
         <Skeleton className="h-5 w-3/4 rounded" />
         <Skeleton className="h-4 w-full rounded" />
@@ -103,22 +120,22 @@ export default function PromotionsSection() {
           <h2 className="font-display font-bold text-2xl text-foreground dark:text-white">
             🔥 Promociones
           </h2>
-          <div className="mt-1.5 h-0.5 w-10 rounded-full bg-brand" />
+          <div className="mt-1.5 h-[3px] w-9 rounded-full bg-brand" />
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => <PromotionCardSkeleton key={i} />)}
           </div>
         ) : (
           <div
             className={cn(
-              'md:grid md:grid-cols-3 md:gap-4',
-              'flex gap-3 overflow-x-auto scrollbar-hide pb-1 md:overflow-visible md:pb-0',
+              'sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4',
+              'flex gap-3 overflow-x-auto scrollbar-hide pb-1 sm:overflow-visible sm:pb-0',
             )}
           >
             {promotions.map((promo) => (
-              <div key={promo.id} className="min-w-[75vw] sm:min-w-[60vw] md:min-w-0">
+              <div key={promo.id} className="min-w-[75vw] sm:min-w-0">
                 <PromotionCard promo={promo} />
               </div>
             ))}

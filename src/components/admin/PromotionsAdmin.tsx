@@ -8,9 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -18,10 +21,13 @@ interface PromotionRow {
   id: string;
   title: string;
   description: string | null;
+  type: 'informative' | 'combo';
   discount_type: 'percentage' | 'fixed' | 'label';
   discount_value: number;
   badge_text: string | null;
   image_url: string | null;
+  cta_text: string | null;
+  cta_url: string | null;
   is_active: boolean;
   starts_at: string | null;
   ends_at: string | null;
@@ -30,14 +36,19 @@ interface PromotionRow {
 }
 
 type DiscountType = 'percentage' | 'fixed' | 'label';
+type PromotionType = 'informative' | 'combo';
+type StatusFilter = 'all' | 'active' | 'inactive';
 
 interface FormState {
   title: string;
   description: string;
+  type: PromotionType;
   discount_type: DiscountType;
   discount_value: string;
   badge_text: string;
   image_url: string;
+  cta_text: string;
+  cta_url: string;
   starts_at: string;
   ends_at: string;
   sort_order: string;
@@ -49,24 +60,18 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   title: '',
   description: '',
-  discount_type: 'percentage',
+  type: 'informative',
+  discount_type: 'label',
   discount_value: '',
   badge_text: '',
   image_url: '',
+  cta_text: '',
+  cta_url: '',
   starts_at: '',
   ends_at: '',
   sort_order: '0',
   is_active: true,
 };
-
-function formatDiscount(row: PromotionRow): string {
-  if (row.discount_type === 'percentage') return `${row.discount_value}%`;
-  if (row.discount_type === 'fixed') {
-    const formatted = row.discount_value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return `-$${formatted}`;
-  }
-  return row.badge_text ?? '—';
-}
 
 function formatDateRange(starts: string | null, ends: string | null): string {
   if (!starts && !ends) return 'Sin fecha';
@@ -77,17 +82,17 @@ function formatDateRange(starts: string | null, ends: string | null): string {
 }
 
 function rowToForm(row: PromotionRow): FormState {
-  const toDatetimeLocal = (iso: string | null) => {
-    if (!iso) return '';
-    return iso.slice(0, 16);
-  };
+  const toDatetimeLocal = (iso: string | null) => iso ? iso.slice(0, 16) : '';
   return {
     title: row.title,
     description: row.description ?? '',
+    type: row.type ?? 'informative',
     discount_type: row.discount_type,
     discount_value: row.discount_value > 0 ? String(row.discount_value) : '',
     badge_text: row.badge_text ?? '',
     image_url: row.image_url ?? '',
+    cta_text: row.cta_text ?? '',
+    cta_url: row.cta_url ?? '',
     starts_at: toDatetimeLocal(row.starts_at),
     ends_at: toDatetimeLocal(row.ends_at),
     sort_order: String(row.sort_order),
@@ -99,15 +104,30 @@ function formToPayload(form: FormState) {
   return {
     title: form.title.trim(),
     description: form.description.trim() || null,
+    type: form.type,
     discount_type: form.discount_type,
     discount_value: form.discount_value !== '' ? Number(form.discount_value) : 0,
     badge_text: form.badge_text.trim() || null,
     image_url: form.image_url.trim() || null,
+    cta_text: form.cta_text.trim() || null,
+    cta_url: form.cta_url.trim() || null,
     starts_at: form.starts_at || null,
     ends_at: form.ends_at || null,
     sort_order: form.sort_order !== '' ? Number(form.sort_order) : 0,
     is_active: form.is_active,
   };
+}
+
+function PromotionThumbnail({ url, title }: { url: string | null; title: string }) {
+  const [err, setErr] = useState(false);
+  if (!url || err) return <div className="w-10 h-10 bg-brand/20 rounded shrink-0 flex items-center justify-center text-lg">🏷️</div>;
+  return <img src={url} alt={title} className="w-10 h-10 object-cover rounded shrink-0" onError={() => setErr(true)} />;
+}
+
+interface UnsplashPhoto {
+  id: string;
+  urls: { small: string; regular: string };
+  alt_description: string | null;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -116,10 +136,20 @@ export default function PromotionsAdmin() {
   const syncCatalog = useCatalogMutationSync();
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  const [imageTab, setImageTab] = useState<'url' | 'upload' | 'unsplash'>('url');
+  const [uploading, setUploading] = useState(false);
+  const [imgPreviewError, setImgPreviewError] = useState(false);
+  const [unsplashQuery, setUnsplashQuery] = useState('');
+  const [unsplashResults, setUnsplashResults] = useState<UnsplashPhoto[]>([]);
+  const [unsplashLoading, setUnsplashLoading] = useState(false);
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -130,35 +160,74 @@ export default function PromotionsAdmin() {
       .select('*')
       .order('sort_order')
       .order('created_at');
-    if (error) { toast.error('Error al cargar promociones'); }
+    if (error) toast.error('Error al cargar promociones');
     setPromotions((data ?? []) as PromotionRow[]);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
+  const resetImageState = () => {
+    setImageTab('url');
+    setImgPreviewError(false);
+    setUnsplashQuery('');
+    setUnsplashResults([]);
+    setUnsplashLoading(false);
+  };
+
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
-    setDialogOpen(true);
+    resetImageState();
+    setSheetOpen(true);
   };
 
   const openEdit = (row: PromotionRow) => {
     setEditingId(row.id);
     setForm(rowToForm(row));
-    setDialogOpen(true);
+    resetImageState();
+    setSheetOpen(true);
   };
 
-  const closeDialog = () => {
-    setDialogOpen(false);
+  const closeSheet = () => {
+    setSheetOpen(false);
     setEditingId(null);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const ext = file.name.split('.').pop();
+    const prefix = editingId ?? `promo-${Date.now()}`;
+    const path = `${prefix}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(path, file, { upsert: true });
+    if (error) { toast.error('Error al subir imagen'); setUploading(false); return; }
+    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    setF('image_url', data.publicUrl);
+    setImgPreviewError(false);
+    setUploading(false);
+  };
+
+  const searchUnsplash = async () => {
+    if (!unsplashQuery.trim()) return;
+    setUnsplashLoading(true);
+    try {
+      const res = await fetch(
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(unsplashQuery)}&per_page=6&client_id=UNSPLASH_API_KEY`,
+      );
+      const json = await res.json();
+      setUnsplashResults(json.results ?? []);
+    } catch {
+      toast.error('Error al buscar en Unsplash');
+    }
+    setUnsplashLoading(false);
   };
 
   const handleSave = async () => {
     if (!form.title.trim()) { toast.error('El título es requerido'); return; }
-    if (form.discount_type !== 'label' && form.discount_value === '') {
-      toast.error('El valor del descuento es requerido'); return;
-    }
     setSaving(true);
     const payload = formToPayload(form);
     let error;
@@ -171,7 +240,7 @@ export default function PromotionsAdmin() {
     if (error) { toast.error(editingId ? 'Error al actualizar' : 'Error al crear'); return; }
     await syncCatalog(['promotions']);
     toast.success(editingId ? 'Promoción actualizada' : 'Promoción creada');
-    closeDialog();
+    closeSheet();
     load();
   };
 
@@ -180,7 +249,6 @@ export default function PromotionsAdmin() {
     if (error) { toast.error('Error al actualizar'); return; }
     await syncCatalog(['promotions']);
     setPromotions(prev => prev.map(p => p.id === id ? { ...p, is_active: active } : p));
-    toast.success(active ? 'Promoción activada' : 'Promoción desactivada');
   };
 
   const handleDelete = async () => {
@@ -198,61 +266,89 @@ export default function PromotionsAdmin() {
   const setF = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
+  const filtered = promotions.filter(p => {
+    if (statusFilter === 'active') return p.is_active;
+    if (statusFilter === 'inactive') return !p.is_active;
+    return true;
+  });
+
   if (loading) return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-14" />)}</div>;
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-2">
         <h2 className="text-xl font-bold">Promociones ({promotions.length})</h2>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="w-4 h-4 mr-1" /> Nueva promoción
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Status filter */}
+          <Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
+            <SelectTrigger className="h-8 text-sm w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="active">Activas</SelectItem>
+              <SelectItem value="inactive">Inactivas</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="w-4 h-4 mr-1" /> Nueva
+          </Button>
+        </div>
       </div>
 
-      {/* ── Create / Edit dialog ────────────────────────────────────────────── */}
-      <Dialog open={dialogOpen} onOpenChange={v => { if (!v) closeDialog(); }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar promoción' : 'Nueva promoción'}</DialogTitle>
-            <DialogDescription>
-              {editingId ? 'Modifica los datos de la promoción.' : 'Crea una nueva promoción para mostrar en el menú.'}
-            </DialogDescription>
-          </DialogHeader>
+      {/* ── Sheet lateral ────────────────────────────────────────────────────── */}
+      <Sheet open={sheetOpen} onOpenChange={v => { if (!v) closeSheet(); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{editingId ? 'Editar promoción' : 'Nueva promoción'}</SheetTitle>
+          </SheetHeader>
 
-          <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+          <div className="space-y-4 py-4">
+            {/* Título */}
             <div>
               <Label>Título *</Label>
               <Input value={form.title} onChange={e => setF('title', e.target.value)} placeholder="ej: Bowl Mediano 2x1" />
             </div>
 
+            {/* Descripción */}
             <div>
               <Label>Descripción</Label>
               <Textarea
                 value={form.description}
                 onChange={e => setF('description', e.target.value)}
                 rows={2}
-                placeholder="Descripción opcional de la promoción"
+                placeholder="Descripción opcional"
               />
             </div>
 
+            {/* Tipo */}
+            <div>
+              <Label>Tipo</Label>
+              <Select value={form.type} onValueChange={v => setF('type', v as PromotionType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="informative">Informativa</SelectItem>
+                  <SelectItem value="combo">Combo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Descuento */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Tipo de descuento *</Label>
+                <Label>Tipo de descuento</Label>
                 <Select value={form.discount_type} onValueChange={v => setF('discount_type', v as DiscountType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="label">Sin descuento</SelectItem>
                     <SelectItem value="percentage">Porcentaje</SelectItem>
-                    <SelectItem value="fixed">Valor fijo COP</SelectItem>
-                    <SelectItem value="label">Solo etiqueta</SelectItem>
+                    <SelectItem value="fixed">Monto fijo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
               {form.discount_type !== 'label' && (
                 <div>
-                  <Label>
-                    {form.discount_type === 'percentage' ? 'Porcentaje (%)' : 'Valor (COP)'} *
-                  </Label>
+                  <Label>{form.discount_type === 'percentage' ? 'Porcentaje (%)' : 'Valor (COP)'}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -264,43 +360,119 @@ export default function PromotionsAdmin() {
               )}
             </div>
 
+            {/* Badge */}
             <div>
               <Label>Badge text</Label>
               <Input
                 value={form.badge_text}
                 onChange={e => setF('badge_text', e.target.value)}
-                placeholder="ej: 2x1, Nuevo, Popular"
+                placeholder="ej: 2x1, NUEVO, OFERTA"
               />
             </div>
 
+            {/* Imagen */}
             <div>
-              <Label>URL de imagen</Label>
-              <Input
-                value={form.image_url}
-                onChange={e => setF('image_url', e.target.value)}
-                placeholder="https://..."
-              />
+              <Label>Imagen</Label>
+              <Tabs value={imageTab} onValueChange={v => setImageTab(v as typeof imageTab)} className="mt-2">
+                <TabsList className="w-full">
+                  <TabsTrigger value="url" className="flex-1">URL</TabsTrigger>
+                  <TabsTrigger value="upload" className="flex-1">Subir archivo</TabsTrigger>
+                  <TabsTrigger value="unsplash" className="flex-1">Unsplash</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="url" className="mt-2">
+                  <Input
+                    value={form.image_url}
+                    onChange={e => { setF('image_url', e.target.value); setImgPreviewError(false); }}
+                    placeholder="https://..."
+                  />
+                </TabsContent>
+
+                <TabsContent value="upload" className="mt-2 space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer disabled:opacity-50"
+                  />
+                  {uploading && <p className="text-xs text-muted-foreground">Subiendo imagen...</p>}
+                </TabsContent>
+
+                <TabsContent value="unsplash" className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={unsplashQuery}
+                      onChange={e => setUnsplashQuery(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && searchUnsplash()}
+                      placeholder="Buscar en Unsplash..."
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={searchUnsplash} disabled={unsplashLoading}>
+                      {unsplashLoading ? '...' : 'Buscar'}
+                    </Button>
+                  </div>
+                  {unsplashResults.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {unsplashResults.map(photo => (
+                        <img
+                          key={photo.id}
+                          src={photo.urls.small}
+                          alt={photo.alt_description ?? ''}
+                          className={cn(
+                            'w-full h-20 object-cover rounded cursor-pointer ring-2',
+                            form.image_url === photo.urls.regular ? 'ring-primary' : 'ring-transparent hover:ring-primary/50',
+                          )}
+                          onClick={() => { setF('image_url', photo.urls.regular); setImgPreviewError(false); }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+
+              {form.image_url && !imgPreviewError && (
+                <img
+                  src={form.image_url}
+                  alt="Preview"
+                  className="mt-2 w-full h-32 object-cover rounded-lg border"
+                  onError={() => setImgPreviewError(true)}
+                />
+              )}
             </div>
 
+            {/* CTA */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Texto del botón</Label>
+                <Input
+                  value={form.cta_text}
+                  onChange={e => setF('cta_text', e.target.value)}
+                  placeholder="ej: Pedir ahora"
+                />
+              </div>
+              <div>
+                <Label>URL del botón</Label>
+                <Input
+                  value={form.cta_url}
+                  onChange={e => setF('cta_url', e.target.value)}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            {/* Fechas */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Inicio</Label>
-                <Input
-                  type="datetime-local"
-                  value={form.starts_at}
-                  onChange={e => setF('starts_at', e.target.value)}
-                />
+                <Input type="datetime-local" value={form.starts_at} onChange={e => setF('starts_at', e.target.value)} />
               </div>
               <div>
                 <Label>Fin</Label>
-                <Input
-                  type="datetime-local"
-                  value={form.ends_at}
-                  onChange={e => setF('ends_at', e.target.value)}
-                />
+                <Input type="datetime-local" value={form.ends_at} onChange={e => setF('ends_at', e.target.value)} />
               </div>
             </div>
 
+            {/* Orden + is_active */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Orden</Label>
@@ -309,7 +481,6 @@ export default function PromotionsAdmin() {
                   min={0}
                   value={form.sort_order}
                   onChange={e => setF('sort_order', e.target.value)}
-                  className="w-full"
                 />
               </div>
               <div className="flex items-end pb-0.5">
@@ -321,14 +492,14 @@ export default function PromotionsAdmin() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
+          <SheetFooter className="pt-2">
+            <Button variant="outline" onClick={closeSheet}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="btn-ohana">
               {saving ? 'Guardando...' : editingId ? 'Guardar cambios' : 'Crear promoción'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* ── Delete confirmation dialog ──────────────────────────────────────── */}
       <Dialog open={!!deleteId} onOpenChange={v => { if (!v) setDeleteId(null); }}>
@@ -351,39 +522,47 @@ export default function PromotionsAdmin() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
+              <th className="p-3 font-semibold w-10"></th>
               <th className="p-3 font-semibold">Título</th>
-              <th className="p-3 font-semibold">Descuento</th>
-              <th className="p-3 font-semibold">Badge</th>
+              <th className="p-3 font-semibold">Tipo</th>
               <th className="p-3 font-semibold">Fechas</th>
               <th className="p-3 font-semibold text-center">Activa</th>
               <th className="p-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {promotions.length === 0 && (
+            {filtered.length === 0 && (
               <tr>
                 <td className="p-6 text-center text-muted-foreground" colSpan={6}>
-                  Sin promociones. Crea la primera.
+                  {statusFilter === 'all' ? 'Sin promociones. Crea la primera.' : 'No hay promociones con este filtro.'}
                 </td>
               </tr>
             )}
-            {promotions.map(promo => (
+            {filtered.map(promo => (
               <tr key={promo.id} className={`border-b last:border-b-0 ${!promo.is_active ? 'opacity-50' : ''}`}>
+                <td className="p-3">
+                  <PromotionThumbnail url={promo.image_url} title={promo.title} />
+                </td>
                 <td className="p-3">
                   <p className="font-medium">{promo.title}</p>
                   {promo.description && (
                     <p className="text-xs text-muted-foreground line-clamp-1 max-w-[180px]">{promo.description}</p>
                   )}
-                </td>
-                <td className="p-3 text-sm font-mono">{formatDiscount(promo)}</td>
-                <td className="p-3">
-                  {promo.badge_text ? (
-                    <span className="bg-brand text-white text-xs px-2 py-0.5 rounded-full">
+                  {promo.badge_text && (
+                    <span className="mt-0.5 inline-block bg-brand text-white text-xs px-2 py-0.5 rounded-full">
                       {promo.badge_text}
                     </span>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">—</span>
                   )}
+                </td>
+                <td className="p-3">
+                  <span className={cn(
+                    'text-xs px-2 py-0.5 rounded-full font-medium',
+                    promo.type === 'combo'
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                  )}>
+                    {promo.type === 'combo' ? 'Combo' : 'Informativa'}
+                  </span>
                 </td>
                 <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
                   {formatDateRange(promo.starts_at, promo.ends_at)}
