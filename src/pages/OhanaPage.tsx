@@ -573,15 +573,6 @@ export default function OhanaPage() {
             <div className="flex flex-col gap-1">
               <p className="text-xs text-white/80">📍 Cable Plaza · Piso 4 Terraza</p>
               <h3 className="text-base font-semibold text-white">¿Listo para pedir?</h3>
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-brand-dark hover:bg-white/90 transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-                Pedir por WhatsApp
-              </a>
             </div>
             <span className="shrink-0 select-none text-5xl opacity-90">🥗</span>
           </div>
