@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useIngredients, useBowlRules } from '@/hooks/use-catalog';
+import { useIngredients, useBowlRules, useProducts } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useCart } from '@/context/CartContext';
@@ -16,7 +16,7 @@ import {
 import { formatGroupedIngredients, getBowlSummaryRows } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
-import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient } from '@/types';
+import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient, Product } from '@/types';
 
 const steps: { id: BowlBuilderStep; label: string }[] = [
   { id: 'size', label: 'Tamaño' },
@@ -25,10 +25,11 @@ const steps: { id: BowlBuilderStep; label: string }[] = [
   { id: 'acompanantes', label: 'Acompañantes' },
   { id: 'salsas', label: 'Salsas' },
   { id: 'complementos', label: 'Complementos' },
+  { id: 'upsell', label: 'Extras' },
   { id: 'summary', label: 'Resumen' },
 ];
 
-type SelectionStep = Exclude<BowlBuilderStep, 'size' | 'summary'>;
+type SelectionStep = Exclude<BowlBuilderStep, 'size' | 'summary' | 'upsell'>;
 
 interface BowlBuilderProps {
   onComplete?: () => void;
@@ -115,13 +116,14 @@ function getStepHint(config: StepConfig, currentCount: number) {
 
 function getStepNextLabel(currentStep: BowlBuilderStep, canProceed: boolean, isOptionalBlank: boolean) {
   if (currentStep === 'summary') return 'Agregar al carrito';
+  if (currentStep === 'upsell') return 'Continuar';
   if (!canProceed) return 'Siguiente';
   if (isOptionalBlank) return 'Omitir';
   return 'Siguiente';
 }
 
 export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
-  const { addCustomBowl } = useCart();
+  const { addCustomBowl, addProduct, cart } = useCart();
 
   const builderRef = useRef<HTMLDivElement>(null);
   const scrollToBuilder = () => {
@@ -129,6 +131,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   };
 
   const { data: bowlSizes = [], isLoading: sizesLoading, error: sizesError } = useBowlRules();
+  const { data: bebidasOptions = [], isLoading: bebidasLoading } = useProducts({ categoryId: 'ohana-bebidas' });
   const { data: baseOptions = [], isLoading: basesLoading, error: basesError } = useIngredients('base');
   const { data: proteinOptions = [], isLoading: proteinsLoading, error: proteinsError } = useIngredients('protein');
   const { data: acompananteOptions = [], isLoading: acompLoading, error: acompError } = useIngredients('acompanante');
@@ -358,7 +361,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
   const totalAccompaniments = selectedAcompanantes.length;
 
-  const currentStepConfig = currentStep !== 'size' && currentStep !== 'summary' && stepConfigs ? stepConfigs[currentStep] : null;
+  const currentStepConfig = currentStep !== 'size' && currentStep !== 'summary' && currentStep !== 'upsell' && stepConfigs ? stepConfigs[currentStep] : null;
 
   const isStepComplete = (step: BowlBuilderStep) => {
     if (!selectedSize && step !== 'size') return false;
@@ -376,6 +379,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         return selectedSauces.length >= (stepConfigs?.salsas.min ?? 0);
       case 'complementos':
         return selectedComplementos.length >= (stepConfigs?.complementos.min ?? 0);
+      case 'upsell':
+        return true;
       case 'summary':
         return true;
       default:
@@ -1320,6 +1325,130 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             );
           })() : null}
 
+          {currentStep === 'upsell' ? (() => {
+            const UPSELL_INGREDIENTS = ['Guacamole', 'Queso rallado', 'Tocineta', 'Queso frito', 'Papa Francesa'];
+            const allIngredients = [...acompananteOptions, ...complementoOptions];
+            const upsellIngredients = UPSELL_INGREDIENTS
+              .map(name => allIngredients.find(i => i.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((i): i is Ingredient => i !== undefined);
+
+            const isInBowl = (ing: Ingredient) =>
+              selectedAcompanantes.some(a => a.id === ing.id) ||
+              selectedComplementos.some(c => c.id === ing.id) ||
+              extraAcompananteSelections.some(e => e.acompName === ing.name) ||
+              extraComplementoSelections.some(e => e.compName === ing.name);
+
+            const addUpsellIngredient = (ing: Ingredient) => {
+              if (isInBowl(ing)) return;
+              const charge = getIngredientExtraCharge(ing);
+              if (ing.type === 'acompanante') {
+                const maxAcomp = selectedSize?.maxAcompanantes ?? 0;
+                if (charge === 0 && selectedAcompanantes.length < maxAcomp) {
+                  setSelectedAcompanantes(prev => [...prev, ing]);
+                } else {
+                  setExtraAcompananteSelections(prev => [...prev, {
+                    uid: `extra-acomp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    acompName: ing.name,
+                    charge: charge > 0 ? charge : 2000,
+                    premiumAcompId: '',
+                  }]);
+                }
+              } else {
+                const maxComp = selectedSize?.maxComplementos ?? 0;
+                if (charge === 0 && selectedComplementos.length < maxComp) {
+                  setSelectedComplementos(prev => [...prev, ing]);
+                } else {
+                  setExtraComplementoSelections(prev => [...prev, {
+                    uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    compName: ing.name,
+                    compId: ing.id,
+                    charge: charge > 0 ? charge : 500,
+                    premiumCompId: '',
+                  }]);
+                }
+              }
+            };
+
+            return (
+              <div className="animate-slide-in space-y-8">
+                {/* Sección 1: Bebidas */}
+                <div>
+                  <p className="text-lg font-semibold mb-4">🥤 ¿Le sumamos una bebida?</p>
+                  {bebidasLoading ? (
+                    <div className="flex gap-3">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="shrink-0 w-32 space-y-2">
+                          <div className="w-full h-20 bg-muted rounded-lg animate-pulse" />
+                          <div className="h-3 bg-muted rounded w-3/4 animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : bebidasOptions.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible">
+                      {bebidasOptions.slice(0, 6).map((drink: Product) => {
+                        const inCart = cart.items.some(item => item.type === 'product' && item.product?.id === drink.id);
+                        return (
+                          <div key={drink.id} className="snap-start shrink-0 w-32 md:w-auto">
+                            {drink.imageUrl ? (
+                              <img src={drink.imageUrl} alt={drink.name} className="w-full h-20 object-cover rounded-lg" />
+                            ) : (
+                              <div className="w-full h-20 bg-brand/20 rounded-lg" />
+                            )}
+                            <p className="text-xs font-semibold line-clamp-1 mt-1">{drink.name}</p>
+                            <p className="text-xs text-brand font-bold">{formatPrice(drink.price)}</p>
+                            <button
+                              type="button"
+                              disabled={inCart}
+                              onClick={() => { if (!inCart) addProduct(drink); }}
+                              className={cn(
+                                'text-white text-xs rounded-lg py-1.5 w-full mt-1 transition-colors',
+                                inCart ? 'bg-brand/40 cursor-not-allowed' : 'bg-brand hover:bg-brand/90',
+                              )}
+                            >
+                              {inCart ? '✓ Añadido' : '+ Agregar'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Sección 2: Ingredientes adicionales */}
+                {upsellIngredients.length > 0 && (
+                  <div>
+                    <p className="text-lg font-semibold mb-4">🍟 ¿Algo más para tu bowl?</p>
+                    <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible">
+                      {upsellIngredients.map(ing => {
+                        const inBowl = isInBowl(ing);
+                        const charge = getIngredientExtraCharge(ing);
+                        return (
+                          <div key={ing.id} className="snap-start shrink-0 w-32 md:w-auto rounded-2xl border bg-card p-3">
+                            <p className="text-xs font-semibold line-clamp-1">{ing.name}</p>
+                            <p className="text-xs text-brand font-bold mt-0.5">
+                              {charge > 0 ? `+${formatPrice(charge)}` : 'Incluido'}
+                            </p>
+                            <button
+                              type="button"
+                              disabled={inBowl}
+                              onClick={() => addUpsellIngredient(ing)}
+                              className={cn(
+                                'text-white text-xs rounded-lg py-1.5 w-full mt-2 transition-colors',
+                                inBowl ? 'bg-brand/40 cursor-not-allowed' : 'bg-brand hover:bg-brand/90',
+                              )}
+                            >
+                              {inBowl ? '✓ En tu bowl' : '+ Agregar'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })() : null}
+
           {currentStep === 'summary' && selectedSize ? (
             <div className="space-y-6">
               <div>
@@ -1442,7 +1571,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                 {getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              {currentStepConfig?.optional && currentSelectionCount === 0 ? (
+              {(currentStepConfig?.optional && currentSelectionCount === 0) || currentStep === 'upsell' ? (
                 <Button variant="ghost" size="sm" onClick={goNext} className="text-muted-foreground">
                   Saltar este paso →
                 </Button>
