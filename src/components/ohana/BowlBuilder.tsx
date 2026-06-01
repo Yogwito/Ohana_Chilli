@@ -185,6 +185,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const [extraComplementoSelections, setExtraComplementoSelections] = useState<Array<{
     uid: string;
     compName: string;
+    compId: string;
     charge: number;
     premiumCompId: string;
   }>>([]);
@@ -1179,8 +1180,18 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           })() : null}
 
           {currentStep === 'complementos' && currentStepConfig ? (() => {
+            const EXTRA_COMP_PRICE = 2000;
+            const SUGGESTED_COMPLEMENTOS = ['Ajonjolí', 'Maní', 'Choclitos triturados'];
+            const maxComplementos = selectedSize?.maxComplementos ?? currentStepConfig.max;
             const freeComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) === 0);
             const premiumComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) > 0);
+            const selectedCompIds = new Set(selectedComplementos.map(c => c.id));
+            const extraCompIds = new Set(extraComplementoSelections.map(e => e.compId));
+            const compSuggestions = SUGGESTED_COMPLEMENTOS
+              .map(name => freeComplementos.find(c => c.name.toLowerCase().includes(name.toLowerCase())))
+              .filter((c): c is Ingredient => c !== undefined && !selectedCompIds.has(c.id) && !extraCompIds.has(c.id))
+              .slice(0, 3);
+            const hasUpsellSection = compSuggestions.length > 0 || premiumComplementos.length > 0;
             return (
               <>
                 <StepPicker
@@ -1213,11 +1224,36 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   </div>
                 )}
 
-                {/* Premium complementos upsell */}
-                {premiumComplementos.length > 0 && (
+                {/* Unified upsell: free suggestions + premium chips */}
+                {hasUpsellSection && (
                   <div className="mt-5">
                     <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
                     <div className="flex flex-wrap gap-2">
+                      {/* Free suggestions with sauces router pattern */}
+                      {compSuggestions.map(comp => (
+                        <button
+                          key={comp.id}
+                          type="button"
+                          onClick={() => {
+                            if (selectedComplementos.length < maxComplementos) {
+                              setSelectedComplementos(prev => [...prev, comp]);
+                            } else {
+                              const charge = (comp.price ?? 0) > 0 ? comp.price! : EXTRA_COMP_PRICE;
+                              setExtraComplementoSelections(prev => [...prev, {
+                                uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                compName: comp.name,
+                                compId: comp.id,
+                                charge,
+                                premiumCompId: '',
+                              }]);
+                            }
+                          }}
+                          className="rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
+                        >
+                          {comp.name}
+                        </button>
+                      ))}
+                      {/* Premium chips with selector */}
                       {premiumComplementos.map(premium => {
                         const charge = getIngredientExtraCharge(premium);
                         return (
@@ -1266,6 +1302,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                               setExtraComplementoSelections(prev => [...prev, {
                                 uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
                                 compName: c.name,
+                                compId: c.id,
                                 charge,
                                 premiumCompId: activePremium.id,
                               }]);
