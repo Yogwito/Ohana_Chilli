@@ -295,22 +295,22 @@ export default function OhanaPage() {
           className="hero-grain relative w-full overflow-hidden"
           style={{ background: 'linear-gradient(135deg, #8CC878 0%, #4a9e3f 50%, #2d6e28 100%)' }}
         >
-          <div className="container max-w-4xl flex items-center justify-between gap-6 px-4 py-10 md:py-14">
+          <div className="container max-w-4xl flex items-center justify-between gap-6 px-4 py-8 md:py-14">
             {/* Left: copy + CTAs */}
             <div className="flex flex-col gap-3 max-w-xs">
               <span className="inline-flex w-fit items-center rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white">
                 🌿 Comida real. Sabor real.
               </span>
-              <h1 className="text-3xl font-normal text-white leading-tight">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-normal text-white leading-tight">
                 Eat Healthy, Live Happy
               </h1>
-              <p className="text-sm text-white/85">
+              <p className="text-sm sm:text-base text-white/85">
                 Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
               </p>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <button
                   onClick={() => scrollToSection(BOWL_BUILDER_ID)}
-                  className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-brand-dark hover:bg-white/90 transition-colors"
+                  className="rounded-full bg-white px-4 py-2 sm:px-5 text-sm font-semibold text-brand-dark hover:bg-white/90 transition-colors"
                 >
                   Arma tu Bowl
                 </button>
@@ -319,18 +319,18 @@ export default function OhanaPage() {
                     const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
                     scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
                   }}
-                  className="rounded-full border border-white px-5 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                  className="rounded-full border border-white px-4 py-2 sm:px-5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
                 >
                   Ver menú
                 </button>
               </div>
             </div>
             {/* Right: decorative circle */}
-            <div className="hidden sm:flex w-32 h-32 shrink-0 rounded-full bg-white/15 items-center justify-center">
+            <div className="flex w-24 h-24 sm:w-32 sm:h-32 shrink-0 rounded-full bg-white/15 items-center justify-center">
               <img
                 src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
                 alt="Bowls Lovers"
-                className="w-56 h-56 object-contain drop-shadow-md rounded-full"
+                className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-md rounded-full"
               />
             </div>
           </div>
@@ -339,22 +339,9 @@ export default function OhanaPage() {
         {/* Info row */}
         <div className="bg-background px-4 pb-5">
           <div className="container max-w-4xl">
-            <div className="flex items-end gap-4 -mt-12 mb-4">
-              {/* Logo card */}
-              <div
-                style={{ transitionDelay: '0ms' }}
-                className={cn(
-                  'w-[120px] h-[120px] rounded-2xl shadow-lg bg-card border border-brand/30 flex flex-col items-center justify-center shrink-0',
-                  'scroll-fade-up',
-                  mounted && 'in-view',
-                )}
-              >
-                <span className="font-display font-black text-2xl text-brand leading-none">Ohana</span>
-                <span className="font-display font-light text-xl text-brand leading-none">Bowls</span>
-              </div>
-
+            <div className="flex items-start gap-4 mb-4">
               {/* Name + badges + social */}
-              <div className="flex-1 min-w-0 pt-14 flex flex-wrap items-start justify-between gap-2">
+              <div className="flex-1 min-w-0 flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p
                     style={{ transitionDelay: '80ms' }}
@@ -486,7 +473,7 @@ export default function OhanaPage() {
                     data-active={isActive}
                     onClick={() => scrollToSection(cat.slug)}
                     className={cn(
-                      'px-4 py-1.5 text-sm font-semibold whitespace-nowrap shrink-0 rounded-full',
+                      'px-3 py-2 sm:px-4 sm:py-2 text-sm font-semibold whitespace-nowrap shrink-0 rounded-full',
                       'transition-all duration-200',
                       isActive
                         ? 'bg-brand text-white shadow-sm'
@@ -503,7 +490,7 @@ export default function OhanaPage() {
       </div>
 
       {/* ── SECTION 3: Product sections ──────────────────────────────────── */}
-      <div className="container max-w-4xl py-4 md:py-6">
+      <div className="container max-w-4xl px-4 sm:px-6 py-4 md:py-6">
         {isLoading && visibleCategories.length === 0 ? (
           <div className="space-y-8">
             {[1, 2, 3].map((g) => (

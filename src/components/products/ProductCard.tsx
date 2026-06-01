@@ -122,7 +122,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
         <Button
           onClick={handleAddClick}
           size="icon"
-          className="rounded-full h-8 w-8 shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
+          className="rounded-full h-8 w-8 min-h-[44px] min-w-[44px] shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
         >
           {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
         </Button>
@@ -145,7 +145,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
 
         <div className="flex flex-col flex-1 p-4 gap-2">
           {/* Name */}
-          <h3 className="font-display font-bold text-base leading-snug tracking-tight">{product.name}</h3>
+          <h3 className="font-display font-bold text-sm sm:text-base leading-snug tracking-tight">{product.name}</h3>
 
           {/* Description */}
           {hasDetailContent && (
