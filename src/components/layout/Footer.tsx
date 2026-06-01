@@ -138,8 +138,11 @@ export default function Footer() {
             Hecho con ♥{address.addressLocality ? ` en ${address.addressLocality}` : ''}
           </p>
           <div className="mt-6 text-center">
-            <Link to="/admin" className="text-[10px] text-white/15 hover:text-white/30 transition-colors select-none">
-              ·
+            <Link
+              to="/admin"
+              className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              Admin
             </Link>
           </div>
         </AnimatedElement>
