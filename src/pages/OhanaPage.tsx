@@ -23,6 +23,7 @@ import { Product, Category } from '@/types';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 const PromotionsSection = lazy(() => import('@/components/ohana/PromotionsSection'));
+const UpsellSection = lazy(() => import('@/components/ohana/UpsellSection'));
 
 // Virtual bowl-builder tab — always first, regardless of DB order
 const BOWL_BUILDER_ID = 'arma-tu-bowl';
@@ -248,8 +249,8 @@ export default function OhanaPage() {
               <span className="inline-flex w-fit items-center rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white">
                 🌿 Comida real. Sabor real.
               </span>
-              <h1 className="text-3xl font-black text-white leading-tight">
-                Bowls frescos<br />hechos para ti
+              <h1 className="text-3xl font-normal text-white leading-tight">
+                Eat Healthy, Live Happy
               </h1>
               <p className="text-sm text-white/85">
                 Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
@@ -274,7 +275,11 @@ export default function OhanaPage() {
             </div>
             {/* Right: decorative circle */}
             <div className="hidden sm:flex w-32 h-32 shrink-0 rounded-full bg-white/15 items-center justify-center">
-              <span className="select-none text-6xl">🥗</span>
+              <img
+                src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers.jpg"
+                alt="Bowls Lovers"
+                className="w-36 h-36 object-contain drop-shadow-md"
+              />
             </div>
           </div>
         </div>
@@ -394,6 +399,13 @@ export default function OhanaPage() {
       <Suspense fallback={null}>
         <PromotionsSection />
       </Suspense>
+
+      {/* ── SECTION 2.5: Upsell ─────────────────────────────────────────── */}
+      <div className="px-4 py-6">
+        <Suspense fallback={null}>
+          <UpsellSection />
+        </Suspense>
+      </div>
 
       {/* ── SECTION 3: Sticky category tabs ────────────────────────────── */}
       <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/40">

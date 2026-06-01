@@ -343,3 +343,67 @@ export function useBusinessSettings() {
     ...liveCatalogQueryOptions,
   });
 }
+
+export function useProductDefaultIngredients(productId: string | null) {
+  return useQuery({
+    queryKey: ['product-default-ingredients', productId],
+    queryFn: async () => {
+      if (!productId) return [];
+      const { data, error } = await supabase
+        .from('product_default_ingredients')
+        .select('*')
+        .eq('product_id', productId)
+        .order('sort_order');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!productId,
+    staleTime: 1000 * 60 * 10,
+  });
+}
+
+export function useTopProducts(limit = 4) {
+  const { data: allProducts } = useProducts();
+
+  return useQuery({
+    queryKey: ['top-products', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('product_id')
+        .limit(500);
+
+      if (error || !data || data.length < 4) {
+        return (allProducts ?? [])
+          .filter(p => p.imageUrl)
+          .slice(0, limit);
+      }
+
+      const counts: Record<string, number> = {};
+      data.forEach(item => {
+        if (!item.product_id) return;
+        counts[item.product_id] = (counts[item.product_id] ?? 0) + 1;
+      });
+
+      const topIds = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([id]) => id);
+
+      const topProducts = topIds
+        .map(id => (allProducts ?? []).find(p => p.id === id && p.imageUrl))
+        .filter((p): p is Product => p !== undefined);
+
+      if (topProducts.length < limit) {
+        const fallback = (allProducts ?? [])
+          .filter(p => p.imageUrl && !topIds.includes(p.id))
+          .slice(0, limit - topProducts.length);
+        return [...topProducts, ...fallback];
+      }
+
+      return topProducts;
+    },
+    enabled: !!allProducts,
+    staleTime: 1000 * 60 * 15,
+  });
+}
