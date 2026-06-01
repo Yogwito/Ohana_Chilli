@@ -1083,13 +1083,12 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
           {currentStep === 'salsas' && currentStepConfig ? (() => {
             const SUGGESTED_SAUCES = ['Ohana Chipotle', 'Mayo Cilantro', 'BBQ Honey'];
-            // Track selected sauce IDs to avoid suggesting already-selected ones
+            // Filter by ID — already-selected sauces don't appear as suggestions
             const selectedSauceIds = new Set(selectedSauces.map(s => s.id));
             const sauceSuggestions = SUGGESTED_SAUCES
               .map(name => sauceOptions.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
               .filter((s): s is Ingredient => s !== undefined && !selectedSauceIds.has(s.id))
               .slice(0, 3);
-            const saucesAtLimit = selectedSauces.length >= currentStepConfig.max;
             return (
               <>
                 <StepPicker
@@ -1107,13 +1106,11 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           key={sauce.id}
                           type="button"
                           onClick={() => {
-                            if (saucesAtLimit) return;
-                            updateIngredientSelection(sauce, setSelectedSauces, 'add', currentStepConfig.max);
+                            // bowl_rules doesn't define sauce limits — add directly without max gate.
+                            // Duplicates are prevented by the selectedSauceIds filter above.
+                            setSelectedSauces(prev => [...prev, sauce]);
                           }}
-                          className={cn(
-                            'rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 transition-colors',
-                            saucesAtLimit ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-brand/15',
-                          )}
+                          className="rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 cursor-pointer hover:bg-brand/15 transition-colors"
                         >
                           {sauce.name}
                         </button>
