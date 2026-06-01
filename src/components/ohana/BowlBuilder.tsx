@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIngredients, useBowlRules } from '@/hooks/use-catalog';
@@ -42,6 +42,8 @@ interface StepConfig {
   plural: string;
   min: number;
   max: number;
+  /** Per-item max: max units of the same ingredient. Defaults to max if omitted. */
+  perItemMax?: number;
   /** When true, the step can be skipped without selecting anything. */
   optional?: boolean;
 }
@@ -121,6 +123,11 @@ function getStepNextLabel(currentStep: BowlBuilderStep, canProceed: boolean, isO
 export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const { addCustomBowl } = useCart();
 
+  const builderRef = useRef<HTMLDivElement>(null);
+  const scrollToBuilder = () => {
+    builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const { data: bowlSizes = [], isLoading: sizesLoading, error: sizesError } = useBowlRules();
   const { data: baseOptions = [], isLoading: basesLoading, error: basesError } = useIngredients('base');
   const { data: proteinOptions = [], isLoading: proteinsLoading, error: proteinsError } = useIngredients('protein');
@@ -180,6 +187,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         plural: 'acompañantes',
         min: selectedSize.maxAcompanantes,
         max: selectedSize.maxAcompanantes,
+        perItemMax: Math.min(3, selectedSize.maxAcompanantes),
       },
       salsas: {
         label: 'Salsas',
@@ -275,6 +283,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     }
   }, [currentStep, selectedAcompanantes.length, selectedBases.length, selectedComplementos.length, selectedProteins.length, selectedSauces.length]);
 
+  const totalAccompaniments = selectedAcompanantes.length;
+
   const currentStepConfig = currentStep !== 'size' && currentStep !== 'summary' && stepConfigs ? stepConfigs[currentStep] : null;
 
   const isStepComplete = (step: BowlBuilderStep) => {
@@ -334,6 +344,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     const nextStep = steps[currentStepIndex + 1];
     if (!nextStep) return;
     setCurrentStep(nextStep.id);
+    scrollToBuilder();
   };
 
   const handleSizeSelect = (size: BowlSizeRule) => {
@@ -343,6 +354,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       resetSelectionsForSizeChange();
     }
     setCurrentStep('bases');
+    scrollToBuilder();
   };
 
   const handleSubmit = () => {
@@ -381,18 +393,21 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     ingredient,
     count,
     max,
+    perItemMax,
     onAdd,
     onRemove,
   }: {
     ingredient: Ingredient;
     count: number;
     max: number;
+    perItemMax?: number;
     onAdd: () => void;
     onRemove: () => void;
   }) => {
     const charge = getIngredientExtraCharge(ingredient);
     const isIncluded = charge === 0;
-    const isAddDisabled = max <= 0 || currentSelectionCount >= max;
+    const effectivePerItemMax = perItemMax ?? max;
+    const isAddDisabled = max <= 0 || currentSelectionCount >= max || count >= effectivePerItemMax;
     const isMaxedForNewSelection = currentSelectionCount >= max;
 
     return (
@@ -462,11 +477,15 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     selectedItems,
     setSelectedItems,
     config,
+    totalCount,
+    totalMax,
   }: {
     items: Ingredient[];
     selectedItems: Ingredient[];
     setSelectedItems: Dispatch<SetStateAction<Ingredient[]>>;
     config: StepConfig;
+    totalCount?: number;
+    totalMax?: number;
   }) => (
     <div className="animate-slide-in">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -474,6 +493,11 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           <div>
             <h3 className="text-xl font-semibold">{config.title}</h3>
             <p className="text-sm text-muted-foreground">{config.subtitle}</p>
+            {totalMax !== undefined && totalCount !== undefined ? (
+              <p className={cn('text-sm', totalCount >= totalMax ? 'text-brand' : 'text-muted-foreground')}>
+                {totalCount}/{totalMax} acompañantes
+              </p>
+            ) : null}
           </div>
           <div className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
             <p>{getStepHint(config, selectedItems.length)}</p>
@@ -491,16 +515,24 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {items.map((item) => (
-            <IngredientCard
-              key={item.id}
-              ingredient={item}
-              count={getIngredientCount(selectedItems, item.id)}
-              max={config.max}
-              onAdd={() => updateIngredientSelection(item, setSelectedItems, 'add', config.max)}
-              onRemove={() => updateIngredientSelection(item, setSelectedItems, 'remove', config.max)}
-            />
-          ))}
+          {items.map((item) => {
+            const itemCount = getIngredientCount(selectedItems, item.id);
+            const effectivePerItemMax = config.perItemMax ?? config.max;
+            return (
+              <IngredientCard
+                key={item.id}
+                ingredient={item}
+                count={itemCount}
+                max={config.max}
+                perItemMax={config.perItemMax}
+                onAdd={() => {
+                  if (itemCount >= effectivePerItemMax) return;
+                  updateIngredientSelection(item, setSelectedItems, 'add', config.max);
+                }}
+                onRemove={() => updateIngredientSelection(item, setSelectedItems, 'remove', config.max)}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -597,7 +629,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[2rem] border bg-card shadow-lg">
+    <div ref={builderRef} className="overflow-hidden rounded-[2rem] border bg-card shadow-lg">
       <div className="h-0.5 bg-muted">
         <div
           className="h-full bg-ohana transition-all duration-500 ease-out"
@@ -677,6 +709,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               selectedItems={selectedAcompanantes}
               setSelectedItems={setSelectedAcompanantes}
               config={currentStepConfig}
+              totalCount={totalAccompaniments}
+              totalMax={selectedSize?.maxAcompanantes}
             />
           ) : null}
 
