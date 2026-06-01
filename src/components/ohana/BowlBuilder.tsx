@@ -127,8 +127,9 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
   const builderRef = useRef<HTMLDivElement>(null);
   const stepsTabsRef = useRef<HTMLDivElement>(null);
+  const stepContentRef = useRef<HTMLDivElement>(null);
   const scrollToBuilder = () => {
-    builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    stepContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const { data: bowlSizes = [], isLoading: sizesLoading, error: sizesError } = useBowlRules();
@@ -801,7 +802,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
       <SizeSelector />
 
-      <div className="p-6" role="tabpanel">
+      <div ref={stepContentRef} className="p-6" role="tabpanel" style={{ scrollMarginTop: '80px' }}>
         <div className={cn('scroll-fade-up', stepVisible && 'in-view')}>
           {currentStep === 'size' ? (
             <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center">
