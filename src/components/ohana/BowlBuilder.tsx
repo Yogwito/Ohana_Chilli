@@ -13,7 +13,7 @@ import {
   getBowlChargeLines,
   getIngredientExtraCharge,
 } from '@/domain/bowlPricing';
-import { formatGroupedIngredients, getBowlSummaryRows } from '@/domain/bowlSummary';
+import { formatGroupedIngredients } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
 import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient, Product } from '@/types';
@@ -326,21 +326,52 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   }, [previewBowl]);
 
   const summaryRows = useMemo(() => {
-    if (!previewBowl) return [];
-    return getBowlSummaryRows(previewBowl);
-  }, [previewBowl]);
+    if (!selectedSize) return [];
+
+    const rows = [
+      { label: 'Base', value: formatGroupedIngredients(selectedBases) },
+      { label: 'Proteínas', value: formatGroupedIngredients(selectedProteins) },
+      { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
+      { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
+      { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
+    ];
+
+    const extraLines = [
+      ...extraProteinSelections.map(e => `Proteína extra: ${e.proteinName} (+${formatPrice(e.charge)})`),
+      ...extraAcompananteSelections.map(e => `Acompañante extra: ${e.acompName} (+${formatPrice(e.charge)})`),
+      ...extraSauceSelections.map(e => `Salsa extra: ${e.sauceName} (+${formatPrice(e.charge)})`),
+      ...extraComplementoSelections.map(e => `Complemento extra: ${e.compName} (+${formatPrice(e.charge)})`),
+    ];
+
+    if (extraLines.length > 0) {
+      rows.push({ label: 'Cargos extra', value: extraLines.join(', ') });
+    }
+
+    return rows;
+  }, [
+    selectedSize,
+    selectedBases,
+    selectedProteins,
+    selectedAcompanantes,
+    selectedSauces,
+    selectedComplementos,
+    extraProteinSelections,
+    extraAcompananteSelections,
+    extraSauceSelections,
+    extraComplementoSelections,
+  ]);
 
   const liveSummaryRows = useMemo(() => {
     if (!selectedSize) return [];
 
     return [
       { label: 'Base', value: formatGroupedIngredients(selectedBases) },
-      { label: 'Proteínas', value: formatGroupedIngredients([...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)]) },
-      { label: 'Acompañantes', value: formatGroupedIngredients([...selectedAcompanantes, ...extraAcompananteSelections.map(makeExtraAcompananteIngredient)]) },
-      { label: 'Salsas', value: formatGroupedIngredients([...selectedSauces, ...extraSauceSelections.map(makeExtraSauceIngredient)]) },
-      { label: 'Complementos', value: formatGroupedIngredients([...selectedComplementos, ...extraComplementoSelections.map(makeExtraComplementoIngredient)]) },
+      { label: 'Proteínas', value: formatGroupedIngredients(selectedProteins) },
+      { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
+      { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
+      { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
     ];
-  }, [selectedAcompanantes, selectedBases, selectedComplementos, selectedProteins, selectedSauces, extraSauceSelections, selectedSize]);
+  }, [selectedAcompanantes, selectedBases, selectedComplementos, selectedProteins, selectedSauces, selectedSize]);
 
   const currentSelectionCount = useMemo(() => {
     switch (currentStep) {
