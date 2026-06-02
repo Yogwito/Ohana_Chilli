@@ -17,6 +17,6 @@ export function trackEvent(event: AnalyticsEvent) {
     .from('analytics_events')
     .insert({ event_type: type, metadata })
     .then(({ error }) => {
-      if (error) console.warn('[analytics]', error.message);
+      if (error) { /* fire-and-forget: analytics failure is non-critical */ }
     });
 }

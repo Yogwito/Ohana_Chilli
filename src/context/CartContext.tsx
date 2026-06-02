@@ -165,11 +165,9 @@ function loadCartFromStorage(): CartState {
     const parsed = JSON.parse(raw);
     const result = cartStateSchema.safeParse(parsed);
     if (result.success) return { items: result.data.items as CartItem[], subtotal: result.data.subtotal, total: result.data.total };
-    console.warn('Cart schema mismatch, resetting cart');
     localStorage.removeItem(CART_STORAGE_KEY);
     return initialState;
   } catch {
-    console.warn('Corrupt cart data, resetting');
     localStorage.removeItem(CART_STORAGE_KEY);
     return initialState;
   }

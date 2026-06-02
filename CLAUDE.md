@@ -32,11 +32,11 @@ npm run lint         # eslint
 
 | Path | Component | Notes |
 |---|---|---|
-| `/` | HomePage | Public landing |
-| `/ohana` | OhanaPage | Ohana menu + BowlBuilder |
-| `/chilli` | ChilliPage | Chilli menu |
-| `/bebidas` | BeveragesPage | Drinks (cross-brand) |
-| `/carta` | CartaPage | Full combined menu |
+| `/` | OhanaPage | Main landing — Ohana menu + BowlBuilder |
+| `/ohana` | — | Redirects to `/` |
+| `/chilli` | — | Redirects to `/` |
+| `/bebidas` | BeveragesPage | Drinks |
+| `/carta` | — | Redirects to `/` (CartaPage exists but is not mounted) |
 | `/checkout` | CheckoutPage | Order form → WhatsApp |
 | `/pedidos` | OrdersPage | Admin-only order list |
 | `/nosotros` | AboutPage | About page |
@@ -68,7 +68,7 @@ Admin routes render without `<Layout>`.
 All prices are stored and computed in **Colombian pesos as integers (cents = whole COP)**. Display via `formatPrice()` in `src/domain/formatPrice.ts`.
 
 ### Brands
-Brand IDs are string literals `'ohana' | 'chilli'` — not UUIDs — used as foreign keys in products, categories, and order_items.
+The `Brand` type in `src/types/index.ts` is currently `'ohana'` only. The DB tables (products, categories, order_items) use `brand_id` as a string FK, and `'chilli'` rows may still exist in the DB — but the TypeScript type only covers `'ohana'`.
 
 ### Cart
 - Persists to `localStorage` with schema version `cart:v2` (key: `ohana-chilli-cart`)
@@ -78,9 +78,8 @@ Brand IDs are string literals `'ohana' | 'chilli'` — not UUIDs — used as for
 
 ### Bowl Builder
 - Multi-step wizard: size → bases → proteins → acompanantes → salsas → complementos → summary
-- **Currently reads from static `src/config/bowlIngredients.ts`** — NOT from Supabase ingredients table
+- Reads live data from Supabase via `useBowlRules()` and `useIngredients()` hooks
 - Bowl pricing in `src/domain/bowlPricing.ts` — base price from size + extra charges for premium ingredients
-- Bowl sizes defined in `bowlIngredients.ts` take priority over `bowl_rules` DB values in the UI
 
 ### Order Flow
 1. Customer fills checkout form (name, phone, pickup/delivery, zone)
@@ -108,15 +107,18 @@ All Supabase reads use React Query via hooks in `src/hooks/use-catalog.ts`:
 src/
   App.tsx                    # Routes definition
   types/index.ts             # All shared TypeScript types
-  config/bowlIngredients.ts  # Static bowl config (sizes + ingredients) — ONLY used by BowlBuilder UI
   context/CartContext.tsx    # Cart state, localStorage persistence
   hooks/use-catalog.ts       # All Supabase data hooks
+  hooks/use-catalog-sync.ts  # Cart ↔ catalog sync logic
   hooks/use-admin-auth.ts    # Admin authentication hook
   domain/
     bowlPricing.ts           # Bowl price calculation
     bowlSummary.ts           # Bowl → readable string / WhatsApp text
+    businessSettings.ts      # Business-level settings helpers
+    cartCatalogSync.ts       # Keeps cart items in sync with catalog changes
     deliveryZones.ts         # Zone name normalization
     formatPrice.ts           # COP price display
+    productImages.ts         # Product image URL resolution
     whatsapp.ts              # WhatsApp URL + message builder
   integrations/supabase/
     client.ts                # Supabase client instance
@@ -127,13 +129,16 @@ src/
 
 ## Known Issues / Gotchas
 
-1. **BowlBuilder uses static config, not Supabase**: `src/config/bowlIngredients.ts` has hardcoded ingredients and prices. Changes in the DB `ingredients` / `bowl_rules` tables won't reflect in the BowlBuilder without updating this file or migrating it to `useBowlRules()` / `useIngredients()`.
+1. **Duplicate orders views**: `/pedidos` (OrdersPage) and the "Pedidos" tab in AdminPage both show orders but are separate components with different features. OrdersPage shows all orders and is accessible to any admin; AdminPage tab also lets you update order status.
 
-2. **Duplicate orders views**: `/pedidos` (OrdersPage) and the "Pedidos" tab in AdminPage both show orders but are separate components with different features. OrdersPage shows all orders and is accessible to any admin; AdminPage tab also lets you update order status.
+2. **WhatsApp handoff in embedded contexts**: The `openWhatsAppHandoff()` function detects if running in an iframe/preview and falls back gracefully. Test checkout on real devices, not previews.
 
-3. **WhatsApp handoff in embedded contexts**: The `openWhatsAppHandoff()` function detects if running in an iframe/preview and falls back gracefully. Test checkout on real devices, not previews.
+3. **Delivery zone re-validation**: At checkout submit, the zone is re-fetched from Supabase to get the canonical fee. If the zone was deactivated between selection and submit, the order is blocked.
 
-4. **Delivery zone re-validation**: At checkout submit, the zone is re-fetched from Supabase to get the canonical fee. If the zone was deactivated between selection and submit, the order is blocked.
+## TypeScript
+
+- `strict: false` and `noImplicitAny: false` — type gaps are tolerated; don't assume strict mode
+- Path alias `@/*` maps to `./src/*` — use it for all internal imports
 
 ## Conventions
 

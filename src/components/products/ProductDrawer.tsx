@@ -90,7 +90,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-background/80 backdrop-blur flex items-center justify-center shadow border border-border hover:bg-muted transition-colors"
+          className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-background/80 backdrop-blur flex items-center justify-center shadow border border-border hover:bg-muted transition-colors"
           aria-label="Cerrar"
         >
           <X className="w-5 h-5" />
@@ -241,9 +241,9 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
               <button
                 type="button"
                 onClick={handleAddWithoutChanges}
-                className="text-sm text-muted-foreground underline text-center w-full cursor-pointer hover:text-foreground transition-colors"
+                className="w-full border border-border text-foreground py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors"
               >
-                Agregar sin cambios →
+                Agregar sin cambios
               </button>
             </>
           ) : (
