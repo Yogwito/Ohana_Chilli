@@ -249,7 +249,7 @@ export default function PromotionsAdmin() {
     setUnsplashLoading(true);
     try {
       const res = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(unsplashQuery)}&per_page=6&client_id=UNSPLASH_API_KEY`,
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(unsplashQuery)}&per_page=6&client_id=${import.meta.env.VITE_UNSPLASH_API_KEY ?? ''}`,
       );
       const json = await res.json();
       setUnsplashResults(json.results ?? []);

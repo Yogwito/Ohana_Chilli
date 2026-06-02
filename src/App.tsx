@@ -11,11 +11,11 @@ import Layout from "@/components/layout/Layout";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import HomePage from "./pages/HomePage";
 import NotFound from "./pages/NotFound";
+import OhanaPage from "./pages/OhanaPage";
+import CheckoutPage from "./pages/CheckoutPage";
 
 // Lazy-loaded routes
-const OhanaPage = lazy(() => import("./pages/OhanaPage"));
 const BeveragesPage = lazy(() => import("./pages/BeveragesPage"));
-const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
