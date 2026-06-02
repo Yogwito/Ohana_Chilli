@@ -294,7 +294,7 @@ export default function OhanaPage() {
       <div>
         {/* Hero strip */}
         <div
-          className="hero-grain relative w-full overflow-hidden min-h-[420px] sm:min-h-[480px] flex items-center"
+          className="hero-grain relative w-full overflow-hidden min-h-[320px] sm:min-h-[360px] flex items-center"
           style={{ background: 'linear-gradient(135deg, #5a9e45 0%, #8CC878 50%, #a8d87a 100%)' }}
         >
           <div className="container max-w-4xl flex items-center justify-between gap-6 px-4 py-8 md:py-14">
@@ -332,7 +332,7 @@ export default function OhanaPage() {
               <img
                 src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
                 alt="Bowls Lovers"
-                className="w-40 h-40 sm:w-64 sm:h-64 object-contain drop-shadow-2xl rounded-full"
+                className="w-40 h-40 sm:w-64 sm:h-64 object-contain rounded-full"
               />
             </div>
           </div>
