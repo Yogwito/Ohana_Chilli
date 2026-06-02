@@ -339,7 +339,7 @@ export default function OhanaPage() {
         </div>
 
         {/* Info row */}
-        <div className="bg-background px-4 pb-5">
+        <div className="bg-background px-4 pt-3 pb-5">
           <div className="container max-w-4xl">
             <div className="flex items-start gap-4 mb-4">
               {/* Name + badges + social */}
