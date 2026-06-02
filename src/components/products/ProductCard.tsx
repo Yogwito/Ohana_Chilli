@@ -122,7 +122,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
         <Button
           onClick={handleAddClick}
           size="icon"
-          className="rounded-full h-8 w-8 shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
+          className="rounded-full h-8 w-8 min-h-[44px] min-w-[44px] shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
         >
           {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
         </Button>
@@ -134,7 +134,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
     <>
       <article
         className={cn(
-          'group flex flex-col rounded-2xl overflow-hidden border border-border/60 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-brand/20',
+          'group flex flex-col rounded-2xl overflow-hidden border border-border/60 bg-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-brand/30',
         )}
       >
         <ProductImage
@@ -145,11 +145,11 @@ export default function ProductCard({ product, variant = 'default', categoryName
 
         <div className="flex flex-col flex-1 p-4 gap-2">
           {/* Name */}
-          <h3 className="font-display font-bold text-base leading-snug tracking-tight">{product.name}</h3>
+          <h3 className="font-display font-bold text-sm sm:text-base leading-snug tracking-tight text-foreground">{product.name}</h3>
 
           {/* Description */}
           {hasDetailContent && (
-            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed flex-1">
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed flex-1">
               {descriptionText || ingredientsText}
             </p>
           )}
@@ -185,7 +185,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
               onClick={handleAddClick}
               size="icon"
               className={cn(
-                'hidden sm:flex h-9 w-9 rounded-full bg-brand text-white hover:bg-brand-dark transition-all duration-200 shrink-0',
+                'hidden sm:flex h-9 w-9 rounded-full bg-brand text-white shadow-md hover:bg-brand/90 hover:shadow-lg active:scale-90 transition-all duration-150 shrink-0',
                 added && 'scale-110',
               )}
               aria-label="Agregar al carrito"

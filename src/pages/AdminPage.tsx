@@ -209,15 +209,6 @@ function OrdersAdmin() {
               <p className="text-xs text-muted-foreground">{order.phone} • {new Date(order.created_at).toLocaleString('es-CO')}</p>
             </div>
             <div className="flex items-center gap-2">
-              <select
-                value={order.status}
-                onChange={(e) => updateStatus(order.id, e.target.value)}
-                className="text-xs border rounded px-2 py-1 bg-background"
-              >
-                {['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
               <span className="font-bold text-primary">{formatPrice(order.total_cents)}</span>
             </div>
           </div>
