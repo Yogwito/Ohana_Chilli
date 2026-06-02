@@ -294,25 +294,25 @@ export default function OhanaPage() {
       <div>
         {/* Hero strip */}
         <div
-          className="hero-grain relative w-full overflow-hidden min-h-[420px] sm:min-h-[480px] flex items-center"
+          className="hero-grain relative w-full overflow-hidden min-h-[320px] sm:min-h-[360px] flex items-center"
           style={{ background: 'linear-gradient(135deg, #5a9e45 0%, #8CC878 50%, #a8d87a 100%)' }}
         >
-          <div className="container max-w-4xl flex items-center justify-between gap-6 px-4 py-8 md:py-14">
+          <div className="container max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-6 px-4 py-8 md:py-12">
             {/* Left: copy + CTAs */}
-            <div className="flex flex-col gap-3 max-w-xs">
+            <div className="flex flex-col gap-3 items-center text-center sm:items-start sm:text-left sm:max-w-xs">
               <span className="inline-flex w-fit items-center rounded-full backdrop-blur-sm bg-white/20 border border-white/30 px-3 py-1 text-xs font-medium text-white">
                 🌿 Comida real. Sabor real.
               </span>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-white leading-tight">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight text-white leading-tight">
                 Eat Healthy, Live Happy
               </h1>
               <p className="text-sm sm:text-base text-white/85">
                 Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
               </p>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-1 w-full sm:w-auto">
                 <button
                   onClick={() => scrollToSection(BOWL_BUILDER_ID)}
-                  className="rounded-full bg-white px-4 py-2 sm:px-5 text-sm font-semibold text-brand-dark shadow-lg hover:bg-white/90 hover:shadow-xl transition-all duration-200 active:scale-95"
+                  className="rounded-full bg-white px-4 py-2 sm:px-5 text-sm font-semibold text-brand-dark shadow-lg hover:bg-white/90 hover:shadow-xl transition-all duration-200 active:scale-95 w-full sm:w-auto"
                 >
                   Arma tu Bowl
                 </button>
@@ -321,18 +321,18 @@ export default function OhanaPage() {
                     const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
                     scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
                   }}
-                  className="rounded-full border-2 border-white/70 px-4 py-2 sm:px-5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                  className="rounded-full border-2 border-white/70 px-4 py-2 sm:px-5 text-sm font-semibold text-white hover:bg-white/10 transition-colors w-full sm:w-auto"
                 >
                   Ver menú
                 </button>
               </div>
             </div>
-            {/* Right: decorative circle */}
-            <div className="flex w-24 h-24 sm:w-32 sm:h-32 shrink-0 rounded-full bg-white/15 items-center justify-center">
+            {/* Right: image */}
+            <div className="flex items-center justify-center shrink-0">
               <img
                 src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
                 alt="Bowls Lovers"
-                className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-2xl rounded-full rotate-3 hover:rotate-0 transition-transform duration-300"
+                className="w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 object-contain rounded-full"
               />
             </div>
           </div>
@@ -466,7 +466,7 @@ export default function OhanaPage() {
             {/* Scrollable category tabs — use allTabs so they appear before products load */}
             <div
               ref={tabsRef}
-              className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-hide py-2"
+              className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-hide py-2 px-4"
               style={{ touchAction: 'pan-x' }}
             >
               {hasActivePromotions && (

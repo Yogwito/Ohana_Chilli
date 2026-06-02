@@ -13,7 +13,17 @@
       "Bash(wrangler pages:*)",
       "mcp__claude_ai_Supabase__apply_migration",
       "Bash(npx tsc *)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(git *)",
+      "Bash(supabase --version)",
+      "Bash(curl *)",
+      "Bash(npx wrangler *)",
+      "Bash(lsof -ti:5173)",
+      "Bash(xargs kill -9)",
+      "Bash(npx playwright *)",
+      "Read(//private/tmp/**)",
+      "Bash(npm init *)",
+      "Bash(npm install *)"
     ]
   }
 }
