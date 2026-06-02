@@ -328,11 +328,11 @@ export default function OhanaPage() {
               </div>
             </div>
             {/* Right: decorative circle */}
-            <div className="flex w-24 h-24 sm:w-32 sm:h-32 shrink-0 rounded-full bg-white/15 items-center justify-center">
+            <div className="flex items-center justify-center shrink-0">
               <img
                 src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
                 alt="Bowls Lovers"
-                className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-2xl rounded-full rotate-3 hover:rotate-0 transition-transform duration-300"
+                className="w-40 h-40 sm:w-64 sm:h-64 object-contain drop-shadow-2xl rounded-full"
               />
             </div>
           </div>
