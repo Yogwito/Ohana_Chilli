@@ -10,11 +10,26 @@ const KNOWN_BAD_PRODUCT_IMAGE_IDS = new Set<string>([
   'chilli-burger-veggie',
 ]);
 
+// ID-based overrides: local images take priority over any Supabase image_url.
+// Used for products whose catalog image_url points to a generic/incorrect stock photo.
+const PRODUCT_IMAGE_OVERRIDES: Record<string, string> = {
+  '23e44c1b-fe27-251a-0759-74f798d65e53': '/images/adicionales/03_guacamole.png',     // Guacamole
+  '3d9f5e71-d95c-7b13-5898-33a0c9e8e04e': '/images/adicionales/04_papas_francesa.png', // Papa Francesa
+  '978c1802-ff11-1e54-8ea9-7995664d91a9': '/images/adicionales/05_pepinillos.png',      // Pepinillos
+  '178e8c3b-d5c8-8faf-271f-8b785a801e07': '/images/adicionales/01_queso.png',           // Queso
+  '12135ae7-32db-9903-7179-f48581e8b8cc': '/images/adicionales/02_queso_frito.png',     // Queso Frito
+  '7e9a2544-4712-8633-f844-0766c82a2a01': '/images/adicionales/06_tocineta.png',        // Tocineta
+};
+
 type ProductImageSource = Pick<Product, 'id' | 'imageUrl'>;
 
 export const PRODUCT_IMAGE_PLACEHOLDER_SRC = '/placeholder.svg';
 
 export function resolveProductImageUrl(product: ProductImageSource): string | undefined {
+  if (PRODUCT_IMAGE_OVERRIDES[product.id]) {
+    return PRODUCT_IMAGE_OVERRIDES[product.id];
+  }
+
   const rawImageUrl = product.imageUrl?.trim();
 
   if (!rawImageUrl || KNOWN_BAD_PRODUCT_IMAGE_IDS.has(product.id)) {
@@ -38,4 +53,32 @@ export function resolveProductImageUrl(product: ProductImageSource): string | un
 
 export function getProductImageFallbackInitial(product: Pick<Product, 'name'>): string {
   return product.name.trim().charAt(0).toUpperCase() || '?';
+}
+
+function normalizeIngredientName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+const ADDITIONAL_INGREDIENT_IMAGE_MAP: Record<string, string> = {
+  'guacamole': '/images/adicionales/03_guacamole.png',
+  'papa francesa': '/images/adicionales/04_papas_francesa.png',
+  'papas francesas': '/images/adicionales/04_papas_francesa.png',
+  'papas a la francesa': '/images/adicionales/04_papas_francesa.png',
+  'pepinillos': '/images/adicionales/05_pepinillos.png',
+  'queso': '/images/adicionales/01_queso.png',
+  'queso rallado': '/images/adicionales/01_queso.png',
+  'queso frito': '/images/adicionales/02_queso_frito.png',
+  'tocineta': '/images/adicionales/06_tocineta.png',
+};
+
+export function getAdditionalIngredientImageUrl(name: string): string | undefined {
+  const key = normalizeIngredientName(name);
+  if (ADDITIONAL_INGREDIENT_IMAGE_MAP[key]) return ADDITIONAL_INGREDIENT_IMAGE_MAP[key];
+  // Partial match: check if any key starts with the normalized name
+  const partialKey = Object.keys(ADDITIONAL_INGREDIENT_IMAGE_MAP).find(k => k.startsWith(key) || key.startsWith(k));
+  return partialKey ? ADDITIONAL_INGREDIENT_IMAGE_MAP[partialKey] : undefined;
 }
