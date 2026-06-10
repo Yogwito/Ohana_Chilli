@@ -15,6 +15,7 @@ import {
 } from '@/domain/bowlPricing';
 import { formatGroupedIngredients } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
+import { getAdditionalIngredientImageUrl } from '@/domain/productImages';
 import { cn } from '@/lib/utils';
 import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient, Product } from '@/types';
 
@@ -1464,8 +1465,16 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                       {upsellIngredients.map(ing => {
                         const inBowl = isInBowl(ing);
                         const charge = getIngredientExtraCharge(ing);
+                        const imgSrc = getAdditionalIngredientImageUrl(ing.name);
                         return (
                           <div key={ing.id} className="snap-start shrink-0 w-32 md:w-auto rounded-2xl border bg-card p-3">
+                            {imgSrc && (
+                              <img
+                                src={imgSrc}
+                                alt={ing.name}
+                                className="w-full h-20 object-cover rounded-lg mb-2"
+                              />
+                            )}
                             <p className="text-xs font-semibold line-clamp-1">{ing.name}</p>
                             <p className="text-xs text-brand font-bold mt-0.5">
                               {charge > 0 ? `+${formatPrice(charge)}` : 'Incluido'}
