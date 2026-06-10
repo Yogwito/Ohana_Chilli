@@ -1,10 +1,13 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Minus, Plus, Heart, Trash2, BookHeart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIngredients, useBowlRules, useProducts } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useCart } from '@/context/CartContext';
+import { useSavedBowls } from '@/hooks/use-saved-bowls';
+import type { SavedBowl } from '@/hooks/use-saved-bowls';
 import {
   calculateBowlExtraCharges,
   calculateBowlPrice,
@@ -124,6 +127,7 @@ function getStepNextLabel(currentStep: BowlBuilderStep, canProceed: boolean, isO
 
 export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const { addCustomBowl, addProduct, cart } = useCart();
+  const { saved: savedBowls, saveBowl, removeBowl } = useSavedBowls();
 
   const builderRef = useRef<HTMLDivElement>(null);
   const stepsTabsRef = useRef<HTMLDivElement>(null);
@@ -152,6 +156,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const [notes, setNotes] = useState('');
   const [stepVisible, setStepVisible] = useState(false);
   const [bowlExpanded, setBowlExpanded] = useState(false);
+  const [saveMode, setSaveMode] = useState(false);
+  const [saveName, setSaveName] = useState('');
 
   // Extra proteins (premium slot → selector de proteína incluida)
   const [extraProteinSelections, setExtraProteinSelections] = useState<Array<{
@@ -457,6 +463,37 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setExtraComplementoSelections([]);
     setExtraSauceSelections([]);
     setNotes('');
+  };
+
+  const loadSavedBowl = (bowl: SavedBowl) => {
+    const { config } = bowl;
+    setSelectedSize(config.size);
+    setSelectedBases(config.bases);
+    setSelectedProteins(config.proteins);
+    setSelectedAcompanantes(config.acompanantes);
+    setSelectedSauces(config.sauces ?? []);
+    setSelectedComplementos(config.complementos ?? []);
+    setExtraProteinSelections([]);
+    setExtraAcompananteSelections([]);
+    setExtraComplementoSelections([]);
+    setExtraSauceSelections([]);
+    setNotes(config.notes ?? '');
+    setCurrentStep('summary');
+    scrollToBuilder();
+    toast.success(`Bowl "${bowl.name}" cargado`);
+  };
+
+  const handleSaveFavorite = () => {
+    if (!previewBowl) return;
+    const suggested = [
+      ...selectedBases.slice(0, 1).map((i) => i.name),
+      ...selectedProteins.slice(0, 1).map((i) => i.name),
+    ].join(' + ');
+    const name = saveName.trim() || suggested || 'Mi bowl';
+    saveBowl(name, previewBowl);
+    setSaveMode(false);
+    setSaveName('');
+    toast.success('Bowl guardado en tus favoritos ❤️');
   };
 
   const goBack = () => {
@@ -805,11 +842,61 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       <div ref={stepContentRef} className="p-6" role="tabpanel" style={{ scrollMarginTop: '80px' }}>
         <div className={cn('scroll-fade-up', stepVisible && 'in-view')}>
           {currentStep === 'size' ? (
-            <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center">
-              <h3 className="text-xl font-semibold">Selecciona un tamaño arriba</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Las tarjetas superiores definen el precio base y te llevan al siguiente paso automáticamente.
-              </p>
+            <div className="space-y-4">
+              {savedBowls.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <BookHeart className="w-4 h-4 text-brand" />
+                    <p className="text-sm font-semibold">Tus bowls guardados</p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {savedBowls.map((bowl) => (
+                      <div
+                        key={bowl.id}
+                        className="flex items-start gap-3 rounded-2xl border bg-card px-4 py-3"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{bowl.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {bowl.config.size.name} · {[
+                              ...bowl.config.bases.slice(0, 2).map((i) => i.name),
+                              ...bowl.config.proteins.slice(0, 1).map((i) => i.name),
+                            ].join(', ')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs px-3"
+                            onClick={() => loadSavedBowl(bowl)}
+                          >
+                            Cargar
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              removeBowl(bowl.id);
+                              toast.success('Bowl eliminado de favoritos');
+                            }}
+                            aria-label="Eliminar favorito"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center">
+                <h3 className="text-xl font-semibold">Selecciona un tamaño arriba</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Las tarjetas superiores definen el precio base y te llevan al siguiente paso automáticamente.
+                </p>
+              </div>
             </div>
           ) : null}
 
@@ -1552,6 +1639,47 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   <span className="text-2xl font-bold text-ohana-dark">{formatPrice(totalPrice)}</span>
                 </div>
               </div>
+
+              {/* Save as favorite */}
+              {!saveMode ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-muted-foreground"
+                  onClick={() => {
+                    const suggested = [
+                      ...selectedBases.slice(0, 1).map((i) => i.name),
+                      ...selectedProteins.slice(0, 1).map((i) => i.name),
+                    ].join(' + ');
+                    setSaveName(suggested);
+                    setSaveMode(true);
+                  }}
+                >
+                  <Heart className="w-3.5 h-3.5" />
+                  Guardar como favorito
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    placeholder="Nombre para este bowl"
+                    className="h-9 text-sm"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveFavorite();
+                      if (e.key === 'Escape') { setSaveMode(false); setSaveName(''); }
+                    }}
+                  />
+                  <Button size="sm" className="btn-ohana h-9 shrink-0" onClick={handleSaveFavorite}>
+                    Guardar
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-9 shrink-0" onClick={() => { setSaveMode(false); setSaveName(''); }}>
+                    Cancelar
+                  </Button>
+                </div>
+              )}
             </div>
           ) : null}
         </div>
