@@ -48,6 +48,7 @@ import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff 
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
+import RecentOrders from '@/components/checkout/RecentOrders';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -579,6 +580,13 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 </AnimatedElement>
+
+                {/* Recent orders */}
+                {form.phone.replace(/\D/g, '').length >= 10 && (
+                  <AnimatedElement as="div" animation="fade-up" delay={50}>
+                    <RecentOrders phone={form.phone} />
+                  </AnimatedElement>
+                )}
 
                 {/* Order type */}
                 <AnimatedElement as="div" animation="fade-up" delay={75} className="relative pl-4">
