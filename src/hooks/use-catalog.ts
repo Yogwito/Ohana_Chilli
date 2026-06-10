@@ -4,6 +4,7 @@ import {
   BUSINESS_SETTING_DEFINITIONS,
   EMPTY_BUSINESS_SETTINGS,
   mapBusinessSettings,
+  isBusinessOpenNow,
 } from '@/domain/businessSettings';
 import { resolveProductImageUrl } from '@/domain/productImages';
 import type { BowlSizeRule, Brand, Category, DeliveryZone, Ingredient, Product, Promotion } from '@/types';
@@ -384,4 +385,19 @@ export function useProductDefaultIngredients(productId: string | null) {
     enabled: !!productId,
     staleTime: 1000 * 60 * 10,
   });
+}
+
+export function useBusinessOpenStatus() {
+  const { data: settings } = useBusinessSettings();
+  const { data: enforceRaw } = useSettingValue('business_hours_enforce');
+
+  const isEnforced = enforceRaw === 'true';
+  const isOpen = settings ? isBusinessOpenNow(settings) : null;
+
+  return {
+    isOpen,
+    isEnforced,
+    isClosed: isEnforced && isOpen === false,
+    hoursConfigured: isOpen !== null,
+  };
 }
