@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
-import { useActiveDeliveryZones, useBusinessSettings } from '@/hooks/use-catalog';
+import { useActiveDeliveryZones, useBusinessSettings, useBusinessOpenStatus } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -67,6 +67,7 @@ export default function CheckoutPage() {
   const location = useLocation();
   const { cart, updateQuantity, removeItem, clearCart } = useCart();
   const { data: businessSettings } = useBusinessSettings();
+  const { isClosed: isBusinessClosed, isOpen: isBusinessOpen, isEnforced: isHoursEnforced } = useBusinessOpenStatus();
   const {
     data: deliveryZones = [],
     isLoading: loadingDeliveryZones,
@@ -116,6 +117,7 @@ export default function CheckoutPage() {
   const orderTotal = orderSubtotal + deliveryFeeCents;
   const submitBlockedByZone = form.orderType === 'delivery'
     && (loadingDeliveryZones || isDeliveryZoneQueryError || !hasSelectedDeliveryZone);
+  const submitBlockedByClosed = isBusinessClosed;
   const whatsappNumber = businessSettings?.whatsappNumber ?? null;
   const businessPhoneLabel = formatBusinessPhone(whatsappNumber);
   const addressParts = parseBusinessAddress(businessSettings?.contactAddress);
@@ -803,23 +805,37 @@ export default function CheckoutPage() {
                 </AnimatedElement>
 
                 <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-auto p-4 lg:p-0 bg-background/95 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none border-t lg:border-0 border-border/40 z-40 lg:z-auto space-y-2">
+                  {submitBlockedByClosed && (
+                    <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-4 py-3 text-sm">
+                      <span className="text-lg leading-none mt-0.5">🔒</span>
+                      <div>
+                        <p className="font-semibold text-red-800 dark:text-red-300">Estamos cerrados</p>
+                        <p className="text-red-700 dark:text-red-400 text-xs mt-0.5">
+                          {businessSettings?.hoursWeekday
+                            ? `Horario: Lun–Vie ${businessSettings.hoursWeekday}${businessSettings.hoursWeekend ? ` · Sáb–Dom ${businessSettings.hoursWeekend}` : ''}`
+                            : 'Vuelve en nuestro próximo horario de atención.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
-                    disabled={orderStatus === 'submitting' || submitBlockedByZone || !termsAccepted}
-                    className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2"
+                    disabled={orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || !termsAccepted}
+                    className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2 disabled:bg-muted disabled:text-muted-foreground"
                     size="lg"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    {orderStatus === 'submitting' ? 'Creando pedido...' : 'Enviar por WhatsApp'}
+                    {orderStatus === 'submitting' ? 'Creando pedido...' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : 'Enviar por WhatsApp'}
                   </Button>
 
-                  {!termsAccepted && (
+                  {!termsAccepted && !submitBlockedByClosed && (
                     <p className="text-xs text-muted-foreground text-center">
                       Acepta los términos para continuar
                     </p>
                   )}
 
-                  {submitBlockedByZone && (
+                  {submitBlockedByZone && !submitBlockedByClosed && (
                     <p className="text-sm text-foreground bg-muted border border-border rounded-xl px-3 py-2">
                       {loadingDeliveryZones
                         ? 'Estamos cargando las zonas activas.'

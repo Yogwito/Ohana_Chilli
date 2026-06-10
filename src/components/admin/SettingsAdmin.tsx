@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Save } from 'lucide-react';
+import { Save, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { BUSINESS_SETTING_DEFINITIONS, type BusinessSettingKey } from '@/domain/businessSettings';
+import { BUSINESS_SETTING_DEFINITIONS, type BusinessSettingKey, isBusinessOpenNow } from '@/domain/businessSettings';
+import { useBusinessSettings } from '@/hooks/use-catalog';
 
 type BannerColor = 'warning' | 'danger' | 'info';
 
@@ -21,6 +22,11 @@ const COLOR_CLASSES: Record<BannerColor, string> = {
 
 export default function SettingsAdmin() {
   const queryClient = useQueryClient();
+  const { data: businessSettings } = useBusinessSettings();
+
+  const [hoursEnforce, setHoursEnforce] = useState(false);
+  const [hoursEnforceLoading, setHoursEnforceLoading] = useState(true);
+  const [hoursEnforceSaving, setHoursEnforceSaving] = useState(false);
 
   const [bannerEnabled, setBannerEnabled] = useState(false);
   const [bannerMessage, setBannerMessage] = useState('Estamos cerrados por ahora. ¡Volvemos pronto!');
@@ -35,6 +41,29 @@ export default function SettingsAdmin() {
   );
   const [bizLoading, setBizLoading] = useState(true);
   const [bizSaving, setBizSaving] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from('settings')
+      .select('key, value')
+      .eq('key', 'business_hours_enforce')
+      .maybeSingle()
+      .then(({ data }) => {
+        setHoursEnforce(data?.value === 'true');
+        setHoursEnforceLoading(false);
+      });
+  }, []);
+
+  const saveHoursEnforce = async (value: boolean) => {
+    setHoursEnforceSaving(true);
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ key: 'business_hours_enforce', value: String(value) }, { onConflict: 'key' });
+    setHoursEnforceSaving(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    await queryClient.invalidateQueries({ queryKey: ['setting', 'business_hours_enforce'] });
+    toast.success(value ? 'Bloqueo activado' : 'Bloqueo desactivado');
+  };
 
   useEffect(() => {
     supabase
@@ -102,6 +131,45 @@ export default function SettingsAdmin() {
   return (
     <div className="max-w-3xl space-y-8">
       <h2 className="text-xl font-bold">Configuración</h2>
+
+      {/* Horarios de atención */}
+      <div className="bg-card border rounded-xl p-6 space-y-4">
+        <h3 className="font-semibold text-base flex items-center gap-2">
+          <Clock className="w-4 h-4" /> Horarios de atención
+        </h3>
+        {hoursEnforceLoading ? <Skeleton className="h-20" /> : (
+          <>
+            <div className="flex items-start gap-3">
+              <Switch
+                id="hours_enforce"
+                checked={hoursEnforce}
+                disabled={hoursEnforceSaving}
+                onCheckedChange={async (v) => {
+                  setHoursEnforce(v);
+                  await saveHoursEnforce(v);
+                }}
+              />
+              <div>
+                <Label htmlFor="hours_enforce" className="cursor-pointer">Bloquear pedidos fuera de horario</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Si está activo, el checkout queda deshabilitado cuando el local está cerrado según los horarios configurados abajo.
+                </p>
+              </div>
+            </div>
+            {businessSettings && (
+              <div className="rounded-lg bg-muted/50 border px-4 py-3 text-sm flex items-center gap-2">
+                {(() => {
+                  const open = isBusinessOpenNow(businessSettings);
+                  if (open === null) return <span className="text-muted-foreground">Sin horarios configurados — define <strong>Horario Lun-Vie</strong> y <strong>Sáb-Dom</strong> en Información del negocio.</span>;
+                  return open
+                    ? <><span className="w-2 h-2 rounded-full bg-green-500 shrink-0" /> <span>Ahora: <strong className="text-green-700 dark:text-green-400">Abierto</strong></span></>
+                    : <><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> <span>Ahora: <strong className="text-red-600 dark:text-red-400">Cerrado</strong></span></>;
+                })()}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Banner de aviso */}
       <div className="bg-card border rounded-xl p-6 space-y-4">
