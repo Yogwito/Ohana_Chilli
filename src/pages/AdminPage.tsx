@@ -127,18 +127,18 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="container py-6">
+      <div className="container py-4 sm:py-6">
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="mb-6 flex flex-wrap">
-            <TabsTrigger value="orders" className="flex items-center gap-1"><ClipboardList className="w-4 h-4" />Pedidos</TabsTrigger>
-            <TabsTrigger value="products" className="flex items-center gap-1"><Package className="w-4 h-4" />Productos</TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-1"><Tag className="w-4 h-4" />Categorías</TabsTrigger>
-            <TabsTrigger value="ingredients" className="flex items-center gap-1"><Salad className="w-4 h-4" />Ingredientes</TabsTrigger>
-            <TabsTrigger value="bowl_rules" className="flex items-center gap-1"><Ruler className="w-4 h-4" />Bowl Rules</TabsTrigger>
-            <TabsTrigger value="delivery_zones" className="flex items-center gap-1"><Truck className="w-4 h-4" />Domicilios</TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1"><Settings className="w-4 h-4" />Configuración</TabsTrigger>
-            <TabsTrigger value="promotions" className="flex items-center gap-1">🏷️ Promociones</TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-1"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
+          <TabsList className="mb-4 sm:mb-6 flex w-full overflow-x-auto h-auto flex-nowrap justify-start rounded-lg bg-muted p-1 gap-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger value="orders" title="Pedidos" className="flex shrink-0 items-center gap-1.5"><ClipboardList className="w-4 h-4" /><span className="hidden sm:inline">Pedidos</span></TabsTrigger>
+            <TabsTrigger value="products" title="Productos" className="flex shrink-0 items-center gap-1.5"><Package className="w-4 h-4" /><span className="hidden sm:inline">Productos</span></TabsTrigger>
+            <TabsTrigger value="categories" title="Categorías" className="flex shrink-0 items-center gap-1.5"><Tag className="w-4 h-4" /><span className="hidden sm:inline">Categorías</span></TabsTrigger>
+            <TabsTrigger value="ingredients" title="Ingredientes" className="flex shrink-0 items-center gap-1.5"><Salad className="w-4 h-4" /><span className="hidden sm:inline">Ingredientes</span></TabsTrigger>
+            <TabsTrigger value="bowl_rules" title="Bowl Rules" className="flex shrink-0 items-center gap-1.5"><Ruler className="w-4 h-4" /><span className="hidden sm:inline">Bowls</span></TabsTrigger>
+            <TabsTrigger value="delivery_zones" title="Domicilios" className="flex shrink-0 items-center gap-1.5"><Truck className="w-4 h-4" /><span className="hidden sm:inline">Domicilios</span></TabsTrigger>
+            <TabsTrigger value="settings" title="Configuración" className="flex shrink-0 items-center gap-1.5"><Settings className="w-4 h-4" /><span className="hidden sm:inline">Config</span></TabsTrigger>
+            <TabsTrigger value="promotions" title="Promociones" className="flex shrink-0 items-center gap-1.5">🏷️<span className="hidden sm:inline">Promos</span></TabsTrigger>
+            <TabsTrigger value="analytics" title="Analytics" className="flex shrink-0 items-center gap-1.5"><BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">Analytics</span></TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders"><OrdersAdmin /></TabsContent>
@@ -157,6 +157,24 @@ export default function AdminPage() {
 }
 
 // ─── Orders Admin ────────────────────────────────────────
+const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'confirmed', label: 'Confirmado' },
+  { value: 'preparing', label: 'Preparando' },
+  { value: 'ready', label: 'Listo' },
+  { value: 'delivered', label: 'Entregado' },
+  { value: 'cancelled', label: 'Cancelado' },
+];
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  confirmed: 'bg-blue-100 text-blue-700',
+  preparing: 'bg-orange-100 text-orange-700',
+  ready: 'bg-green-100 text-green-700',
+  delivered: 'bg-muted text-muted-foreground',
+  cancelled: 'bg-red-100 text-red-700',
+};
+
 function OrdersAdmin() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,8 +226,18 @@ function OrdersAdmin() {
               <p className="font-semibold">{order.customer_name}</p>
               <p className="text-xs text-muted-foreground">{order.phone} • {new Date(order.created_at).toLocaleString('es-CO')}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-primary">{formatPrice(order.total_cents)}</span>
+              <Select value={order.status} onValueChange={v => updateStatus(order.id, v)}>
+                <SelectTrigger className={`h-7 w-auto text-xs px-2 gap-1 border-0 font-medium rounded-full ${STATUS_COLORS[order.status] ?? 'bg-muted text-muted-foreground'}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(s => (
+                    <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           {order.order_type === 'delivery' && (
@@ -315,9 +343,9 @@ function CategoriesAdmin() {
           <thead>
             <tr className="border-b text-left">
               <th className="p-3 font-semibold">Nombre</th>
-              <th className="p-3 font-semibold">Slug</th>
+              <th className="p-3 font-semibold hidden sm:table-cell">Slug</th>
               <th className="p-3 font-semibold">Orden</th>
-              <th className="p-3 font-semibold text-center">Productos</th>
+              <th className="p-3 font-semibold text-center">Prods</th>
               <th className="p-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
@@ -336,7 +364,7 @@ function CategoriesAdmin() {
                         onKeyDown={e => e.key === 'Enter' && saveEdit(cat.id)}
                       />
                     </td>
-                    <td className="p-2 text-xs text-muted-foreground">{toSlug(editForm.name || cat.name)}</td>
+                    <td className="p-2 text-xs text-muted-foreground hidden sm:table-cell">{toSlug(editForm.name || cat.name)}</td>
                     <td className="p-2">
                       <Input
                         type="number"
@@ -357,7 +385,7 @@ function CategoriesAdmin() {
                 ) : (
                   <>
                     <td className="p-3 font-medium">{cat.name}</td>
-                    <td className="p-3 text-xs text-muted-foreground font-mono">{cat.slug ?? '—'}</td>
+                    <td className="p-3 text-xs text-muted-foreground font-mono hidden sm:table-cell">{cat.slug ?? '—'}</td>
                     <td className="p-3 text-muted-foreground">{cat.sort_order ?? '—'}</td>
                     <td className="p-3 text-center">{productCounts[cat.id] ?? 0}</td>
                     <td className="p-3 text-right">
@@ -792,7 +820,43 @@ function DeliveryZonesAdmin() {
         />
       </div>
 
-      <div className="border rounded-xl overflow-x-auto bg-card">
+      {/* Mobile: card list */}
+      <div className="sm:hidden space-y-2">
+        {filtered.length === 0 && (
+          <p className="text-center py-8 text-muted-foreground text-sm">No hay domicilios para mostrar</p>
+        )}
+        {filtered.map((zone) => (
+          <div key={zone.id} className="bg-card border rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Input
+                value={drafts[zone.id]?.name ?? zone.name}
+                onChange={(e) => setDrafts((prev) => ({ ...prev, [zone.id]: { ...prev[zone.id], name: e.target.value } }))}
+                className="h-8 text-sm flex-1"
+                placeholder="Nombre de zona"
+              />
+              <Switch
+                checked={drafts[zone.id]?.is_active ?? zone.is_active}
+                onCheckedChange={(checked) => setDrafts((prev) => ({ ...prev, [zone.id]: { ...prev[zone.id], is_active: checked } }))}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={drafts[zone.id]?.feeInput ?? String(zone.fee_cents)}
+                onChange={(e) => setDrafts((prev) => ({ ...prev, [zone.id]: { ...prev[zone.id], feeInput: e.target.value } }))}
+                className="h-8 text-sm flex-1"
+                placeholder="Tarifa COP"
+              />
+              <Button size="sm" className="shrink-0" onClick={() => saveZone(zone.id)} disabled={savingId === zone.id}>
+                <Save className="w-3.5 h-3.5 mr-1" />
+                Guardar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden sm:block border rounded-xl overflow-x-auto bg-card">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
