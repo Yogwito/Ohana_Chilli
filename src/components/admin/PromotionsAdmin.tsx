@@ -574,8 +574,8 @@ export default function PromotionsAdmin() {
             <tr className="border-b text-left">
               <th className="p-3 font-semibold w-10"></th>
               <th className="p-3 font-semibold">Título</th>
-              <th className="p-3 font-semibold">Tipo</th>
-              <th className="p-3 font-semibold">Fechas</th>
+              <th className="p-3 font-semibold hidden sm:table-cell">Tipo</th>
+              <th className="p-3 font-semibold hidden md:table-cell">Fechas</th>
               <th className="p-3 font-semibold text-center">Activa</th>
               <th className="p-3 font-semibold text-right">Acciones</th>
             </tr>
@@ -583,7 +583,7 @@ export default function PromotionsAdmin() {
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td className="p-6 text-center text-muted-foreground" colSpan={6}>
+                <td className="p-6 text-center text-muted-foreground" colSpan={4}>
                   {statusFilter === 'all' ? 'Sin promociones. Crea la primera.' : 'No hay promociones con este filtro.'}
                 </td>
               </tr>
@@ -604,7 +604,7 @@ export default function PromotionsAdmin() {
                     </span>
                   )}
                 </td>
-                <td className="p-3">
+                <td className="p-3 hidden sm:table-cell">
                   <span className={cn(
                     'text-xs px-2 py-0.5 rounded-full font-medium',
                     promo.type === 'combo'
@@ -614,7 +614,7 @@ export default function PromotionsAdmin() {
                     {promo.type === 'combo' ? 'Combo' : 'Informativa'}
                   </span>
                 </td>
-                <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
+                <td className="p-3 text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">
                   {formatDateRange(promo.starts_at, promo.ends_at)}
                 </td>
                 <td className="p-3 text-center">
