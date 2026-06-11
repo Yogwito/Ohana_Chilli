@@ -30,6 +30,7 @@ vi.mock('@/hooks/use-catalog', () => ({
     data: type ? mocks.ingredientMap[type] : [],
     isLoading: false,
   }),
+  useProducts: () => ({ data: [], isLoading: false }),
 }));
 
 vi.mock('@/context/CartContext', () => ({
@@ -48,6 +49,7 @@ describe('BowlBuilder', () => {
       return 1;
     });
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
   it('allows repeated selections, skipping optional steps, and preserves the final bowl payload', async () => {
@@ -76,6 +78,10 @@ describe('BowlBuilder', () => {
     const skipToppingsButton = screen.getByRole('button', { name: /^Omitir$/i });
     expect(skipToppingsButton).toBeEnabled();
     fireEvent.click(skipToppingsButton);
+
+    const skipExtrasButton = screen.getByRole('button', { name: /Saltar este paso/i });
+    expect(skipExtrasButton).toBeEnabled();
+    fireEvent.click(skipExtrasButton);
 
     expect(screen.getByText(/Pollo x2/i)).toBeInTheDocument();
     expect(screen.getAllByText(/\$.*23\.900/).length).toBeGreaterThan(0);
