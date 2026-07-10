@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const VIDEO_SRC = '/videos/bowl-hero.mp4';
-const POSTER_SRC = '/images/bowl-hero-poster.png';
+const POSTER_SRC = '/images/bowl-hero-poster.jpg';
 
 interface ScrollHeroProps {
   onPrimaryClick: () => void;
@@ -33,6 +33,7 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const rafRef = useRef<number>();
+  const pendingSeekRef = useRef<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [videoFailed, setVideoFailed] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -55,8 +56,21 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
     setProgress(p);
 
     const video = videoRef.current;
-    if (video && video.duration && !video.seeking) {
-      video.currentTime = p * (video.duration - 0.05);
+    if (video && video.duration) {
+      const target = p * (video.duration - 0.05);
+      if (video.seeking) {
+        pendingSeekRef.current = target; // apply on 'seeked' so fast scrolling never wedges
+      } else {
+        video.currentTime = target;
+      }
+    }
+  }, []);
+
+  const handleSeeked = useCallback(() => {
+    const video = videoRef.current;
+    if (video && pendingSeekRef.current !== null) {
+      video.currentTime = pendingSeekRef.current;
+      pendingSeekRef.current = null;
     }
   }, []);
 
@@ -101,6 +115,7 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
             muted
             playsInline
             preload="auto"
+            onSeeked={handleSeeked}
             onError={() => setVideoFailed(true)}
             className="absolute inset-0 w-full h-full object-cover"
           />
