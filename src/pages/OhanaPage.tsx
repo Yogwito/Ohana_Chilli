@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import ProductImage from '@/components/products/ProductImage';
 import ProductDrawer from '@/components/products/ProductDrawer';
+import ScrollHero from '@/components/ohana/ScrollHero';
 import {
   buildBusinessWhatsAppUrl,
   formatCompactHours,
@@ -241,51 +242,14 @@ export default function OhanaPage() {
 
       {/* ── SECTION 1: Restaurant header ────────────────────────────────── */}
       <div>
-        {/* Hero strip */}
-        <div
-          className="hero-grain relative w-full overflow-hidden min-h-[320px] sm:min-h-[360px] flex items-center"
-          style={{ background: 'linear-gradient(135deg, #5a9e45 0%, #8CC878 50%, #a8d87a 100%)' }}
-        >
-          <div className="container max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-6 px-4 py-8 md:py-12">
-            {/* Left: copy + CTAs */}
-            <div className="flex flex-col gap-3 items-center text-center sm:items-start sm:text-left sm:max-w-xs">
-              <span className="inline-flex w-fit items-center rounded-full backdrop-blur-sm bg-white/20 border border-white/30 px-3 py-1 text-xs font-medium text-white">
-                🌿 Comida real. Sabor real.
-              </span>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight text-white leading-tight">
-                Eat Healthy, Live Happy
-              </h1>
-              <p className="text-sm sm:text-base text-white/85">
-                Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
-              </p>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-1 w-full sm:w-auto">
-                <button
-                  onClick={() => scrollToSection(BOWL_BUILDER_ID)}
-                  className="rounded-full bg-white px-4 py-2 sm:px-5 text-sm font-semibold text-brand-dark shadow-lg hover:bg-white/90 hover:shadow-xl transition-all duration-200 active:scale-95 w-full sm:w-auto"
-                >
-                  Arma tu Bowl
-                </button>
-                <button
-                  onClick={() => {
-                    const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
-                    scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
-                  }}
-                  className="rounded-full border-2 border-white/70 px-4 py-2 sm:px-5 text-sm font-semibold text-white hover:bg-white/10 transition-colors w-full sm:w-auto"
-                >
-                  Ver menú
-                </button>
-              </div>
-            </div>
-            {/* Right: image */}
-            <div className="flex items-center justify-center shrink-0">
-              <img
-                src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
-                alt="Bowls Lovers"
-                className="w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 object-contain rounded-full"
-              />
-            </div>
-          </div>
-        </div>
+        {/* Scroll-driven hero (video scrubbing + staged text reveal) */}
+        <ScrollHero
+          onPrimaryClick={() => scrollToSection(BOWL_BUILDER_ID)}
+          onSecondaryClick={() => {
+            const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
+            scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
+          }}
+        />
 
         {/* Info row */}
         <div className="bg-background px-4 pt-3 pb-5">
