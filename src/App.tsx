@@ -9,7 +9,6 @@ import { useCatalogCrossTabSync } from "@/hooks/use-catalog-sync";
 import { lazy, Suspense } from "react";
 import Layout from "@/components/layout/Layout";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
-import HomePage from "./pages/HomePage";
 import NotFound from "./pages/NotFound";
 import OhanaPage from "./pages/OhanaPage";
 import CheckoutPage from "./pages/CheckoutPage";

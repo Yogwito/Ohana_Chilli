@@ -9,21 +9,15 @@ import SEOHead from '@/components/SEOHead';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import ProductImage from '@/components/products/ProductImage';
-import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
+import ProductDrawer from '@/components/products/ProductDrawer';
 import {
   buildBusinessWhatsAppUrl,
   formatCompactHours,
   isBusinessOpenNow,
 } from '@/domain/businessSettings';
-import {
-  calculateProductUnitPrice,
-  isProductCustomizable,
-  normalizeProductCustomization,
-} from '@/domain/productCustomizations';
+import { formatPrice } from '@/domain/formatPrice';
 import { useBusinessSettings, useProducts, useCategories, usePromotions } from '@/hooks/use-catalog';
-import { useCart } from '@/context/CartContext';
-import { trackEvent } from '@/lib/analytics';
-import { toast } from 'sonner';
+import { useAddProduct } from '@/hooks/use-add-product';
 import { cn } from '@/lib/utils';
 import { Product, Category } from '@/types';
 
@@ -41,11 +35,6 @@ const VIRTUAL_BOWL_TAB: Category = {
   icon: undefined,
 };
 const HEADER_OFFSET = 120;
-
-/** Colombian peso format: $ 24.900 */
-function formatCOP(cents: number): string {
-  return `$ ${cents.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
-}
 
 // ─── Product row skeleton ────────────────────────────────────────────────────
 
@@ -66,9 +55,6 @@ function ProductRowSkeleton() {
 
 function ProductRow({ product, category, index = 0 }: { product: Product; category?: Category; index?: number }) {
   const { ref, isVisible } = useIntersection({ threshold: 0.05 });
-  const { addProduct } = useCart();
-  const [added, setAdded] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const productWithCategory = useMemo(
     () => ({
@@ -80,48 +66,8 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
     [category, product],
   );
 
-  const handleAddDirect = () => {
-    addProduct(product);
-    trackEvent({
-      type: 'add_to_cart',
-      productId: product.id,
-      productName: product.name,
-      brand: product.brand,
-      priceCents: product.price,
-    });
-    toast.success(`${product.name} agregado`);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 800);
-  };
-
-  const handleAddClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isProductCustomizable(productWithCategory)) {
-      setDrawerOpen(true);
-      return;
-    }
-
-    handleAddDirect();
-  };
-
-  const handleDrawerConfirm = (config: ProductConfig) => {
-    const customizations = normalizeProductCustomization(config);
-    const unitPrice = calculateProductUnitPrice(product.price, customizations);
-    const notes = customizations?.note || undefined;
-
-    addProduct(product, 1, notes, customizations);
-    trackEvent({
-      type: 'add_to_cart',
-      productId: product.id,
-      productName: product.name,
-      brand: product.brand,
-      priceCents: unitPrice,
-    });
-    toast.success(`${product.name} agregado`, { description: formatCOP(unitPrice) });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 800);
-  };
+  const { added, drawerOpen, setDrawerOpen, handleAddClick, handleDrawerConfirm } =
+    useAddProduct(product, productWithCategory);
 
   return (
     <>
@@ -143,7 +89,7 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
             </p>
           )}
           <p className="text-sm font-bold text-brand mt-1">
-            {formatCOP(product.price)}
+            {formatPrice(product.price)}
           </p>
         </div>
 
@@ -159,7 +105,10 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
 
           {/* Floating add button */}
           <button
-            onClick={handleAddClick}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddClick();
+            }}
             className={cn(
               'absolute bottom-2 right-2 w-9 h-9 rounded-full bg-brand text-white shadow-md',
               'flex items-center justify-center hover:bg-brand/90 hover:shadow-lg active:scale-90 transition-all duration-150',

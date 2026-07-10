@@ -2,19 +2,12 @@ import { useMemo, useState } from 'react';
 import { Plus, Check, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductImage from '@/components/products/ProductImage';
-import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
+import ProductDrawer from '@/components/products/ProductDrawer';
 import { Product, Brand } from '@/types';
-import { useCart } from '@/context/CartContext';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { trackEvent } from '@/lib/analytics';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatPrice } from '@/domain/formatPrice';
-import {
-  calculateProductUnitPrice,
-  isProductCustomizable as resolveProductCustomizable,
-  normalizeProductCustomization,
-} from '@/domain/productCustomizations';
+import { useAddProduct } from '@/hooks/use-add-product';
 
 interface ProductCardProps {
   product: Product;
@@ -42,15 +35,8 @@ function humanizeCategoryId(categoryId: string): string {
   return tokens.map((t) => CATEGORY_TOKEN_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
 }
 
-function isProductCustomizable(product: Product): boolean {
-  return resolveProductCustomizable(product);
-}
-
 export default function ProductCard({ product, variant = 'default', categoryName }: ProductCardProps) {
-  const { addProduct } = useCart();
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [added, setAdded] = useState(false);
 
   const descriptionText = product.description.trim();
   const ingredientsText = useMemo(() => {
@@ -67,34 +53,8 @@ export default function ProductCard({ product, variant = 'default', categoryName
     [product, resolvedCategoryName],
   );
 
-  const handleAddDirect = () => {
-    addProduct(product);
-    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: product.price });
-    toast.success(`${product.name} agregado`, { description: formatPrice(product.price) });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 800);
-  };
-
-  const handleAddClick = () => {
-    if (isProductCustomizable(productWithCategory)) {
-      setDrawerOpen(true);
-      return;
-    }
-
-    handleAddDirect();
-  };
-
-  const handleDrawerConfirm = (config: ProductConfig) => {
-    const customizations = normalizeProductCustomization(config);
-    const unitPrice = calculateProductUnitPrice(product.price, customizations);
-    const notes = customizations?.note || undefined;
-
-    addProduct(product, 1, notes, customizations);
-    trackEvent({ type: 'add_to_cart', productId: product.id, productName: product.name, brand: product.brand, priceCents: unitPrice });
-    toast.success(`${product.name} agregado`, { description: formatPrice(unitPrice) });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 800);
-  };
+  const { added, drawerOpen, setDrawerOpen, handleAddClick, handleDrawerConfirm } =
+    useAddProduct(product, productWithCategory);
 
   const isCompact = variant === 'compact';
 
