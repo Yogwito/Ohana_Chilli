@@ -266,6 +266,7 @@ function CategoriesAdmin() {
   const [editForm, setEditForm] = useState<{ name: string; sort_order: string }>({ name: '', sort_order: '' });
   const [newOpen, setNewOpen] = useState(false);
   const [newForm, setNewForm] = useState({ name: '', sort_order: '' });
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -397,7 +398,7 @@ function CategoriesAdmin() {
                           size="icon"
                           variant="ghost"
                           disabled={!!(productCounts[cat.id] ?? 0)}
-                          onClick={() => deleteCategory(cat.id)}
+                          onClick={() => setDeleteCategoryId(cat.id)}
                           aria-label="Eliminar"
                           className="text-destructive hover:text-destructive disabled:opacity-30"
                           title={(productCounts[cat.id] ?? 0) > 0 ? `${productCounts[cat.id]} productos en esta categoría` : 'Eliminar categoría'}
@@ -434,6 +435,27 @@ function CategoriesAdmin() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
             <Button onClick={createCategory} className="btn-ohana">Crear</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteCategoryId !== null} onOpenChange={(open) => !open && setDeleteCategoryId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar categoría?</DialogTitle>
+            <DialogDescription>Esta acción no se puede deshacer.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCategoryId(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteCategoryId) deleteCategory(deleteCategoryId);
+                setDeleteCategoryId(null);
+              }}
+            >
+              Eliminar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

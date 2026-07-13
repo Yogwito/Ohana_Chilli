@@ -15,6 +15,15 @@ function reconcileIngredientSelections(
   const nextSelections: Ingredient[] = [];
 
   for (const selection of selections) {
+    // "extra-*" ids are synthetic, user-picked premium add-ons created in
+    // BowlBuilder (see makeExtra*Ingredient) — they never exist in the
+    // catalog by design, so looking them up would wrongly invalidate the
+    // whole bowl. They already carry their own price, so pass them through.
+    if (selection.id.startsWith('extra-')) {
+      nextSelections.push(selection);
+      continue;
+    }
+
     const currentIngredient = ingredientsById.get(selection.id);
     if (!currentIngredient) return null;
     nextSelections.push(currentIngredient);
