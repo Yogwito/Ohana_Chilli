@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { formatPrice } from '@/domain/formatPrice';
@@ -110,7 +110,10 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
           <div className="p-5 space-y-6">
             {/* Header */}
             <div>
-              <h2 className="text-xl font-bold text-foreground">{product.name}</h2>
+              <SheetTitle className="text-xl font-bold text-foreground">{product.name}</SheetTitle>
+              <SheetDescription>
+                Personaliza el producto antes de agregarlo al carrito.
+              </SheetDescription>
               <p className="text-brand font-bold mt-1">{formatPrice(product.price)}</p>
             </div>
 

@@ -4,22 +4,31 @@
 
 @layer base {
   :root {
-    /* Base colors */
-    --background: 0 0% 98%;
-    --foreground: 220 20% 10%;
+    /* Base colors — warm paper over green ink (the paper bowl on the table) */
+    --background: 42 33% 97%;
+    --foreground: 160 28% 11%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card: 40 40% 99%;
+    --card-foreground: 160 28% 11%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover: 40 40% 99%;
+    --popover-foreground: 160 28% 11%;
 
     /* Brand tokens */
     --brand: 142 45% 62%;
     --brand-light: 138 40% 77%;
-    --brand-dark: 142 45% 48%;
+    --brand-dark: 142 45% 40%;
     --brand-foreground: 0 0% 100%;
     --brand-muted: 142 40% 95%;
+
+    /* La mesa — deep emerald tabletop from the hero commercial */
+    --mesa: 167 58% 20%;
+    --mesa-light: 167 45% 28%;
+    --mesa-foreground: 42 33% 97%;
+
+    /* Maíz — corn-kernel accent scattered on the table */
+    --maiz: 43 89% 55%;
+    --maiz-foreground: 160 28% 11%;
 
     /* Ohana aliases (backward compat) */
     --ohana: var(--brand);
@@ -340,6 +349,36 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 256px 256px;
   background-repeat: repeat;
+}
+
+/* Hero copy is always visible. The animation only adds movement, so stalled
+   timers/rAF, video failures, or unsupported animation APIs cannot hide it. */
+.hero-copy-enter {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-title {
+  font-family: 'Bricolage Grotesque', 'Nunito', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy-enter {
+    animation: hero-copy-enter 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .hero-copy-enter-1 { animation-delay: 80ms; }
+  .hero-copy-enter-2 { animation-delay: 160ms; }
+  .hero-copy-enter-3 { animation-delay: 240ms; }
+  .hero-copy-enter-4 { animation-delay: 320ms; }
+}
+
+@keyframes hero-copy-enter {
+  from { transform: translateY(24px); }
+  to { transform: translateY(0); }
 }
 
 /* Multi-line text truncation */

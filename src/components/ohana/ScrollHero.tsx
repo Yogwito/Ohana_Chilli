@@ -1,31 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const VIDEO_SRC = '/videos/bowl-hero.mp4';
-const POSTER_SRC = '/images/bowl-hero-poster.jpg';
+const MOBILE_VIDEO_SRC = '/videos/bowl-hero-mobile.mp4';
+// Shown before the video buffers and while scrubbing hasn't started yet —
+// the empty bowl, so the page loads "unassembled" and scrolling is what
+// reveals the commercial, never the other way around.
+const POSTER_START_SRC = '/images/bowl-hero-poster-start.jpg';
+// Only used for the reduced-motion / video-failed static fallback, where
+// there's no scroll to reveal anything — the finished bowl is the payoff.
+const POSTER_FINAL_SRC = '/images/bowl-hero-poster.jpg';
 
 interface ScrollHeroProps {
   onPrimaryClick: () => void;
   onSecondaryClick: () => void;
 }
 
-/** Maps overall progress (0–1) to a local 0–1 window between `start` and `end`. */
-function stage(progress: number, start: number, end: number): number {
-  return Math.min(1, Math.max(0, (progress - start) / (end - start)));
-}
-
-/** Inline style for text emerging from the shadows as its stage completes. */
-function revealStyle(t: number): React.CSSProperties {
-  return {
-    opacity: t,
-    filter: `blur(${(1 - t) * 10}px)`,
-    transform: `translateY(${(1 - t) * 28}px)`,
-  };
-}
-
 /**
  * Scroll-driven hero: the wrapper is taller than the viewport and the content
  * is sticky, so scrolling scrubs the bowl-assembly video (currentTime follows
- * scroll progress) while the copy emerges from a dark overlay in stages.
+ * scroll progress). Hero copy is visible by default and enters with CSS only,
+ * so a stalled animation frame or failed video can never hide the primary CTA.
  * Falls back to a static poster when the video is missing or the user
  * prefers reduced motion.
  */
@@ -34,14 +28,28 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
   const videoRef = useRef<HTMLVideoElement>(null);
   const rafRef = useRef<number>();
   const pendingSeekRef = useRef<number | null>(null);
+  const videoPreparedRef = useRef(false);
   const [progress, setProgress] = useState(0);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     setReducedMotion(mq.matches);
     const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches);
+      setVideoFailed(false);
+      videoPreparedRef.current = false;
+      pendingSeekRef.current = null;
+    };
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
@@ -74,6 +82,29 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
     }
   }, []);
 
+  const handleVideoReady = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Safari/iOS may not decode frames from a paused video until it has briefly
+    // entered the playback pipeline. Muted + playsInline makes this eligible for
+    // autoplay without taking over the screen. Failure is harmless: seeking and
+    // the poster fallback still work. Rewind to frame 0 right after so priming
+    // never leaves a visible "already assembled" flash before the user scrolls.
+    if (!videoPreparedRef.current) {
+      videoPreparedRef.current = true;
+      try {
+        await video.play();
+        video.pause();
+        video.currentTime = 0;
+      } catch {
+        // Some browsers still require a gesture; the first scroll seek retries.
+      }
+    }
+
+    update();
+  }, [update]);
+
   useEffect(() => {
     if (reducedMotion) return;
     const onScroll = () => {
@@ -91,10 +122,6 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
 
   // Static variant: reduced motion → no scrubbing, everything visible
   const p = reducedMotion ? 1 : progress;
-  const badgeT = reducedMotion ? 1 : stage(p, 0.05, 0.3);
-  const titleT = reducedMotion ? 1 : stage(p, 0.2, 0.5);
-  const subtitleT = reducedMotion ? 1 : stage(p, 0.4, 0.65);
-  const ctaT = reducedMotion ? 1 : stage(p, 0.55, 0.8);
   const overlayOpacity = reducedMotion ? 0.35 : 0.72 - p * 0.37; // shadows lift as you scroll
 
   return (
@@ -109,19 +136,23 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
         {/* Background media: scrubbed video, poster fallback */}
         {!videoFailed && !reducedMotion ? (
           <video
+            key={isMobile ? 'mobile' : 'desktop'}
             ref={videoRef}
-            src={VIDEO_SRC}
-            poster={POSTER_SRC}
+            src={isMobile ? MOBILE_VIDEO_SRC : VIDEO_SRC}
+            poster={POSTER_START_SRC}
             muted
             playsInline
             preload="auto"
+            onLoadedMetadata={update}
+            onLoadedData={handleVideoReady}
+            onCanPlay={update}
             onSeeked={handleSeeked}
             onError={() => setVideoFailed(true)}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
           <img
-            src={POSTER_SRC}
+            src={POSTER_FINAL_SRC}
             alt="Paisa Bowl con todos sus ingredientes"
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -137,23 +168,20 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
         {/* Copy */}
         <div className="relative z-10 container max-w-4xl px-4 flex flex-col items-center text-center gap-4">
           <span
-            style={revealStyle(badgeT)}
-            className="inline-flex w-fit items-center rounded-full backdrop-blur-sm bg-white/20 border border-white/30 px-3 py-1 text-xs font-medium text-white"
+            className="hero-copy-enter hero-copy-enter-1 inline-flex w-fit items-center rounded-full backdrop-blur-sm bg-white/20 border border-white/30 px-3 py-1 text-xs font-medium text-white"
           >
             🌿 Comida real. Sabor real.
           </span>
           <h1
-            style={revealStyle(titleT)}
-            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-normal tracking-tight text-white leading-tight drop-shadow-lg"
+            className="hero-title hero-copy-enter hero-copy-enter-2 text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-white leading-[0.95] drop-shadow-lg"
           >
             Eat Healthy, Live Happy
           </h1>
-          <p style={revealStyle(subtitleT)} className="text-sm sm:text-lg text-white/90 max-w-md drop-shadow">
+          <p className="hero-copy-enter hero-copy-enter-3 text-sm sm:text-lg text-white/90 max-w-md drop-shadow">
             Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
           </p>
           <div
-            style={revealStyle(ctaT)}
-            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-2 w-full sm:w-auto"
+            className="hero-copy-enter hero-copy-enter-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-2 w-full sm:w-auto"
           >
             <button
               onClick={onPrimaryClick}

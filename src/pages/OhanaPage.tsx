@@ -54,7 +54,17 @@ function ProductRowSkeleton() {
 
 // ─── Product row (La Cocina style: text left, image right) ───────────────────
 
-function ProductRow({ product, category, index = 0 }: { product: Product; category?: Category; index?: number }) {
+function ProductRow({
+  product,
+  category,
+  index = 0,
+  compact = false,
+}: {
+  product: Product;
+  category?: Category;
+  index?: number;
+  compact?: boolean;
+}) {
   const { ref, isVisible } = useIntersection({ threshold: 0.05 });
 
   const productWithCategory = useMemo(
@@ -95,7 +105,10 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
         </div>
 
         {/* Right: image with add button */}
-        <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 overflow-hidden rounded-2xl shadow-md">
+        <div className={cn(
+          'relative shrink-0 overflow-hidden rounded-2xl shadow-md transition-all duration-200',
+          compact ? 'h-20 w-20 sm:h-24 sm:w-24' : 'h-28 w-28 sm:h-32 sm:w-32',
+        )}>
           <ProductImage
             product={product}
             ratio={1}
@@ -137,7 +150,11 @@ export default function OhanaPage() {
   const location = useLocation();
   const tabsRef = useRef<HTMLDivElement>(null);
   const promotionsRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [activeSlug, setActiveSlug] = useState<string>('arma-tu-bowl');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [compactView, setCompactView] = useState(false);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -172,12 +189,22 @@ export default function OhanaPage() {
   // Products grouped by categoryId
   const productsByCategory = useMemo(() => {
     const map: Record<string, Product[]> = {};
-    for (const p of allProducts) {
+    const query = searchQuery.trim().toLowerCase();
+    const visibleProducts = query
+      ? allProducts.filter((product) => {
+        const category = categories.find((cat) => cat.id === product.categoryId);
+        return [product.name, product.description, category?.name]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(query));
+      })
+      : allProducts;
+
+    for (const p of visibleProducts) {
       if (!map[p.categoryId]) map[p.categoryId] = [];
       map[p.categoryId].push(p);
     }
     return map;
-  }, [allProducts]);
+  }, [allProducts, categories, searchQuery]);
 
   // Visible categories: bowl builder always shows; others when they have products
   const visibleCategories = useMemo(() => {
@@ -186,6 +213,16 @@ export default function OhanaPage() {
       return (productsByCategory[cat.id]?.length ?? 0) > 0;
     });
   }, [allTabs, productsByCategory]);
+
+  const totalVisibleProducts = useMemo(
+    () => Object.values(productsByCategory).reduce((sum, products) => sum + products.length, 0),
+    [productsByCategory],
+  );
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   const scrollToSection = useCallback((slug: string) => {
     const el = document.getElementById(slug);
@@ -360,17 +397,29 @@ export default function OhanaPage() {
       <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm">
         <div className="container max-w-4xl">
           <div className="flex items-center gap-2">
-            {/* Left: action icons (visual only) */}
+            {/* Left: menu tools */}
             <div className="flex items-center gap-1 shrink-0 py-1">
               <button
+                type="button"
+                onClick={() => setSearchOpen((open) => !open)}
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                aria-label="Buscar"
+                aria-label={searchOpen ? 'Cerrar búsqueda' : 'Buscar en el menú'}
+                aria-expanded={searchOpen}
+                aria-controls="menu-search"
               >
                 <Search className="w-4 h-4" />
               </button>
               <button
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                aria-label="Ver como cuadrícula"
+                type="button"
+                onClick={() => setCompactView((value) => !value)}
+                className={cn(
+                  'p-2 rounded-lg transition-colors',
+                  compactView
+                    ? 'bg-brand/10 text-brand-dark'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                )}
+                aria-label={compactView ? 'Ver menú con imágenes grandes' : 'Ver menú compacto'}
+                aria-pressed={compactView}
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
@@ -411,6 +460,28 @@ export default function OhanaPage() {
               })}
             </div>
           </div>
+
+          {searchOpen && (
+            <div className="border-t border-border/40 py-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  ref={searchInputRef}
+                  id="menu-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Busca bowls, bebidas o ingredientes..."
+                  className="h-11 w-full rounded-full border border-border bg-card pl-10 pr-4 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+              </div>
+              {searchQuery.trim() ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {totalVisibleProducts} resultado{totalVisibleProducts === 1 ? '' : 's'} para “{searchQuery.trim()}”
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -424,6 +495,20 @@ export default function OhanaPage() {
                 {[1, 2, 3].map((i) => <ProductRowSkeleton key={i} />)}
               </div>
             ))}
+          </div>
+        ) : searchQuery.trim() && totalVisibleProducts === 0 ? (
+          <div className="rounded-3xl border border-dashed bg-card p-8 text-center">
+            <p className="text-lg font-semibold text-foreground">No encontramos “{searchQuery.trim()}”</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Prueba con otro ingrediente, una bebida o vuelve a ver el menú completo.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="mt-5 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
+            >
+              Limpiar búsqueda
+            </button>
           </div>
         ) : (
           <div className="space-y-10">
@@ -468,7 +553,9 @@ export default function OhanaPage() {
                     <div>
                       {isLoading
                         ? [1, 2, 3].map((i) => <ProductRowSkeleton key={i} />)
-                        : products.map((p, idx) => <ProductRow key={p.id} product={p} category={cat} index={idx} />)
+                        : products.map((p, idx) => (
+                          <ProductRow key={p.id} product={p} category={cat} index={idx} compact={compactView} />
+                        ))
                       }
                     </div>
                   )}
