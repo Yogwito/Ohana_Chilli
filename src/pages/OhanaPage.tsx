@@ -20,6 +20,7 @@ import {
   isProductCustomizable,
   normalizeProductCustomization,
 } from '@/domain/productCustomizations';
+import { resolveActiveMenuSection } from '@/domain/menuScrollSpy';
 import { useBusinessSettings, useProducts, useCategories, usePromotions } from '@/hooks/use-catalog';
 import { useCart } from '@/context/CartContext';
 import { trackEvent } from '@/lib/analytics';
@@ -188,6 +189,7 @@ export default function OhanaPage() {
   const tabsRef = useRef<HTMLDivElement>(null);
   const promotionsRef = useRef<HTMLDivElement>(null);
   const [activeSlug, setActiveSlug] = useState<string>('arma-tu-bowl');
+  const activeSlugRef = useRef(activeSlug);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -237,14 +239,20 @@ export default function OhanaPage() {
     });
   }, [allTabs, productsByCategory]);
 
+  const activateSection = useCallback((slug: string) => {
+    if (activeSlugRef.current === slug) return;
+    activeSlugRef.current = slug;
+    setActiveSlug(slug);
+    window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: slug } }));
+  }, []);
+
   const scrollToSection = useCallback((slug: string) => {
     const el = document.getElementById(slug);
     if (!el) return;
     const y = el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET;
     window.scrollTo({ top: y, behavior: 'smooth' });
-    setActiveSlug(slug);
-    window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: slug } }));
-  }, []);
+    activateSection(slug);
+  }, [activateSection]);
 
   // Hash navigation (e.g. /ohana#bebidas from Navbar "Bebidas" link)
   useEffect(() => {
@@ -254,26 +262,50 @@ export default function OhanaPage() {
     return () => clearTimeout(timer);
   }, [location.hash, visibleCategories, scrollToSection]);
 
-  // IntersectionObserver: track active section + broadcast to Navbar NavCategoryBar
+  // Track the section crossing the sticky navigation. A position-based scroll
+  // spy also handles short final categories that cannot satisfy an observer's
+  // intersection threshold before the page reaches its scroll limit.
   useEffect(() => {
     if (visibleCategories.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const slug = entry.target.getAttribute('data-section') ?? '';
-            if (slug) {
-              setActiveSlug(slug);
-              window.dispatchEvent(new CustomEvent('sectionchange', { detail: { section: slug } }));
-            }
-          }
-        }
-      },
-      { rootMargin: `-${HEADER_OFFSET}px 0px -50% 0px`, threshold: 0.3 },
-    );
-    document.querySelectorAll('[data-section]').forEach((s) => observer.observe(s));
-    return () => observer.disconnect();
-  }, [visibleCategories]);
+    let animationFrame = 0;
+
+    const updateActiveSection = () => {
+      animationFrame = 0;
+      const sections = visibleCategories
+        .map((category) => {
+          const element = document.getElementById(category.slug);
+          return element
+            ? { slug: category.slug, top: element.getBoundingClientRect().top }
+            : null;
+        })
+        .filter((section): section is { slug: string; top: number } => section !== null);
+
+      const isAtPageEnd = window.scrollY + window.innerHeight
+        >= document.documentElement.scrollHeight - 2;
+      const slug = resolveActiveMenuSection({
+        sections,
+        activationLine: HEADER_OFFSET + 1,
+        isAtPageEnd,
+      });
+
+      if (slug) activateSection(slug);
+    };
+
+    const scheduleUpdate = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(updateActiveSection);
+    };
+
+    updateActiveSection();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+
+    return () => {
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, [activateSection, visibleCategories]);
 
   // Scroll active tab into view in the tabs bar when activeSlug changes
   useEffect(() => {
