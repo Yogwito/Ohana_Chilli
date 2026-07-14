@@ -19,6 +19,7 @@ const BeveragesPage = lazy(() => import("./pages/BeveragesPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const OrderTrackingPage = lazy(() => import("./pages/OrderTrackingPage"));
 const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/chilli" element={<Navigate to="/" replace />} />
               <Route path="/bebidas" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><BeveragesPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/checkout" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><CheckoutPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/pedido/:token" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OrderTrackingPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/nosotros" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><AboutPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/contacto" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><ContactPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/pedidos" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OrdersPage /></Layout></Suspense></ErrorBoundary>} />

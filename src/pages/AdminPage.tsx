@@ -24,6 +24,7 @@ import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 import PromotionsAdmin from '@/components/admin/PromotionsAdmin';
 import ProductsAdmin from '@/components/admin/ProductsAdmin';
 import SettingsAdminComponent from '@/components/admin/SettingsAdmin';
+import OrdersKanban from '@/components/admin/orders/OrdersKanban';
 
 // ─── Types ───────────────────────────────────────────────
 interface IngredientRow {
@@ -33,12 +34,6 @@ interface IngredientRow {
 
 interface BowlRuleRow {
   size: string; name: string; price_cents: number; bases: number; proteins: number; accompaniments: number;
-}
-
-interface OrderRow {
-  id: string; customer_name: string; phone: string; order_type: string;
-  total_cents: number; status: string; created_at: string; notes: string | null; address: string | null;
-  delivery_zone: string | null; delivery_fee_cents: number;
 }
 
 interface DeliveryZoneRow {
@@ -141,7 +136,7 @@ export default function AdminPage() {
             <TabsTrigger value="analytics" title="Analytics" className="flex shrink-0 items-center gap-1.5"><BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">Analytics</span></TabsTrigger>
           </TabsList>
 
-          <TabsContent value="orders"><OrdersAdmin /></TabsContent>
+          <TabsContent value="orders"><OrdersKanban /></TabsContent>
           <TabsContent value="products"><ProductsAdmin /></TabsContent>
           <TabsContent value="categories"><CategoriesAdmin /></TabsContent>
           <TabsContent value="ingredients"><IngredientsAdmin /></TabsContent>
@@ -152,106 +147,6 @@ export default function AdminPage() {
           <TabsContent value="analytics"><AnalyticsAdmin /></TabsContent>
         </Tabs>
       </div>
-    </div>
-  );
-}
-
-// ─── Orders Admin ────────────────────────────────────────
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pendiente' },
-  { value: 'confirmed', label: 'Confirmado' },
-  { value: 'preparing', label: 'Preparando' },
-  { value: 'ready', label: 'Listo' },
-  { value: 'delivered', label: 'Entregado' },
-  { value: 'cancelled', label: 'Cancelado' },
-];
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  confirmed: 'bg-blue-100 text-blue-700',
-  preparing: 'bg-orange-100 text-orange-700',
-  ready: 'bg-green-100 text-green-700',
-  delivered: 'bg-muted text-muted-foreground',
-  cancelled: 'bg-red-100 text-red-700',
-};
-
-function OrdersAdmin() {
-  const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(50);
-    setOrders((data ?? []) as OrderRow[]);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchOrders(); }, []);
-
-  // Real-time: refetch when orders are inserted or updated
-  useEffect(() => {
-    const channel = supabase
-      .channel('orders-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
-        toast.success('Nuevo pedido recibido');
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  const updateStatus = async (id: string, status: string) => {
-    await supabase.from('orders').update({ status }).eq('id', id);
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-    toast.success(`Pedido actualizado a ${status}`);
-  };
-
-  if (loading) return <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div>;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Pedidos recientes</h2>
-        <Button variant="outline" size="sm" onClick={fetchOrders}>Refrescar</Button>
-      </div>
-      {orders.length === 0 ? (
-        <p className="text-center py-12 text-muted-foreground">No hay pedidos</p>
-      ) : orders.map(order => (
-        <div key={order.id} className="bg-card border rounded-xl p-4 space-y-3">
-          <div className="flex flex-wrap justify-between gap-2">
-            <div>
-              <p className="font-semibold">{order.customer_name}</p>
-              <p className="text-xs text-muted-foreground">{order.phone} • {new Date(order.created_at).toLocaleString('es-CO')}</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-primary">{formatPrice(order.total_cents)}</span>
-              <Select value={order.status} onValueChange={v => updateStatus(order.id, v)}>
-                <SelectTrigger className={`h-7 w-auto text-xs px-2 gap-1 border-0 font-medium rounded-full ${STATUS_COLORS[order.status] ?? 'bg-muted text-muted-foreground'}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map(s => (
-                    <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {order.order_type === 'delivery' && (
-            <div className="text-xs text-muted-foreground space-x-2">
-              {order.address && <span>📍 {order.address}</span>}
-              {order.delivery_zone && <span>• 🏘️ {order.delivery_zone}</span>}
-              {order.delivery_fee_cents > 0 && <span>• 🚚 {formatPrice(order.delivery_fee_cents)}</span>}
-            </div>
-          )}
-          {order.order_type === 'pickup' && <p className="text-xs text-muted-foreground">🏪 Recoger en sucursal</p>}
-          {order.notes && <p className="text-xs text-muted-foreground">📝 {order.notes}</p>}
-          <p className="text-xs font-mono text-muted-foreground">ID: {order.id.slice(0, 8)}</p>
-        </div>
-      ))}
     </div>
   );
 }
@@ -975,4 +870,3 @@ function DeliveryZonesAdmin() {
     </div>
   );
 }
-

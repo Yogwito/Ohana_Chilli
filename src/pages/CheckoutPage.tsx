@@ -23,13 +23,11 @@ import {
 import {
   ArrowLeft,
   Banknote,
-  CheckCircle,
   CreditCard,
   Leaf,
   MapPin,
   ShoppingCart,
   Store,
-  MessageCircle,
   Minus,
   Plus,
   Trash2,
@@ -44,7 +42,6 @@ import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatProductCustomizationLines } from '@/domain/productCustomizations';
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
-import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
@@ -60,7 +57,7 @@ const checkoutSchema = z.object({
 });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
-type OrderStatus = 'idle' | 'submitting' | 'created';
+type OrderStatus = 'idle' | 'submitting';
 type CheckoutLocationState = { from?: string } | null;
 
 export default function CheckoutPage() {
@@ -76,12 +73,8 @@ export default function CheckoutPage() {
   } = useActiveDeliveryZones();
 
   const [orderStatus, setOrderStatus] = useState<OrderStatus>('idle');
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [whatsappMessage, setWhatsappMessage] = useState<string>('');
-  const [whatsappUrl, setWhatsappUrl] = useState<string>('');
   const [submitError, setSubmitError] = useState<string>('');
   const [selectedZoneId, setSelectedZoneId] = useState('');
-  const [platform, setPlatform] = useState<'mobile' | 'desktop'>('mobile');
 
   // CHANGE 1 — delivery as default
   const [form, setForm] = useState<CheckoutForm>({
@@ -123,25 +116,6 @@ export default function CheckoutPage() {
   const businessPhoneLabel = formatBusinessPhone(whatsappNumber);
   const addressParts = parseBusinessAddress(businessSettings?.contactAddress);
 
-  const formattedOrderRef = useMemo(() => {
-    if (!orderId) return null;
-    return orderId.slice(0, 8).toUpperCase();
-  }, [orderId]);
-
-  const messagePreview = useMemo(() => {
-    if (cart.items.length === 0) return '';
-    return generateWhatsAppMessage(cart.items, orderTotal, {
-      name: form.name || 'Cliente',
-      phone: form.phone || '',
-      orderType: form.orderType,
-      address: form.address,
-      deliveryZone: selectedDeliveryZone?.name,
-      deliveryFeeCents,
-      notes: form.notes,
-      orderId: 'PREVIEW000',
-      paymentMethod,
-    });
-  }, [cart.items, orderTotal, form, selectedDeliveryZone, deliveryFeeCents, paymentMethod]);
 
   const updateField = <K extends keyof CheckoutForm>(field: K, value: CheckoutForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -198,10 +172,6 @@ export default function CheckoutPage() {
     navigate('/');
   };
 
-  const handleStartAnotherOrder = () => {
-    navigate(continueShoppingPath);
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitError('');
@@ -238,13 +208,6 @@ export default function CheckoutPage() {
 
     if (form.orderType === 'delivery' && isDeliveryZoneQueryError) {
       const message = 'No se pudieron cargar las zonas activas. Intenta nuevamente.';
-      setSubmitError(message);
-      toast.error(message);
-      return;
-    }
-
-    if (!whatsappNumber) {
-      const message = 'El número de WhatsApp no está configurado. Intenta nuevamente en unos minutos.';
       setSubmitError(message);
       toast.error(message);
       return;
@@ -312,8 +275,8 @@ export default function CheckoutPage() {
 
       // Use SECURITY DEFINER RPC — bypasses RLS so anon users can insert orders.
       // Direct inserts into orders/order_items are blocked by RLS (no anon policies).
-      const { data: createdOrderId, error: createOrderError } = await supabase.rpc(
-        'create_order_with_items',
+      const { data: createdOrder, error: createOrderError } = await supabase.rpc(
+        'create_order_with_items_v2' as never,
         {
           p_customer_name: form.name,
           p_phone: form.phone,
@@ -324,10 +287,13 @@ export default function CheckoutPage() {
           p_notes: form.notes || null,
           p_total_cents: finalOrderTotal,
           p_items: orderItems,
-        }
+          p_payment_method: paymentMethod,
+        } as never,
       );
 
-      if (createOrderError || !createdOrderId) {
+      const creationResult = createdOrder as unknown as { order_id?: string; tracking_token?: string } | null;
+
+      if (createOrderError || !creationResult?.order_id || !creationResult.tracking_token) {
         console.error('Error creating order:', createOrderError);
         setSubmitError(
           createOrderError?.message
@@ -339,57 +305,23 @@ export default function CheckoutPage() {
         return;
       }
 
-      const phone = whatsappNumber;
-      // CHANGE 3 — pass paymentMethod to WhatsApp message generator
-      const message = generateWhatsAppMessage(cart.items, finalOrderTotal, {
-        name: form.name,
-        phone: form.phone,
-        orderType: form.orderType,
-        address: form.address,
-        deliveryZone: resolvedDeliveryZone,
-        deliveryFeeCents: resolvedDeliveryFeeCents,
-        notes: form.notes,
-        orderId: createdOrderId,
-        paymentMethod,
-      });
-      const { url, platform: detectedPlatform } = buildPlatformWhatsAppUrl(phone, message);
-      setPlatform(detectedPlatform);
-
-      setOrderId(createdOrderId);
-      setWhatsappMessage(message);
-      setWhatsappUrl(url);
       clearCart();
 
       trackEvent({
         type: 'checkout_complete',
-        orderId: createdOrderId,
+        orderId: creationResult.order_id,
         totalCents: finalOrderTotal,
         orderType: form.orderType,
         itemCount: cart.items.length,
       });
 
-      setOrderStatus('created');
-
-      if (detectedPlatform === 'desktop') {
-        openWhatsAppHandoff(phone, message);
-        toast.success('WhatsApp Web se abrió en una nueva pestaña.');
-      } else {
-        toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
-      }
+      toast.success('Pedido recibido por Ohana');
+      navigate(`/pedido/${creationResult.tracking_token}`, { replace: true });
     } catch (err) {
       console.error('Unexpected error:', err);
       setSubmitError('Ocurrió un error inesperado al crear tu pedido.');
       toast.error('Error inesperado. Intenta de nuevo.');
       setOrderStatus('idle');
-    }
-  };
-
-  const handleCopyMessage = async () => {
-    try {
-      await navigator.clipboard.writeText(whatsappMessage);
-      toast.success('Mensaje copiado al portapapeles');
-    } catch {
-      toast.info('Selecciona y copia el mensaje manualmente');
     }
   };
 
@@ -414,109 +346,6 @@ export default function CheckoutPage() {
               Volver al inicio
             </Button>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Success state
-  if (orderStatus === 'created') {
-    return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4">
-        <div className="max-w-md w-full space-y-6 text-center">
-
-          {/* Animated checkmark */}
-          <div className="w-20 h-20 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
-            <CheckCircle className="w-10 h-10 text-brand" />
-          </div>
-
-          {/* Order reference */}
-          <div>
-            <h2 className="text-2xl font-display font-bold">¡Pedido creado!</h2>
-            {formattedOrderRef && (
-              <p className="text-sm text-muted-foreground mt-1">
-                Referencia:{' '}
-                <span className="font-mono font-bold text-foreground">
-                  {formattedOrderRef}
-                </span>
-              </p>
-            )}
-          </div>
-
-          {/* Status message */}
-          <p className="text-muted-foreground text-sm">
-            {platform === 'desktop'
-              ? 'WhatsApp Web se abrió en una nueva pestaña. Envía el mensaje para confirmar tu pedido.'
-              : 'Toca el botón para enviar tu pedido por WhatsApp.'}
-          </p>
-
-          <div className="rounded-2xl border bg-card/60 px-4 py-3 text-left text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Siguiente paso</p>
-            <p>
-              Tu pedido ya fue creado. Solo falta enviar el mensaje en WhatsApp para confirmarlo con el equipo de Ohana.
-            </p>
-          </div>
-
-          {/* Primary CTA */}
-          {platform === 'mobile' ? (
-            <a
-              href={whatsappUrl}
-              className={cn(
-                'w-full h-12 rounded-full text-base font-semibold',
-                'flex items-center justify-center gap-2',
-                'text-white transition-colors',
-              )}
-              style={{ backgroundColor: '#25D366' }}
-            >
-              <MessageCircle className="w-5 h-5" />
-              Abrir WhatsApp
-            </a>
-          ) : (
-            <Button
-              onClick={() => openWhatsAppHandoff(whatsappNumber!, whatsappMessage)}
-              className="w-full h-12 rounded-full text-base font-semibold"
-              style={{ backgroundColor: '#25D366', color: 'white' }}
-            >
-              <MessageCircle className="w-5 h-5 mr-2" />
-              Abrir WhatsApp Web
-            </Button>
-          )}
-
-          {/* Fallback — always visible for edge cases */}
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleCopyMessage}
-          >
-            <Copy className="w-4 h-4 mr-2" />
-            Copiar mensaje
-          </Button>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Button
-              variant="outline"
-              onClick={handleGoHome}
-              className="w-full"
-            >
-              Volver al inicio
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={handleStartAnotherOrder}
-              className="w-full"
-            >
-              Hacer otro pedido
-            </Button>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={() => navigate('/')}
-            className="w-full"
-          >
-            Seguir comprando →
-          </Button>
-
         </div>
       </div>
     );
@@ -833,8 +662,8 @@ export default function CheckoutPage() {
                     className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2 disabled:bg-muted disabled:text-muted-foreground"
                     size="lg"
                   >
-                    <MessageCircle className="w-5 h-5" />
-                    {orderStatus === 'submitting' ? 'Creando pedido...' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : 'Enviar por WhatsApp'}
+                    <ShoppingBag className="w-5 h-5" />
+                    {orderStatus === 'submitting' ? 'Enviando pedido...' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : 'Confirmar pedido'}
                   </Button>
 
                   {!termsAccepted && !submitBlockedByClosed && (
@@ -953,21 +782,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* WhatsApp message preview */}
-                {messagePreview && (
-                  <div className="mt-4 pt-4 border-t border-border/40">
-                    <details className="text-xs">
-                      <summary className="cursor-pointer text-muted-foreground hover:text-brand transition-colors py-1 select-none list-none flex items-center gap-1">
-                        <span className="text-base">▾</span>
-                        Vista previa del mensaje WhatsApp
-                      </summary>
-                      <pre className="mt-2 p-3 bg-muted rounded-lg text-xs font-mono whitespace-pre-wrap text-muted-foreground overflow-auto max-h-48">
-                        {messagePreview}
-                      </pre>
-                    </details>
-                  </div>
-                )}
-
                 {/* CHANGE 4 — Seguir comprando */}
                 <div className="mt-4 pt-4 border-t border-border/40">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1025,15 +839,15 @@ export default function CheckoutPage() {
                 2. Pedidos y Pagos
               </h3>
               <p>
-                Los pedidos se confirman únicamente a través de WhatsApp. El precio
+                Los pedidos se confirman directamente en esta plataforma. El precio
                 final incluye el costo de los productos más el valor del domicilio
                 según la zona seleccionada. Aceptamos pagos contra entrega y
                 transferencias bancarias desde Davivienda, Bancolombia, Nequi
                 o llaves.
               </p>
               <p>
-                Para pagos por transferencia, el pedido se inicia únicamente
-                después de recibir el comprobante de pago en el chat de WhatsApp.
+                Para pagos por transferencia, el equipo podrá solicitar el comprobante
+                antes de iniciar la preparación del pedido.
               </p>
             </section>
 
