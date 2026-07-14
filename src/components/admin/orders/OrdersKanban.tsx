@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell, BellOff, Bike, Check, ChevronRight, Clock3, MapPin, PackageCheck,
-  RefreshCw, Search, ShoppingBag, Store, XCircle,
+  Printer, RefreshCw, Search, ShoppingBag, Store, XCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
@@ -9,7 +9,7 @@ import {
   getElapsedMinutes, getUrgencyLevel, NEXT_ORDER_ACTION, NEXT_ORDER_STATUS,
   ORDER_STATUS_LABELS, type OrderStatus,
 } from '@/domain/orderStatus';
-import { formatProductCustomizationLines } from '@/domain/productCustomizations';
+import { getOrderItemPresentation } from '@/domain/orderItemDetails';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +100,9 @@ function playNewOrderSound(context: AudioContext) {
 function OrderCard({ order, now, onOpen }: { order: KanbanOrder; now: Date; onOpen: () => void }) {
   const urgency = getUrgencyLevel(order.created_at, order.status, now);
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const customBowlCount = order.items
+    .filter((item) => getOrderItemPresentation(item.details).kind === 'custom-bowl')
+    .reduce((sum, item) => sum + item.quantity, 0);
   return (
     <button
       type="button"
@@ -128,6 +131,11 @@ function OrderCard({ order, now, onOpen }: { order: KanbanOrder; now: Date; onOp
         <span aria-hidden="true">·</span>
         <span>{itemCount} {itemCount === 1 ? 'producto' : 'productos'}</span>
       </div>
+      {customBowlCount > 0 && (
+        <span className="mt-3 inline-flex rounded-full bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">
+          {customBowlCount} {customBowlCount === 1 ? 'bowl personalizado' : 'bowls personalizados'}
+        </span>
+      )}
       {order.notes && <p className="mt-3 line-clamp-2 rounded-lg bg-muted/60 px-2.5 py-2 text-xs">⚠ {order.notes}</p>}
       <div className="mt-4 flex items-center justify-between border-t pt-3">
         <span className="text-xs text-muted-foreground">{order.payment_method === 'transfer' ? 'Transferencia' : 'Contraentrega'}</span>
@@ -137,13 +145,102 @@ function OrderCard({ order, now, onOpen }: { order: KanbanOrder; now: Date; onOp
   );
 }
 
+function OrderItemBreakdown({ item }: { item: OrderItemRow }) {
+  const presentation = getOrderItemPresentation(item.details);
+  if (presentation.rows.length === 0 && presentation.notes.length === 0) return null;
+
+  return (
+    <div className={cn(
+      'ml-7 mt-3 rounded-xl border p-3',
+      presentation.kind === 'custom-bowl'
+        ? 'border-brand/25 bg-brand/5'
+        : 'border-border/70 bg-muted/30',
+    )}>
+      {presentation.kind === 'custom-bowl' && (
+        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-brand">Bowl personalizado</p>
+      )}
+      <dl className="space-y-1.5">
+        {presentation.rows.map((row, index) => (
+          <div key={`${row.label}-${index}`} className="grid grid-cols-[6.5rem_1fr] gap-2 text-xs leading-relaxed">
+            <dt className="font-semibold text-muted-foreground">{row.label}</dt>
+            <dd className="font-medium text-foreground">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {presentation.notes.map((note, index) => (
+        <p key={`${note}-${index}`} className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          ⚠ Nota: {note}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+export function PrintOrderTicket({ order }: { order: KanbanOrder }) {
+  const createdAt = new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(order.created_at));
+
+  return (
+    <article id="order-print-ticket" className="order-print-ticket" aria-hidden="true">
+      <header className="ticket-header">
+        <p className="ticket-brand">OHANA BOWLS</p>
+        <h1>COMANDA DE COCINA</h1>
+        <p className="ticket-order-number">#{order.id.slice(0, 8).toUpperCase()}</p>
+        <p>{createdAt}</p>
+      </header>
+
+      <section className="ticket-meta">
+        <p><strong>Cliente:</strong> {order.customer_name}</p>
+        <p><strong>Teléfono:</strong> {order.phone}</p>
+        <p><strong>Entrega:</strong> {order.order_type === 'delivery' ? 'DOMICILIO' : 'RECOGER EN TIENDA'}</p>
+        {order.delivery_zone && <p><strong>Zona:</strong> {order.delivery_zone}</p>}
+        {order.address && <p><strong>Dirección:</strong> {order.address}</p>}
+      </section>
+
+      <section className="ticket-items">
+        {order.items.map((item, itemIndex) => {
+          const presentation = getOrderItemPresentation(item.details);
+          return (
+            <div key={item.id} className="ticket-item">
+              <p className="ticket-item-title">{item.quantity}× {item.name}</p>
+              {presentation.kind === 'custom-bowl' && <p className="ticket-item-kind">BOWL PERSONALIZADO</p>}
+              {presentation.rows.map((row, rowIndex) => (
+                <p key={`${itemIndex}-${rowIndex}`}><strong>{row.label}:</strong> {row.value}</p>
+              ))}
+              {presentation.notes.map((note, noteIndex) => (
+                <p key={`${itemIndex}-note-${noteIndex}`} className="ticket-note">*** NOTA: {note} ***</p>
+              ))}
+            </div>
+          );
+        })}
+      </section>
+
+      {order.notes && (
+        <section className="ticket-order-note">
+          <strong>NOTA GENERAL</strong>
+          <p>{order.notes}</p>
+        </section>
+      )}
+
+      <footer className="ticket-footer">
+        <p><strong>Pago:</strong> {order.payment_method === 'transfer' ? 'Transferencia' : 'Contraentrega'}</p>
+        <p className="ticket-total">TOTAL {formatPrice(order.total_cents)}</p>
+        <p>Estado: {ORDER_STATUS_LABELS[order.status]}</p>
+      </footer>
+    </article>
+  );
+}
+
 function OrderDetail({
-  order, busy, onTransition, onCancel,
+  order, busy, onTransition, onCancel, onPrint,
 }: {
   order: KanbanOrder;
   busy: boolean;
   onTransition: (status: OrderStatus) => void;
   onCancel: () => void;
+  onPrint: () => void;
 }) {
   const nextStatus = NEXT_ORDER_STATUS[order.status];
   return (
@@ -160,22 +257,21 @@ function OrderDetail({
           </div>
         </div>
 
+        <Button variant="outline" className="h-11 w-full rounded-xl border-dashed" onClick={onPrint}>
+          <Printer className="mr-2 h-4 w-4" />Imprimir comanda
+        </Button>
+
         <section>
           <h4 className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Productos</h4>
           <div className="mt-3 divide-y rounded-xl border">
             {order.items.map((item) => {
-              const customizations = item.details?.customizations as Parameters<typeof formatProductCustomizationLines>[0] | undefined;
-              const detailLines = customizations ? formatProductCustomizationLines(customizations) : [];
               return (
                 <div key={item.id} className="p-3">
                   <div className="flex justify-between gap-3">
                     <p className="font-medium"><span className="mr-2 font-mono text-brand">{item.quantity}×</span>{item.name}</p>
                     <span className="text-sm font-semibold">{formatPrice(item.unit_price_cents * item.quantity)}</span>
                   </div>
-                  {detailLines.map((line) => <p key={line} className="mt-1 pl-7 text-xs text-muted-foreground">{line}</p>)}
-                  {typeof item.details?.notes === 'string' && item.details.notes && (
-                    <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">Nota: {item.details.notes}</p>
-                  )}
+                  <OrderItemBreakdown item={item} />
                 </div>
               );
             })}
@@ -307,6 +403,12 @@ export default function OrdersKanban() {
   const pauseAlerts = () => {
     setAlertsArmed(false);
     toast.info('Alertas de sonido pausadas');
+  };
+  const printOrder = (order: KanbanOrder) => {
+    const originalTitle = document.title;
+    document.title = `Comanda #${order.id.slice(0, 8).toUpperCase()}`;
+    window.addEventListener('afterprint', () => { document.title = originalTitle; }, { once: true });
+    window.print();
   };
   const moveOrder = async (order: KanbanOrder, status: OrderStatus) => {
     setBusy(true);
@@ -441,7 +543,13 @@ export default function OrdersKanban() {
               <SheetDescription className="font-mono font-bold tracking-wider">#{selectedOrder.id.slice(0, 8).toUpperCase()} · {ORDER_STATUS_LABELS[selectedOrder.status]}</SheetDescription>
               <SheetTitle className="text-2xl">{selectedOrder.customer_name}</SheetTitle>
             </SheetHeader>
-            <OrderDetail order={selectedOrder} busy={busy} onTransition={(status) => moveOrder(selectedOrder, status)} onCancel={() => setCancelTarget(selectedOrder)} />
+            <OrderDetail
+              order={selectedOrder}
+              busy={busy}
+              onTransition={(status) => moveOrder(selectedOrder, status)}
+              onCancel={() => setCancelTarget(selectedOrder)}
+              onPrint={() => printOrder(selectedOrder)}
+            />
           </>}
         </SheetContent>
       </Sheet>
@@ -473,6 +581,8 @@ export default function OrdersKanban() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {selectedOrder ? <PrintOrderTicket order={selectedOrder} /> : null}
     </div>
   );
 }
