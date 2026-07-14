@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import BowlBuilder from '@/components/ohana/BowlBuilder';
 import type { BowlSizeRule, Ingredient } from '@/types';
 
@@ -99,5 +99,47 @@ describe('BowlBuilder', () => {
     expect(savedBowl.acompanantes[0].id).toBe('acomp-maiz');
     expect(savedBowl.sauces).toEqual([]);
     expect(savedBowl.complementos).toEqual([]);
+  });
+
+  it('keeps the next action within reach and removes the size selector after choosing on mobile', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: true,
+        media: '(max-width: 639px)',
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }),
+    });
+    const boundsSpy = vi.spyOn(window.HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 80,
+      bottom: 1800,
+      left: 0,
+      right: 390,
+      width: 390,
+      height: 1720,
+      x: 0,
+      y: 80,
+      toJSON: () => ({}),
+    });
+
+    render(<BowlBuilder />);
+
+    expect(screen.getByRole('heading', { name: /Elige el tamaño de tu bowl/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Pequeño/i }));
+
+    expect(screen.queryByRole('heading', { name: /Elige el tamaño de tu bowl/i })).not.toBeInTheDocument();
+    const mobileControls = await screen.findByRole('navigation', { name: /Controles de Arma tu Bowl/i });
+    const nextButton = within(mobileControls).getByRole('button', { name: /^Siguiente$/i });
+    expect(nextButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Agregar Arroz/i }));
+    await waitFor(() => expect(nextButton).toBeEnabled());
+
+    boundsSpy.mockRestore();
   });
 });

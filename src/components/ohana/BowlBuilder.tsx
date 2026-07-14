@@ -1,4 +1,5 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Minus, Plus, Heart, Trash2, BookHeart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIngredients, useBowlRules, useProducts } from '@/hooks/use-catalog';
@@ -156,7 +157,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   const [selectedComplementos, setSelectedComplementos] = useState<Ingredient[]>([]);
   const [notes, setNotes] = useState('');
   const [stepVisible, setStepVisible] = useState(false);
-  const [bowlExpanded, setBowlExpanded] = useState(false);
+  const [mobileActionVisible, setMobileActionVisible] = useState(false);
   const [saveMode, setSaveMode] = useState(false);
   const [saveName, setSaveName] = useState('');
 
@@ -244,6 +245,37 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     const activeTab = stepsTabsRef.current.querySelector<HTMLElement>('[aria-selected="true"]');
     activeTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [currentStep]);
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateMobileActionVisibility = () => {
+      animationFrame = 0;
+      const builder = builderRef.current;
+      if (!builder || !window.matchMedia('(max-width: 639px)').matches) {
+        setMobileActionVisible(false);
+        return;
+      }
+
+      const bounds = builder.getBoundingClientRect();
+      setMobileActionVisible(bounds.top < window.innerHeight - 96 && bounds.bottom > 160);
+    };
+
+    const scheduleUpdate = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(updateMobileActionVisibility);
+    };
+
+    updateMobileActionVisibility();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+
+    return () => {
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, []);
 
   const stepConfigs = useMemo<Record<SelectionStep, StepConfig> | null>(() => {
     if (!selectedSize) return null;
@@ -501,6 +533,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     const previousStep = steps[currentStepIndex - 1];
     if (!previousStep) return;
     setCurrentStep(previousStep.id);
+    window.requestAnimationFrame(scrollToBuilder);
   };
 
   const goNext = () => {
@@ -508,7 +541,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     const nextStep = steps[currentStepIndex + 1];
     if (!nextStep) return;
     setCurrentStep(nextStep.id);
-    scrollToBuilder();
+    window.requestAnimationFrame(scrollToBuilder);
   };
 
   const handleSizeSelect = (size: BowlSizeRule) => {
@@ -518,7 +551,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       resetSelectionsForSizeChange();
     }
     setCurrentStep('bases');
-    scrollToBuilder();
+    window.requestAnimationFrame(scrollToBuilder);
   };
 
   const handleSubmit = () => {
@@ -577,16 +610,16 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     return (
       <div
         className={cn(
-          'rounded-2xl border bg-card p-3 sm:p-4 shadow-sm transition-all duration-150',
+          'min-w-0 rounded-2xl border bg-card p-2.5 sm:p-4 shadow-sm transition-all duration-150',
           count > 0
             ? 'border-brand bg-brand/5 shadow-sm'
             : 'border-border/60 hover:border-brand/40 hover:shadow-md',
           isMaxedForNewSelection && 'opacity-60',
         )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">{ingredient.name}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 space-y-0.5 sm:space-y-1">
+            <p className="line-clamp-2 text-sm font-semibold leading-tight text-foreground">{ingredient.name}</p>
             <p className="text-xs text-muted-foreground">
               {isIncluded ? 'Incluido' : `+${formatPrice(charge)}`}
             </p>
@@ -601,15 +634,15 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           </span>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
+        <div className="mt-2 flex items-center justify-end gap-1 sm:mt-4 sm:justify-between sm:gap-3">
+          <p className="hidden text-xs text-muted-foreground sm:block">
             {count > 0
               ? `${formatStepQuantity(count, 'selección', 'selecciones')}`
               : isMaxedForNewSelection
                 ? 'Límite alcanzado'
                 : 'Disponible'}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button
               type="button"
               variant="outline"
@@ -654,25 +687,29 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     totalMax?: number;
   }) => (
     <div className="animate-slide-in">
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
+      <div className="mb-3 flex items-start justify-between gap-3 sm:mb-5 md:items-start">
+        <div className="min-w-0 space-y-2">
           <div>
-            <h3 className="text-xl font-semibold">{config.title}</h3>
-            <p className="text-sm text-muted-foreground">{config.subtitle}</p>
+            <h3 className="text-lg font-semibold sm:text-xl">{config.title}</h3>
+            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{config.subtitle}</p>
             {totalMax !== undefined && totalCount !== undefined ? (
               <p className={cn('text-sm', totalCount >= totalMax ? 'text-brand' : 'text-muted-foreground')}>
                 {totalCount}/{totalMax} acompañantes
               </p>
             ) : null}
           </div>
-          <div className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-xl border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
             <p>{getStepHint(config, selectedItems.length)}</p>
-            <p className="mt-2 font-medium text-foreground">
-              Selección actual: {formatGroupedIngredients(selectedItems)}
-            </p>
+            {selectedItems.length > 0 ? (
+              <p className="mt-1 line-clamp-2 font-medium text-foreground sm:mt-2">
+                Elegiste: {formatGroupedIngredients(selectedItems)}
+              </p>
+            ) : null}
           </div>
         </div>
-        <CounterBadge current={selectedItems.length} config={config} />
+        <div className="shrink-0">
+          <CounterBadge current={selectedItems.length} config={config} />
+        </div>
       </div>
 
       {items.length === 0 ? (
@@ -680,7 +717,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           No hay ingredientes disponibles en esta sección por ahora.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3">
           {items.map((item) => {
             const itemCount = getIngredientCount(selectedItems, item.id);
             const effectivePerItemMax = config.perItemMax ?? config.max;
@@ -705,7 +742,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   );
 
   const SizeSelector = () => (
-    <section className="border-b bg-muted/20 px-6 py-6">
+    <section className="border-b bg-muted/20 px-4 py-4 sm:px-6 sm:py-6">
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Paso 1</p>
@@ -721,7 +758,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:pb-0">
         {bowlSizes.map((size) => {
           const isSelected = selectedSize?.size === size.size;
 
@@ -732,7 +769,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               onClick={() => handleSizeSelect(size)}
               aria-pressed={isSelected}
               className={cn(
-                'rounded-2xl border bg-card p-5 text-left shadow-sm transition-all duration-200',
+                'w-[82%] shrink-0 snap-start rounded-2xl border bg-card p-4 text-left shadow-sm transition-all duration-200 sm:w-auto sm:p-5',
                 isSelected
                   ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
                   : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
@@ -752,7 +789,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
               <div className="my-4 h-px bg-border/70" />
 
-              <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-muted-foreground sm:block sm:space-y-2 sm:text-sm">
                 {getSizeStructure(size).map((item) => (
                   <p key={item}>{item}</p>
                 ))}
@@ -795,6 +832,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   }
 
   return (
+    <>
     <div ref={builderRef} className="overflow-hidden rounded-[2rem] border bg-card shadow-lg">
       <div className="h-0.5 bg-muted">
         <div
@@ -838,9 +876,14 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         </div>
       </div>
 
-      <SizeSelector />
+      {currentStep === 'size' ? <SizeSelector /> : null}
 
-      <div ref={stepContentRef} className="p-6" role="tabpanel" style={{ scrollMarginTop: '80px' }}>
+      <div
+        ref={stepContentRef}
+        className="p-4 pb-28 sm:p-6"
+        role="tabpanel"
+        style={{ scrollMarginTop: '128px' }}
+      >
         <div className={cn('scroll-fade-up', stepVisible && 'in-view')}>
           {currentStep === 'size' ? (
             <div className="space-y-4">
@@ -916,20 +959,24 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             return (
               <div className="animate-slide-in">
                 {/* Header */}
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-2">
+                <div className="mb-3 flex items-start justify-between gap-3 sm:mb-5">
+                  <div className="min-w-0 space-y-2">
                     <div>
-                      <h3 className="text-xl font-semibold">{currentStepConfig.title}</h3>
-                      <p className="text-sm text-muted-foreground">{currentStepConfig.subtitle}</p>
+                      <h3 className="text-lg font-semibold sm:text-xl">{currentStepConfig.title}</h3>
+                      <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{currentStepConfig.subtitle}</p>
                     </div>
-                    <div className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-xl border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
                       <p>{getStepHint(currentStepConfig, selectedProteins.length)}</p>
-                      <p className="mt-2 font-medium text-foreground">
-                        Selección actual: {formatGroupedIngredients(selectedProteins)}
-                      </p>
+                      {selectedProteins.length > 0 ? (
+                        <p className="mt-1 line-clamp-2 font-medium text-foreground sm:mt-2">
+                          Elegiste: {formatGroupedIngredients(selectedProteins)}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
-                  <CounterBadge current={selectedProteins.length} config={currentStepConfig} />
+                  <div className="shrink-0">
+                    <CounterBadge current={selectedProteins.length} config={currentStepConfig} />
+                  </div>
                 </div>
 
                 {/* Included proteins */}
@@ -938,7 +985,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                     No hay proteínas disponibles en esta sección por ahora.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3">
                     {includedProteins.map((protein) => {
                       const itemCount = getIngredientCount(selectedProteins, protein.id);
                       const effectivePerItemMax = currentStepConfig.perItemMax ?? currentStepConfig.max;
@@ -996,7 +1043,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                       </span>
                       <div className="h-px flex-1 bg-border/50" />
                     </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3">
                       {premiumProteins.map((protein) => {
                         const extrasForThis = extraProteinSelections.filter(e => e.premiumProteinId === protein.id);
                         const count = extrasForThis.length;
@@ -1005,7 +1052,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           <div
                             key={protein.id}
                             className={cn(
-                              'rounded-2xl border border-dashed border-brand/40 bg-card p-4 shadow-sm transition-all duration-200',
+                              'rounded-2xl border border-dashed border-brand/40 bg-card p-3 shadow-sm transition-all duration-200 sm:p-4',
                               count > 0 && 'border-primary bg-primary/5 shadow-md shadow-primary/10',
                             )}
                           >
@@ -1695,29 +1742,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       </div>
 
       {selectedSize && currentStep !== 'summary' ? (
-        <div className="border-t bg-muted/20 px-4 py-4">
-          {/* Mobile: collapsed header toggle */}
-          <button
-            type="button"
-            className="sm:hidden w-full rounded-2xl border bg-card px-4 py-3 flex items-center justify-between gap-3 mb-2"
-            onClick={() => setBowlExpanded(v => !v)}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground shrink-0">Tu bowl</p>
-              <p className="text-sm font-semibold truncate">{selectedSize.name}</p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <p className="text-base font-bold text-ohana-dark">{formatPrice(totalPrice)}</p>
-              <span className="text-xs text-muted-foreground">{bowlExpanded ? '▴' : '▾'}</span>
-            </div>
-          </button>
-
-          {/* Full panel: always on sm+, toggleable on mobile */}
-          <div className={cn(
-            'rounded-2xl border border-border/60 bg-card p-4 shadow-sm',
-            'hidden sm:block',
-            bowlExpanded && '!block max-h-48 overflow-y-auto',
-          )}>
+        <div className="hidden border-t bg-muted/20 px-4 py-4 sm:block">
+          <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Tu bowl</p>
@@ -1744,7 +1770,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-4 border-t p-4">
+      <div className="hidden items-center justify-between gap-4 border-t p-4 sm:flex">
         <Button variant="ghost" onClick={goBack} disabled={currentStepIndex === 0} className="gap-1 min-h-[44px] min-w-[44px]">
           <ChevronLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Anterior</span>
@@ -1781,5 +1807,61 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         </div>
       </div>
     </div>
+    {selectedSize && mobileActionVisible ? createPortal((
+      <div
+        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[45] border-t border-border/60 bg-background/95 px-3 py-2 shadow-[0_-10px_30px_-18px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:hidden"
+        role="navigation"
+        aria-label="Controles de Arma tu Bowl"
+      >
+        <div className="mx-auto flex max-w-lg items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={goBack}
+            disabled={currentStepIndex === 0}
+            className="h-11 w-11 shrink-0 rounded-full"
+            aria-label="Volver al paso anterior"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+
+          <div className="min-w-0 flex-1" aria-live="polite">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-xs font-semibold text-foreground">
+                {steps[currentStepIndex]?.label} · {currentStepIndex + 1}/{steps.length}
+              </p>
+              <span className="shrink-0 text-sm font-bold text-ohana-dark">{formatPrice(totalPrice)}</span>
+            </div>
+            <p className={cn(
+              'truncate text-[11px]',
+              canProceed ? 'text-brand' : 'text-muted-foreground',
+            )}>
+              {currentStepConfig
+                ? getStepHint(currentStepConfig, currentSelectionCount)
+                : currentStep === 'summary'
+                  ? 'Tu bowl está listo para agregar.'
+                  : 'Puedes agregar algo más o continuar.'}
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            onClick={currentStep === 'summary' ? handleSubmit : goNext}
+            disabled={!canProceed}
+            className={cn(
+              'btn-ohana h-11 shrink-0 gap-1 rounded-2xl px-4 font-semibold shadow-md',
+              !canProceed && 'opacity-50',
+            )}
+          >
+            {currentStep === 'summary'
+              ? 'Agregar'
+              : getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
+            {currentStep !== 'summary' ? <ChevronRight className="h-4 w-4" /> : null}
+          </Button>
+        </div>
+      </div>
+    ), document.body) : null}
+    </>
   );
 }
