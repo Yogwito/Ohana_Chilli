@@ -72,11 +72,37 @@ export interface ProductCustomizationExtra {
   price: number;
 }
 
+// Selected flavor/variant (product_variants). Mandatory when the product has
+// active variants; the flavor list lives in Supabase, never hardcoded here.
+export interface ProductVariantSelection {
+  id: string;
+  name: string;
+  priceDelta?: number;
+}
+
 export interface ProductCustomization {
   removedIngredients: string[];
   extras: ProductCustomizationExtra[];
   note: string;
   extraTotal: number;
+  variant?: ProductVariantSelection;
+}
+
+// Catalog variant row (product_variants table)
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  name: string;
+  priceDelta: number;
+  sortOrder: number;
+}
+
+// Shared add-on catalog row (addons table)
+export interface Addon {
+  id: string;
+  name: string;
+  price: number;
+  sortOrder: number;
 }
 
 // Custom Bowl Type

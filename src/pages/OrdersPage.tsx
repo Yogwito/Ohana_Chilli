@@ -18,6 +18,8 @@ interface OrderRow {
   total_cents: number;
   status: string;
   created_at: string;
+  payment_method: string | null;
+  payment_status: string;
 }
 
 const statusConfig: Record<string, { label: string; icon: ReactNode; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -119,6 +121,11 @@ export default function OrdersPage() {
                       <Badge variant="outline">
                         {order.order_type === 'pickup' ? 'Recoger' : 'Domicilio'}
                       </Badge>
+                      {order.payment_method === 'wompi' && (
+                        <Badge variant={order.payment_status === 'approved' ? 'default' : 'outline'}>
+                          Wompi: {order.payment_status === 'approved' ? 'Pagado' : 'Pendiente'}
+                        </Badge>
+                      )}
                     </div>
                   </div>
 

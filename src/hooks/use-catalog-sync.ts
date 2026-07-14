@@ -8,7 +8,10 @@ export type CatalogTable =
   | 'bowl_rules'
   | 'delivery_zones'
   | 'settings'
-  | 'promotions';
+  | 'promotions'
+  | 'product_variants'
+  | 'addons'
+  | 'addon_recommendations';
 
 interface CatalogSyncPayload {
   sourceId: string;
@@ -28,6 +31,9 @@ const CATALOG_QUERY_KEYS: Record<CatalogTable, QueryKey[]> = {
   delivery_zones: [['delivery_zones']],
   settings: [['settings'], ['setting']],
   promotions: [['promotions']],
+  product_variants: [['product_variants']],
+  addons: [['addons']],
+  addon_recommendations: [['addon_recommendations']],
 };
 
 function normalizeTables(tables: CatalogTable[]) {

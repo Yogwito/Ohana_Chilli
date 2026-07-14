@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
-import { useActiveDeliveryZones, useBusinessSettings, useBusinessOpenStatus } from '@/hooks/use-catalog';
+import { useActiveDeliveryZones, useBusinessSettings, useBusinessOpenStatus, useProductVariantsMap } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,7 +60,8 @@ const checkoutSchema = z.object({
 });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
-type OrderStatus = 'idle' | 'submitting' | 'created';
+type OrderStatus = 'idle' | 'submitting' | 'redirecting' | 'created';
+type PaymentMethod = 'cash' | 'transfer' | 'wompi';
 type CheckoutLocationState = { from?: string } | null;
 
 export default function CheckoutPage() {
@@ -68,6 +69,7 @@ export default function CheckoutPage() {
   const location = useLocation();
   const { cart, updateQuantity, removeItem, clearCart } = useCart();
   const { data: businessSettings } = useBusinessSettings();
+  const { data: variantsMap } = useProductVariantsMap();
   const { isClosed: isBusinessClosed, isOpen: isBusinessOpen, isEnforced: isHoursEnforced } = useBusinessOpenStatus();
   const {
     data: deliveryZones = [],
@@ -96,7 +98,7 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
   // CHANGE 2 — payment method state
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
 
   // CHANGE 5 — terms states
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -257,6 +259,24 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Preflight por item: todo producto con sabores activos debe traer uno
+    // seleccionado (items agregados antes de que existieran las variantes,
+    // o restaurados de localStorage). El servidor también lo exige; aquí
+    // damos un error accionable en vez de un rechazo genérico de la RPC.
+    const itemMissingVariant = cart.items.find(
+      (item) =>
+        item.type === 'product' &&
+        item.product &&
+        (variantsMap?.[item.product.id]?.length ?? 0) > 0 &&
+        !item.customizations?.variant?.id,
+    );
+    if (itemMissingVariant) {
+      const message = `"${itemMissingVariant.product?.name}" necesita que elijas un sabor. Edítalo desde el carrito.`;
+      setSubmitError(message);
+      toast.error(message);
+      return;
+    }
+
     setOrderStatus('submitting');
     trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
@@ -294,32 +314,60 @@ export default function CheckoutPage() {
       }
 
       const finalOrderTotal = orderSubtotal + resolvedDeliveryFeeCents;
-      const orderItems = cart.items.map((item) => ({
-        brand_id: item.brand,
-        name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
-        quantity: item.quantity,
-        unit_price_cents: item.unitPrice,
-        details:
-          item.type === 'custom-bowl' && item.customBowl
-            ? {
-                size: item.customBowl.size.name,
-                bases: item.customBowl.bases.map((b) => b.name),
-                proteins: item.customBowl.proteins.map((p) => p.name),
-                acompanantes: item.customBowl.acompanantes.map((a) => a.name),
-                sauces: item.customBowl.sauces?.map((s) => s.name),
-                complementos: item.customBowl.complementos?.map((c) => c.name),
-                notes: item.notes,
-              }
-            : {
-                product_id: item.product?.id,
-                notes: item.notes,
-                customizations: item.customizations ?? null,
+      const orderItems = cart.items.map((item) => {
+        if (item.type === 'custom-bowl' && item.customBowl) {
+          const allIngredients = [
+            ...item.customBowl.bases,
+            ...item.customBowl.proteins,
+            ...item.customBowl.acompanantes,
+            ...(item.customBowl.sauces ?? []),
+            ...(item.customBowl.complementos ?? []),
+          ];
+          return {
+            brand_id: item.brand,
+            name: 'Bowl Personalizado',
+            quantity: item.quantity,
+            unit_price_cents: item.unitPrice,
+            details: {
+              // Bloque legible para admin/historial (nombres)
+              size: item.customBowl.size.name,
+              bases: item.customBowl.bases.map((b) => b.name),
+              proteins: item.customBowl.proteins.map((p) => p.name),
+              acompanantes: item.customBowl.acompanantes.map((a) => a.name),
+              sauces: item.customBowl.sauces?.map((s) => s.name),
+              complementos: item.customBowl.complementos?.map((c) => c.name),
+              notes: item.notes,
+              // Bloque de validación server-side: la RPC recalcula el precio
+              // con estos ids contra el catálogo vivo y rechaza discrepancias.
+              validation: {
+                size: item.customBowl.size.size,
+                ingredient_ids: allIngredients
+                  .filter((ing) => !ing.id.startsWith('extra-'))
+                  .map((ing) => ing.id),
+                extras: allIngredients
+                  .filter((ing) => ing.id.startsWith('extra-'))
+                  .map((ing) => ({ name: ing.name, charge: ing.price ?? 0 })),
               },
-      }));
+            },
+          };
+        }
+        return {
+          brand_id: item.brand,
+          name: item.product?.name ?? 'Producto',
+          quantity: item.quantity,
+          unit_price_cents: item.unitPrice,
+          details: {
+            product_id: item.product?.id,
+            notes: item.notes,
+            customizations: item.customizations ?? null,
+          },
+        };
+      });
 
-      // create_order_with_items keeps order + order_items inserts atomic.
-      // It's SECURITY INVOKER — anon inserts are already allowed by RLS
-      // (orders/order_items have public FOR INSERT WITH CHECK (true) policies).
+      // create_order_with_items es SECURITY DEFINER y re-valida CADA precio
+      // (producto, variante, adicionales, bowl, zona) contra el catálogo vivo;
+      // el cliente solo calcula para mostrar. Cualquier discrepancia aborta
+      // la transacción completa.
       const { data: createdOrderId, error: createOrderError } = await supabase.rpc(
         'create_order_with_items',
         {
@@ -332,6 +380,7 @@ export default function CheckoutPage() {
           p_notes: form.notes || null,
           p_total_cents: finalOrderTotal,
           p_items: orderItems,
+          p_payment_method: paymentMethod,
         }
       );
 
@@ -344,6 +393,30 @@ export default function CheckoutPage() {
         );
         toast.error('Error al crear el pedido. Intenta de nuevo.');
         setOrderStatus('idle');
+        return;
+      }
+
+      if (paymentMethod === 'wompi') {
+        const { data: checkout, error: checkoutError } = await supabase.functions.invoke(
+          'wompi-create-checkout',
+          { body: { orderId: createdOrderId } },
+        );
+
+        if (checkoutError || !checkout?.checkoutUrl || !checkout?.fields) {
+          console.error('Error creating Wompi checkout:', checkoutError);
+          setSubmitError('El pedido se creó, pero no pudimos abrir el pago. Intenta nuevamente.');
+          toast.error('No fue posible iniciar el pago con Wompi.');
+          setOrderStatus('idle');
+          return;
+        }
+
+        setOrderStatus('redirecting');
+        sessionStorage.setItem('ohana-wompi-pending-order', createdOrderId);
+        const wompiUrl = new URL(checkout.checkoutUrl);
+        Object.entries(checkout.fields as Record<string, string>).forEach(([key, value]) => {
+          if (value) wompiUrl.searchParams.set(key, value);
+        });
+        window.location.assign(wompiUrl.toString());
         return;
       }
 
@@ -721,7 +794,7 @@ export default function CheckoutPage() {
                 {/* CHANGE 2 — Payment method */}
                 <AnimatedElement as="div" animation="fade-up" delay={150} className="bg-card rounded-xl p-6 border">
                   <h3 className="font-semibold mb-4">Método de pago</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('cash')}
@@ -751,7 +824,28 @@ export default function CheckoutPage() {
                       <span className="text-sm font-medium">Transferencia</span>
                       <span className="text-xs text-muted-foreground">Bancolombia, Nequi, Davivienda</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('wompi')}
+                      className={cn(
+                        'flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all duration-200',
+                        paymentMethod === 'wompi'
+                          ? 'ring-2 ring-brand bg-brand/5 dark:bg-brand/10'
+                          : 'border hover:border-brand/50',
+                      )}
+                    >
+                      <CreditCard className={cn('w-5 h-5', paymentMethod === 'wompi' ? 'text-brand' : 'text-muted-foreground')} />
+                      <span className="text-sm font-medium">Pago en línea</span>
+                      <span className="text-xs text-muted-foreground">Tarjeta, PSE, Nequi y más</span>
+                    </button>
                   </div>
+
+                  {paymentMethod === 'wompi' && (
+                    <div className="mt-4 rounded-xl border border-brand/20 bg-brand/5 p-4 text-sm text-muted-foreground animate-fade-in">
+                      Pagarás de forma segura en Wompi. Tu pedido se confirmará automáticamente cuando recibamos la aprobación del pago.
+                    </div>
+                  )}
 
                   {paymentMethod === 'transfer' && (
                     <div className="mt-4 rounded-xl bg-brand/5 dark:bg-brand/10 border border-brand/20 dark:border-brand/30 p-4 space-y-3 animate-fade-in">
@@ -859,8 +953,16 @@ export default function CheckoutPage() {
                     className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2 disabled:bg-muted disabled:text-muted-foreground"
                     size="lg"
                   >
-                    <MessageCircle className="w-5 h-5" />
-                    {orderStatus === 'submitting' ? 'Creando pedido...' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : 'Enviar por WhatsApp'}
+                    {paymentMethod === 'wompi'
+                      ? <CreditCard className="w-5 h-5" />
+                      : <MessageCircle className="w-5 h-5" />}
+                    {orderStatus === 'submitting' || orderStatus === 'redirecting'
+                      ? paymentMethod === 'wompi' ? 'Abriendo pago seguro...' : 'Creando pedido...'
+                      : submitBlockedByClosed
+                        ? 'Cerrado — fuera de horario'
+                        : paymentMethod === 'wompi'
+                          ? 'Continuar al pago'
+                          : 'Enviar por WhatsApp'}
                   </Button>
 
                   {!termsAccepted && !submitBlockedByClosed && (

@@ -12,7 +12,7 @@ interface OrderInfo {
   deliveryFeeCents?: number;
   notes?: string;
   orderId: string;
-  paymentMethod?: 'cash' | 'transfer';
+  paymentMethod?: 'cash' | 'transfer' | 'wompi';
 }
 
 const SEP = '─────────────────';
@@ -29,7 +29,12 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
   ];
 
   if (info.paymentMethod) {
-    lines.push(`Pago: ${info.paymentMethod === 'cash' ? 'Contra entrega' : 'Transferencia bancaria'}`);
+    const paymentLabels = {
+      cash: 'Contra entrega',
+      transfer: 'Transferencia bancaria',
+      wompi: 'Pago en línea con Wompi',
+    } as const;
+    lines.push(`Pago: ${paymentLabels[info.paymentMethod]}`);
   }
 
   if (info.orderType === 'delivery') {

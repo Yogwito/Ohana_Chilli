@@ -7,7 +7,7 @@ import {
   isBusinessOpenNow,
 } from '@/domain/businessSettings';
 import { resolveProductImageUrl } from '@/domain/productImages';
-import type { BowlSizeRule, Brand, Category, DeliveryZone, Ingredient, Product, Promotion } from '@/types';
+import type { Addon, BowlSizeRule, Brand, Category, DeliveryZone, Ingredient, Product, ProductVariant, Promotion } from '@/types';
 
 interface ProductQueryRow {
   id: string;
@@ -383,6 +383,78 @@ export function useProductDefaultIngredients(productId: string | null) {
       return data ?? [];
     },
     enabled: !!productId,
+    staleTime: 1000 * 60 * 10,
+  });
+}
+
+/**
+ * All ACTIVE product variants (flavors) grouped by product id. One query for
+ * the whole catalog: it powers both "does this product need a flavor?" and
+ * the selector options. RLS already filters inactive rows for anon.
+ */
+export function useProductVariantsMap() {
+  return useQuery({
+    queryKey: ['product_variants'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      const map: Record<string, ProductVariant[]> = {};
+      for (const row of (data ?? []) as Array<{
+        id: string; product_id: string; name: string; price_delta_cents: number; sort_order: number;
+      }>) {
+        (map[row.product_id] ??= []).push({
+          id: row.id,
+          productId: row.product_id,
+          name: row.name,
+          priceDelta: row.price_delta_cents,
+          sortOrder: row.sort_order,
+        });
+      }
+      return map;
+    },
+    ...liveCatalogQueryOptions,
+  });
+}
+
+/** Shared add-on catalog (official Chilli adicionales), active only. */
+export function useAddons() {
+  return useQuery({
+    queryKey: ['addons'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('addons')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      return ((data ?? []) as Array<{ id: string; name: string; price_cents: number; sort_order: number }>).map(
+        (row): Addon => ({ id: row.id, name: row.name, price: row.price_cents, sortOrder: row.sort_order }),
+      );
+    },
+    ...liveCatalogQueryOptions,
+  });
+}
+
+/** addon_id lists per category, in recommendation order. */
+export function useAddonRecommendations() {
+  return useQuery({
+    queryKey: ['addon_recommendations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('addon_recommendations')
+        .select('*')
+        .order('sort_order');
+      if (error) throw error;
+      const map: Record<string, string[]> = {};
+      for (const row of (data ?? []) as Array<{ category_id: string; addon_id: string }>) {
+        (map[row.category_id] ??= []).push(row.addon_id);
+      }
+      return map;
+    },
     staleTime: 1000 * 60 * 10,
   });
 }

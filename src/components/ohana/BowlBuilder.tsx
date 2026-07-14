@@ -437,6 +437,15 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
   const canProceed = isStepComplete(currentStep);
   const isOptionalBlank = Boolean(currentStepConfig && currentStepConfig.min === 0 && currentSelectionCount === 0);
+  const [confirmingIncomplete, setConfirmingIncomplete] = useState(false);
+  const missingCount = currentStepConfig
+    ? Math.max(0, currentStepConfig.min - currentSelectionCount)
+    : 0;
+
+  // Al cambiar de paso o completar la selección, retira la confirmación
+  useEffect(() => {
+    setConfirmingIncomplete(false);
+  }, [currentStep, canProceed]);
 
   const resetBuilder = () => {
     setSelectedSize(null);
@@ -503,8 +512,19 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     setCurrentStep(previousStep.id);
   };
 
-  const goNext = () => {
-    if (!canProceed) return;
+  const goNext = (force = false) => {
+    // Pasos incompletos: se puede continuar con menos selecciones, pero solo
+    // tras confirmación explícita (se muestra cuántas faltan y NO se agregan
+    // ingredientes automáticamente; los cupos sin usar no se cobran porque el
+    // precio del bowl es fijo por tamaño).
+    if (!canProceed) {
+      if (currentStep === 'size') return; // el tamaño sí es obligatorio
+      if (!force) {
+        setConfirmingIncomplete(true);
+        return;
+      }
+    }
+    setConfirmingIncomplete(false);
     const nextStep = steps[currentStepIndex + 1];
     if (!nextStep) return;
     setCurrentStep(nextStep.id);
@@ -1789,18 +1809,50 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             <Button onClick={handleSubmit} className="btn-ohana gap-2 min-h-[44px]">
               {getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
             </Button>
+          ) : confirmingIncomplete && !canProceed ? (
+            // Confirmación explícita para continuar con selecciones incompletas.
+            // No se agregan ingredientes automáticamente ni se cobra por los
+            // cupos sin usar (el precio del bowl es fijo por tamaño).
+            <div className="animate-fade-in w-full max-w-md rounded-2xl border border-amber-300 bg-amber-50 p-3 text-center dark:border-amber-700 dark:bg-amber-950/40">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                Te {missingCount === 1 ? 'falta 1 selección' : `faltan ${missingCount} selecciones`} incluida{missingCount === 1 ? '' : 's'} en tu bowl.
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                Puedes continuar así, pero no se reemplazarán ni descontarán del precio.
+              </p>
+              <div className="mt-2 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmingIncomplete(false)}
+                  className="min-h-[40px]"
+                >
+                  Seguir eligiendo
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => goNext(true)}
+                  className="min-h-[40px] bg-amber-600 text-white hover:bg-amber-700"
+                >
+                  Continuar de todos modos
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <Button
-                onClick={goNext}
-                disabled={!canProceed}
-                className={cn('btn-ohana gap-2 min-h-[44px] rounded-2xl px-6 py-3 font-semibold shadow-md hover:shadow-lg hover:bg-brand/90 active:scale-95 transition-all', !canProceed && 'opacity-50')}
+                onClick={() => goNext()}
+                disabled={currentStep === 'size' && !canProceed}
+                className={cn(
+                  'btn-ohana gap-2 min-h-[44px] rounded-2xl px-6 py-3 font-semibold shadow-md hover:shadow-lg hover:bg-brand/90 active:scale-95 transition-all',
+                  !canProceed && 'opacity-60',
+                )}
               >
                 {getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
                 <ChevronRight className="h-4 w-4" />
               </Button>
               {(currentStepConfig?.optional && currentSelectionCount === 0) || currentStep === 'upsell' ? (
-                <Button variant="ghost" size="sm" onClick={goNext} className="text-muted-foreground min-h-[44px] min-w-[44px] hover:text-foreground text-sm underline-offset-2 hover:underline">
+                <Button variant="ghost" size="sm" onClick={() => goNext()} className="text-muted-foreground min-h-[44px] min-w-[44px] hover:text-foreground text-sm underline-offset-2 hover:underline">
                   Saltar este paso →
                 </Button>
               ) : null}

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 import PromotionsAdmin from '@/components/admin/PromotionsAdmin';
+import VariantsAddonsAdmin from '@/components/admin/VariantsAddonsAdmin';
 import ProductsAdmin from '@/components/admin/ProductsAdmin';
 import SettingsAdminComponent from '@/components/admin/SettingsAdmin';
 
@@ -39,6 +40,7 @@ interface OrderRow {
   id: string; customer_name: string; phone: string; order_type: string;
   total_cents: number; status: string; created_at: string; notes: string | null; address: string | null;
   delivery_zone: string | null; delivery_fee_cents: number;
+  payment_method: string | null; payment_status: string; payment_transaction_id: string | null;
 }
 
 interface DeliveryZoneRow {
@@ -135,6 +137,7 @@ export default function AdminPage() {
             <TabsTrigger value="categories" title="Categorías" className="flex shrink-0 items-center gap-1.5"><Tag className="w-4 h-4" /><span className="hidden sm:inline">Categorías</span></TabsTrigger>
             <TabsTrigger value="ingredients" title="Ingredientes" className="flex shrink-0 items-center gap-1.5"><Salad className="w-4 h-4" /><span className="hidden sm:inline">Ingredientes</span></TabsTrigger>
             <TabsTrigger value="bowl_rules" title="Bowl Rules" className="flex shrink-0 items-center gap-1.5"><Ruler className="w-4 h-4" /><span className="hidden sm:inline">Bowls</span></TabsTrigger>
+            <TabsTrigger value="variants_addons" title="Variantes y Adicionales" className="flex shrink-0 items-center gap-1.5">🥤<span className="hidden sm:inline">Variantes</span></TabsTrigger>
             <TabsTrigger value="delivery_zones" title="Domicilios" className="flex shrink-0 items-center gap-1.5"><Truck className="w-4 h-4" /><span className="hidden sm:inline">Domicilios</span></TabsTrigger>
             <TabsTrigger value="settings" title="Configuración" className="flex shrink-0 items-center gap-1.5"><Settings className="w-4 h-4" /><span className="hidden sm:inline">Config</span></TabsTrigger>
             <TabsTrigger value="promotions" title="Promociones" className="flex shrink-0 items-center gap-1.5">🏷️<span className="hidden sm:inline">Promos</span></TabsTrigger>
@@ -146,6 +149,7 @@ export default function AdminPage() {
           <TabsContent value="categories"><CategoriesAdmin /></TabsContent>
           <TabsContent value="ingredients"><IngredientsAdmin /></TabsContent>
           <TabsContent value="bowl_rules"><BowlRulesAdmin /></TabsContent>
+          <TabsContent value="variants_addons"><VariantsAddonsAdmin /></TabsContent>
           <TabsContent value="delivery_zones"><DeliveryZonesAdmin /></TabsContent>
           <TabsContent value="settings"><SettingsAdminComponent /></TabsContent>
           <TabsContent value="promotions"><PromotionsAdmin /></TabsContent>
@@ -248,6 +252,18 @@ function OrdersAdmin() {
             </div>
           )}
           {order.order_type === 'pickup' && <p className="text-xs text-muted-foreground">🏪 Recoger en sucursal</p>}
+          {order.payment_method === 'wompi' && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className={order.payment_status === 'approved'
+                ? 'rounded-full bg-green-100 px-2 py-1 font-medium text-green-700'
+                : order.payment_status === 'pending'
+                  ? 'rounded-full bg-yellow-100 px-2 py-1 font-medium text-yellow-700'
+                  : 'rounded-full bg-red-100 px-2 py-1 font-medium text-red-700'}>
+                Wompi: {order.payment_status === 'approved' ? 'Pagado' : order.payment_status === 'pending' ? 'Pendiente' : 'No aprobado'}
+              </span>
+              {order.payment_transaction_id && <span className="font-mono text-muted-foreground">Tx: {order.payment_transaction_id}</span>}
+            </div>
+          )}
           {order.notes && <p className="text-xs text-muted-foreground">📝 {order.notes}</p>}
           <p className="text-xs font-mono text-muted-foreground">ID: {order.id.slice(0, 8)}</p>
         </div>
@@ -997,4 +1013,3 @@ function DeliveryZonesAdmin() {
     </div>
   );
 }
-

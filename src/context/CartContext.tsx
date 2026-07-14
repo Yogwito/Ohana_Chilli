@@ -3,6 +3,7 @@ import React, { createContext, useContext, useReducer, useEffect, useCallback, u
 import { CartItem, CartState, Product, CustomBowl, Brand, ProductCustomization } from '@/types';
 import { reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
 import { calculateBowlPrice } from '@/domain/bowlPricing';
+import { getCustomBowlSignature } from '@/domain/bowlSignature';
 import {
   calculateProductUnitPrice,
   getProductCustomizationKey,
@@ -25,6 +26,11 @@ const productCustomizationSchema = z.object({
   })),
   note: z.string(),
   extraTotal: z.number(),
+  variant: z.object({
+    id: z.string(),
+    name: z.string(),
+    priceDelta: z.number().optional(),
+  }).optional().nullable(),
 });
 
 const cartItemSchema = z.object({
@@ -52,6 +58,7 @@ type CartAction =
   | { type: 'ADD_PRODUCT'; payload: { product: Product; quantity: number; notes?: string; customizations?: ProductCustomization } }
   | { type: 'ADD_CUSTOM_BOWL'; payload: { customBowl: CustomBowl; notes?: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
+  | { type: 'UPDATE_ITEM_CUSTOMIZATIONS'; payload: { itemId: string; customizations?: ProductCustomization } }
   | { type: 'REMOVE_ITEM'; payload: { itemId: string } }
   | { type: 'RECONCILE_CATALOG'; payload: { products: Product[]; bowlRules: Parameters<typeof reconcileCartWithCatalog>[1]['bowlRules']; ingredients: Parameters<typeof reconcileCartWithCatalog>[1]['ingredients'] } }
   | { type: 'CLEAR_CART' }
@@ -108,10 +115,70 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     case 'ADD_CUSTOM_BOWL': {
       const { customBowl, notes } = action.payload;
       const unitPrice = calculateBowlPrice(customBowl);
-      const newItems = [...state.items, {
-        id: generateId(), brand: 'ohana' as Brand, type: 'custom-bowl' as const,
-        customBowl, quantity: 1, notes, unitPrice, totalPrice: unitPrice,
-      }];
+      // Identical configurations merge by quantity (deterministic signature:
+      // sorted ingredient ids + extras by name|charge + size + notes).
+      const signature = getCustomBowlSignature(customBowl);
+      const existingIndex = state.items.findIndex(
+        item => item.type === 'custom-bowl'
+          && item.customBowl
+          && getCustomBowlSignature(item.customBowl) === signature,
+      );
+      let newItems: CartItem[];
+      if (existingIndex >= 0) {
+        newItems = state.items.map((item, index) => {
+          if (index === existingIndex) {
+            const newQuantity = item.quantity + 1;
+            return { ...item, quantity: newQuantity, totalPrice: item.unitPrice * newQuantity };
+          }
+          return item;
+        });
+      } else {
+        newItems = [...state.items, {
+          id: generateId(), brand: 'ohana' as Brand, type: 'custom-bowl' as const,
+          customBowl, quantity: 1, notes, unitPrice, totalPrice: unitPrice,
+        }];
+      }
+      return { items: newItems, ...calculateTotals(newItems) };
+    }
+    case 'UPDATE_ITEM_CUSTOMIZATIONS': {
+      // Cart editing: reapply the drawer flow onto an existing line —
+      // recompute price and identity, then merge into an identical line if
+      // one exists, preserving the edited line's quantity.
+      const { itemId, customizations: rawCustomizations } = action.payload;
+      const target = state.items.find(item => item.id === itemId);
+      if (!target || target.type !== 'product' || !target.product) return state;
+
+      const customizations = normalizeProductCustomization(rawCustomizations);
+      const customizationKey = getProductCustomizationKey(customizations);
+      const normalizedNotes = getProductNotesKey(customizations, undefined);
+      const unitPrice = calculateProductUnitPrice(target.product.price, customizations);
+
+      const twin = state.items.find(item => {
+        if (item.id === itemId || item.type !== 'product' || item.product?.id !== target.product!.id) return false;
+        const itemCustomizations = normalizeProductCustomization(item.customizations);
+        return getProductCustomizationKey(itemCustomizations) === customizationKey
+          && getProductNotesKey(itemCustomizations, item.notes) === normalizedNotes;
+      });
+
+      let newItems: CartItem[];
+      if (twin) {
+        const mergedQuantity = twin.quantity + target.quantity;
+        newItems = state.items
+          .filter(item => item.id !== itemId)
+          .map(item => item.id === twin.id
+            ? { ...item, quantity: mergedQuantity, totalPrice: item.unitPrice * mergedQuantity }
+            : item);
+      } else {
+        newItems = state.items.map(item => item.id === itemId
+          ? {
+              ...item,
+              customizations,
+              notes: normalizedNotes || undefined,
+              unitPrice,
+              totalPrice: unitPrice * item.quantity,
+            }
+          : item);
+      }
       return { items: newItems, ...calculateTotals(newItems) };
     }
     case 'UPDATE_QUANTITY': {
@@ -149,6 +216,7 @@ interface CartActionsContextType {
   addProduct: (product: Product, quantity?: number, notes?: string, customizations?: ProductCustomization) => void;
   addCustomBowl: (customBowl: CustomBowl, notes?: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
+  updateItemCustomizations: (itemId: string, customizations?: ProductCustomization) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
   getItemCount: () => number;
@@ -194,10 +262,35 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     if (!catalogReady) return;
 
+    // Diff before dispatch so catalog adjustments are never silent: the
+    // customer is told when an item disappeared or a price changed.
+    const snapshot = { products, bowlRules, ingredients };
+    const reconciled = reconcileCartWithCatalog(cart, snapshot);
+    if (reconciled !== cart) {
+      const removedCount = cart.items.length - reconciled.items.length;
+      const repriced = reconciled.items.some(next => {
+        const prev = cart.items.find(item => item.id === next.id);
+        return prev && prev.unitPrice !== next.unitPrice;
+      });
+      if (removedCount > 0) {
+        toast.warning(
+          removedCount === 1
+            ? 'Un producto de tu carrito ya no está disponible y fue retirado.'
+            : `${removedCount} productos de tu carrito ya no están disponibles y fueron retirados.`,
+        );
+      } else if (repriced) {
+        toast.info('Actualizamos los precios de tu carrito con el menú vigente.');
+      }
+    }
+
     dispatch({
       type: 'RECONCILE_CATALOG',
-      payload: { products, bowlRules, ingredients },
+      payload: snapshot,
     });
+    // `cart` intentionally omitted: reconciliation must run on catalog
+    // changes, not on every cart mutation (the reducer already keeps state
+    // stable when nothing changed).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bowlRules, catalogReady, ingredients, products]);
 
   const addProduct = useCallback((product: Product, quantity = 1, notes?: string, customizations?: ProductCustomization) => {
@@ -212,6 +305,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'UPDATE_QUANTITY', payload: { itemId, quantity } });
   }, []);
 
+  const updateItemCustomizations = useCallback((itemId: string, customizations?: ProductCustomization) => {
+    dispatch({ type: 'UPDATE_ITEM_CUSTOMIZATIONS', payload: { itemId, customizations } });
+  }, []);
+
   const removeItem = useCallback((itemId: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: { itemId } });
   }, []);
@@ -224,8 +321,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const stateValue = useMemo(() => ({ cart }), [cart]);
   const actionsValue = useMemo(() => ({
-    addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand,
-  }), [addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand]);
+    addProduct, addCustomBowl, updateQuantity, updateItemCustomizations, removeItem, clearCart, getItemCount, getItemsByBrand,
+  }), [addProduct, addCustomBowl, updateQuantity, updateItemCustomizations, removeItem, clearCart, getItemCount, getItemsByBrand]);
 
   return (
     <CartStateContext.Provider value={stateValue}>

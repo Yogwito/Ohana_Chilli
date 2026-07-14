@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react';
-import { X, Minus, Plus } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Minus, Plus, Check } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useProductDefaultIngredients } from '@/hooks/use-catalog';
+import {
+  useProductDefaultIngredients,
+  useProductVariantsMap,
+  useAddons,
+  useAddonRecommendations,
+} from '@/hooks/use-catalog';
+import { isProductCustomizable } from '@/domain/productCustomizations';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
-import type { Product, ProductCustomization } from '@/types';
+import type { Addon, Product, ProductCustomization } from '@/types';
 
 export type ProductConfig = ProductCustomization;
 
@@ -14,79 +20,154 @@ interface ProductDrawerProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (config: ProductConfig) => void;
+  /** Prefill for cart editing: the item's existing configuration. */
+  initialConfig?: ProductCustomization | null;
+  /** Changes footer copy to "Actualizar" when editing an existing cart item. */
+  isEditing?: boolean;
 }
 
-export default function ProductDrawer({ product, open, onClose, onConfirm }: ProductDrawerProps) {
-  const { data: ingredients = [], isLoading } = useProductDefaultIngredients(product?.id ?? null);
+export default function ProductDrawer({
+  product,
+  open,
+  onClose,
+  onConfirm,
+  initialConfig,
+  isEditing = false,
+}: ProductDrawerProps) {
+  const { data: ingredients = [], isLoading: pdiLoading } = useProductDefaultIngredients(product?.id ?? null);
+  const { data: variantsMap, isLoading: variantsLoading } = useProductVariantsMap();
+  const { data: addons = [] } = useAddons();
+  const { data: recommendations } = useAddonRecommendations();
 
   const [removed, setRemoved] = useState<string[]>([]);
-  const [extraQty, setExtraQty] = useState<Record<string, number>>({});
+  const [addonQty, setAddonQty] = useState<Record<string, number>>({});
   const [note, setNote] = useState('');
+  const [variantId, setVariantId] = useState<string | null>(null);
+  const [showAllAddons, setShowAllAddons] = useState(false);
 
-  // Reset state when product changes
+  const variants = product ? (variantsMap?.[product.id] ?? []) : [];
+  const requiresVariant = variants.length > 0;
+  // Beverages and simple adicionales don't take add-ons; everything else does.
+  const allowsAddons = product ? isProductCustomizable(product) : false;
+
+  // Reset / prefill when the drawer opens for a product
   useEffect(() => {
-    setRemoved([]);
-    setExtraQty({});
-    setNote('');
-  }, [product?.id]);
+    if (!open) return;
+    const init = initialConfig ?? null;
+    setRemoved(init?.removedIngredients ?? []);
+    setNote(init?.note ?? '');
+    setVariantId(init?.variant?.id ?? null);
+    const qty: Record<string, number> = {};
+    for (const extra of init?.extras ?? []) {
+      qty[extra.id] = (qty[extra.id] ?? 0) + 1;
+    }
+    setAddonQty(qty);
+    setShowAllAddons(false);
+  }, [open, product?.id, initialConfig]);
+
+  const orderedAddons = useMemo(() => {
+    if (!product) return { recommended: [] as Addon[], rest: [] as Addon[] };
+    const recIds = recommendations?.[product.categoryId] ?? [];
+    const byId = new Map(addons.map((a) => [a.id, a]));
+    const recommended = recIds.map((id) => byId.get(id)).filter((a): a is Addon => Boolean(a));
+    const recommendedIds = new Set(recommended.map((a) => a.id));
+    const rest = addons.filter((a) => !recommendedIds.has(a.id));
+    return { recommended, rest };
+  }, [product, addons, recommendations]);
 
   if (!product) return null;
 
-  const removableIngredients = ingredients.filter(i => i.is_removable && !i.is_extra);
-  const extraIngredients = ingredients.filter(i => i.is_extra);
-  const hasConfiguredIngredients = ingredients.length > 0;
+  const removableIngredients = ingredients.filter((i) => i.is_removable && !i.is_extra);
+  const selectedVariant = variants.find((v) => v.id === variantId) ?? null;
 
   const toggleRemoved = (name: string) => {
-    setRemoved(prev =>
-      prev.includes(name) ? prev.filter(r => r !== name) : [...prev, name],
-    );
+    setRemoved((prev) => (prev.includes(name) ? prev.filter((r) => r !== name) : [...prev, name]));
   };
 
-  const changeExtraQty = (id: string, delta: number) => {
-    setExtraQty(prev => {
+  const changeAddonQty = (id: string, delta: number) => {
+    setAddonQty((prev) => {
       const next = (prev[id] ?? 0) + delta;
       if (next <= 0) {
-        const { [id]: _, ...rest } = prev;
+        const { [id]: _removed, ...rest } = prev;
         return rest;
       }
       return { ...prev, [id]: next };
     });
   };
 
-  const extrasSelected = extraIngredients.flatMap(ing => {
-    const qty = extraQty[ing.id] ?? 0;
-    return Array.from({ length: qty }, () => ({
-      id: ing.id,
-      name: ing.ingredient_name,
-      price: ing.extra_price_cents,
-    }));
-  });
+  // Expanded copies: quantity N = N entries, so pricing and cart identity
+  // (sorted extras) capture quantities without a separate field.
+  const extrasSelected = allowsAddons
+    ? addons.flatMap((addon) => {
+        const qty = addonQty[addon.id] ?? 0;
+        return Array.from({ length: qty }, () => ({ id: addon.id, name: addon.name, price: addon.price }));
+      })
+    : [];
 
   const extraTotal = extrasSelected.reduce((s, e) => s + e.price, 0);
-  const totalPrice = product.price + extraTotal;
+  const totalPrice = product.price + extraTotal + (selectedVariant?.priceDelta ?? 0);
+  const canConfirm = !requiresVariant || Boolean(selectedVariant);
+  const isLoading = pdiLoading || (requiresVariant && variantsLoading);
+
+  const buildConfig = (): ProductConfig => ({
+    removedIngredients: removed,
+    extras: extrasSelected,
+    note,
+    extraTotal,
+    variant: selectedVariant
+      ? { id: selectedVariant.id, name: selectedVariant.name, priceDelta: selectedVariant.priceDelta }
+      : undefined,
+  });
 
   const handleConfirm = () => {
-    onConfirm({ removedIngredients: removed, extras: extrasSelected, note, extraTotal });
+    if (!canConfirm) return;
+    onConfirm(buildConfig());
     onClose();
   };
 
-  const handleAddWithoutChanges = () => {
-    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0 });
-    onClose();
-  };
-
-  const handleAddWithoutConfiguredIngredients = () => {
-    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0 });
-    onClose();
+  const renderAddonRow = (addon: Addon) => {
+    const qty = addonQty[addon.id] ?? 0;
+    return (
+      <div
+        key={addon.id}
+        className="flex items-center justify-between border border-dashed border-brand/40 bg-brand/5 rounded-xl px-4 py-3"
+      >
+        <div>
+          <p className="text-sm font-medium text-foreground">{addon.name}</p>
+          <span className="text-xs bg-brand/10 text-brand rounded-full px-2 py-0.5 mt-0.5 inline-block">
+            +{formatPrice(addon.price)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => changeAddonQty(addon.id, -1)}
+            disabled={qty === 0}
+            className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
+            aria-label={`Quitar ${addon.name}`}
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span className="w-6 text-center text-sm font-semibold">{qty}</span>
+          <button
+            type="button"
+            onClick={() => changeAddonQty(addon.id, 1)}
+            className="w-8 h-8 rounded-full border border-brand bg-brand/10 text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors"
+            aria-label={`Agregar ${addon.name}`}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <Sheet open={open} onOpenChange={open => { if (!open) onClose(); }}>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent
         side="bottom"
         className="sm:side-right h-[90dvh] sm:h-full sm:max-w-md sm:left-auto rounded-t-2xl sm:rounded-none p-0 flex flex-col"
       >
-        {/* Close button */}
         <button
           type="button"
           onClick={onClose}
@@ -96,9 +177,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
           <X className="w-5 h-5" />
         </button>
 
-        {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Product image */}
           {product.imageUrl && (
             <img
               src={product.imageUrl}
@@ -108,34 +187,65 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
           )}
 
           <div className="p-5 space-y-6">
-            {/* Header */}
             <div>
               <SheetTitle className="text-xl font-bold text-foreground">{product.name}</SheetTitle>
               <SheetDescription>
-                Personaliza el producto antes de agregarlo al carrito.
+                {requiresVariant
+                  ? 'Elige tu sabor y personaliza antes de agregar al carrito.'
+                  : 'Personaliza el producto antes de agregarlo al carrito.'}
               </SheetDescription>
               <p className="text-brand font-bold mt-1">{formatPrice(product.price)}</p>
             </div>
 
             {isLoading ? (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-44 rounded" />
-                  <Skeleton className="h-10 w-full rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-36 rounded" />
-                  <Skeleton className="h-20 w-full rounded-xl" />
-                </div>
+                <Skeleton className="h-4 w-44 rounded" />
+                <Skeleton className="h-10 w-full rounded-xl" />
+                <Skeleton className="h-20 w-full rounded-xl" />
               </div>
             ) : (
               <>
-                {/* Sección 1: Quitar ingredientes */}
+                {/* Sabor / variante — obligatorio si el producto tiene variantes */}
+                {requiresVariant && (
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-2">
+                      Elige tu sabor <span className="text-red-500">*</span>
+                    </p>
+                    <div className="space-y-1.5" role="radiogroup" aria-label="Sabor">
+                      {variants.map((variant) => {
+                        const isSelected = variantId === variant.id;
+                        return (
+                          <button
+                            key={variant.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            onClick={() => setVariantId(variant.id)}
+                            className={cn(
+                              'w-full flex items-center justify-between rounded-xl border px-4 py-2.5 text-sm text-left transition-all',
+                              isSelected
+                                ? 'border-brand bg-brand/10 font-semibold text-brand-dark'
+                                : 'border-border bg-background hover:border-brand/40',
+                            )}
+                          >
+                            <span>
+                              {variant.name}
+                              {variant.priceDelta > 0 ? ` (+${formatPrice(variant.priceDelta)})` : ''}
+                            </span>
+                            {isSelected && <Check className="w-4 h-4 shrink-0 text-brand" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quitar ingredientes (solo los del producto) */}
                 {removableIngredients.length > 0 && (
                   <div>
                     <p className="text-sm font-semibold text-foreground mb-2">¿Quieres quitar algo?</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {removableIngredients.map(ing => {
+                      {removableIngredients.map((ing) => {
                         const isRemoved = removed.includes(ing.ingredient_name);
                         return (
                           <button
@@ -157,57 +267,35 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
                   </div>
                 )}
 
-                {/* Sección 2: Extras de pago */}
-                {extraIngredients.length > 0 && (
+                {/* Adicionales — catálogo compartido, recomendados primero */}
+                {allowsAddons && addons.length > 0 && (
                   <div>
                     <p className="text-sm font-semibold text-foreground mb-2">¿Le agregamos algo?</p>
                     <div className="space-y-2">
-                      {extraIngredients.map(ing => {
-                        const qty = extraQty[ing.id] ?? 0;
-                        return (
-                          <div
-                            key={ing.id}
-                            className="flex items-center justify-between border border-dashed border-brand/40 bg-brand/5 rounded-xl px-4 py-3"
-                          >
-                            <div>
-                              <p className="text-sm font-medium text-foreground">{ing.ingredient_name}</p>
-                              <span className="text-xs bg-brand/10 text-brand rounded-full px-2 py-0.5 mt-0.5 inline-block">
-                                +{formatPrice(ing.extra_price_cents)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => changeExtraQty(ing.id, -1)}
-                                disabled={qty === 0}
-                                className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
-                                aria-label="Quitar"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-                              <span className="w-6 text-center text-sm font-semibold">{qty}</span>
-                              <button
-                                type="button"
-                                onClick={() => changeExtraQty(ing.id, 1)}
-                                className="w-8 h-8 rounded-full border border-brand bg-brand/10 text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors"
-                                aria-label="Agregar"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {(orderedAddons.recommended.length > 0
+                        ? orderedAddons.recommended
+                        : orderedAddons.rest
+                      ).map(renderAddonRow)}
+                      {showAllAddons && orderedAddons.recommended.length > 0 && orderedAddons.rest.map(renderAddonRow)}
                     </div>
+                    {orderedAddons.recommended.length > 0 && orderedAddons.rest.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllAddons((v) => !v)}
+                        className="mt-2 text-xs font-medium text-brand hover:underline"
+                      >
+                        {showAllAddons ? 'Ver menos' : `Ver todos los adicionales (${orderedAddons.rest.length} más)`}
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {/* Sección 3: Nota para la cocina */}
+                {/* Nota para la cocina */}
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-2">Nota para la cocina</p>
                   <textarea
                     value={note}
-                    onChange={e => setNote(e.target.value)}
+                    onChange={(e) => setNote(e.target.value)}
                     placeholder="Ej: sin cebolla, bien cocido..."
                     rows={2}
                     className="w-full border border-border rounded-lg p-3 text-sm resize-none bg-background focus:outline-none focus:ring-2 focus:ring-brand/30"
@@ -232,30 +320,23 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
             >
               Cargando opciones...
             </button>
-          ) : hasConfiguredIngredients ? (
-            <>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
-              >
-                Agregar al carrito · {formatPrice(totalPrice)}
-              </button>
-              <button
-                type="button"
-                onClick={handleAddWithoutChanges}
-                className="w-full border border-border text-foreground py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors"
-              >
-                Agregar sin cambios
-              </button>
-            </>
           ) : (
             <button
               type="button"
-              onClick={handleAddWithoutConfiguredIngredients}
-              className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
+              onClick={handleConfirm}
+              disabled={!canConfirm}
+              className={cn(
+                'w-full py-3 rounded-xl font-semibold text-sm transition-colors',
+                canConfirm
+                  ? 'bg-brand text-white hover:bg-brand/90'
+                  : 'bg-muted text-muted-foreground cursor-not-allowed',
+              )}
             >
-              Agregar sin cambios →
+              {!canConfirm
+                ? 'Elige un sabor para continuar'
+                : isEditing
+                  ? `Actualizar · ${formatPrice(totalPrice)}`
+                  : `Agregar al carrito · ${formatPrice(totalPrice)}`}
             </button>
           )}
         </div>

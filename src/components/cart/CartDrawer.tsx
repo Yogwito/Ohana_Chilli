@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import { useCart } from '@/context/CartContext';
-import { Minus, Plus, Trash2, ShoppingBag, Leaf } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, Leaf, Pencil } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatProductCustomizationLines } from '@/domain/productCustomizations';
+import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
+import type { CartItem } from '@/types';
 
 interface CartDrawerProps {
   open: boolean;
@@ -15,9 +18,15 @@ interface CartDrawerProps {
 }
 
 export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
-  const { cart, updateQuantity, removeItem } = useCart();
+  const { cart, updateQuantity, updateItemCustomizations, removeItem } = useCart();
+  const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleEditConfirm = (config: ProductConfig) => {
+    if (editingItem) updateItemCustomizations(editingItem.id, config);
+    setEditingItem(null);
+  };
 
   const currentPath = `${location.pathname}${location.search}${location.hash}`;
 
@@ -114,13 +123,24 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                               <p className="mt-0.5 text-xs italic text-muted-foreground">Nota: {item.notes}</p>
                             )}
                           </div>
-                          <button
-                            onClick={() => removeItem(item.id)}
-                            className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            aria-label={`Eliminar ${item.type === 'product' ? item.product?.name ?? 'producto' : 'bowl personalizado'}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center">
+                            {item.type === 'product' && item.product && (
+                              <button
+                                onClick={() => setEditingItem(item)}
+                                className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-brand/10 hover:text-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                aria-label={`Editar ${item.product.name}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              aria-label={`Eliminar ${item.type === 'product' ? item.product?.name ?? 'producto' : 'bowl personalizado'}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
 
                         <div className="mt-2 flex items-center justify-between">
@@ -175,6 +195,16 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
           </>
         )}
       </SheetContent>
+
+      {/* Cart editing: same customization flow, prefilled */}
+      <ProductDrawer
+        product={editingItem?.product ?? null}
+        open={editingItem !== null}
+        onClose={() => setEditingItem(null)}
+        onConfirm={handleEditConfirm}
+        initialConfig={editingItem?.customizations ?? null}
+        isEditing
+      />
     </Sheet>
   );
 }

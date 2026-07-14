@@ -97,6 +97,15 @@ function normalizeExtra(extra: ProductCustomizationExtra) {
   return { id, name, price };
 }
 
+function normalizeVariant(variant?: ProductCustomization['variant'] | null) {
+  if (!variant) return undefined;
+  const id = normalizeText(variant.id);
+  const name = normalizeText(variant.name);
+  if (!id || !name) return undefined;
+  const priceDelta = Number.isFinite(variant.priceDelta) ? Number(variant.priceDelta) : 0;
+  return { id, name, priceDelta };
+}
+
 export function normalizeProductCustomization(
   customizations?: ProductCustomization | null,
 ): ProductCustomization | undefined {
@@ -111,13 +120,14 @@ export function normalizeProductCustomization(
     .map(normalizeExtra)
     .filter((extra): extra is ProductCustomizationExtra => Boolean(extra));
   const note = normalizeText(customizations.note);
+  const variant = normalizeVariant(customizations.variant);
   const extraTotal = extras.reduce((sum, extra) => sum + extra.price, 0);
 
-  if (removedIngredients.length === 0 && extras.length === 0 && !note) {
+  if (removedIngredients.length === 0 && extras.length === 0 && !note && !variant) {
     return undefined;
   }
 
-  return { removedIngredients, extras, note, extraTotal };
+  return { removedIngredients, extras, note, extraTotal, variant };
 }
 
 export function getProductCustomizationKey(customizations?: ProductCustomization | null) {
@@ -135,6 +145,7 @@ export function getProductCustomizationKey(customizations?: ProductCustomization
     removedIngredients: sortedRemoved,
     extras: sortedExtras,
     note: normalized.note,
+    variant: normalized.variant ? normalized.variant.id : null,
   });
 }
 
@@ -143,7 +154,7 @@ export function calculateProductUnitPrice(
   customizations?: ProductCustomization | null,
 ) {
   const normalized = normalizeProductCustomization(customizations);
-  return basePrice + (normalized?.extraTotal ?? 0);
+  return basePrice + (normalized?.extraTotal ?? 0) + (normalized?.variant?.priceDelta ?? 0);
 }
 
 export function formatProductCustomizationLines(customizations?: ProductCustomization | null) {
@@ -152,13 +163,29 @@ export function formatProductCustomizationLines(customizations?: ProductCustomiz
 
   const lines: string[] = [];
 
+  if (normalized.variant) {
+    lines.push(`Sabor: ${normalized.variant.name}`);
+  }
+
   if (normalized.removedIngredients.length > 0) {
     lines.push(`Sin: ${normalized.removedIngredients.join(', ')}`);
   }
 
   if (normalized.extras.length > 0) {
-    const extras = normalized.extras
-      .map((extra) => `${extra.name} (+${formatPrice(extra.price)})`)
+    // Repeated add-ons (double bacon…) collapse to "Tocineta x2 (+$9.000)"
+    const grouped = new Map<string, { name: string; price: number; qty: number }>();
+    for (const extra of normalized.extras) {
+      const key = `${extra.id}|${extra.name}|${extra.price}`;
+      const entry = grouped.get(key);
+      if (entry) entry.qty += 1;
+      else grouped.set(key, { name: extra.name, price: extra.price, qty: 1 });
+    }
+    const extras = Array.from(grouped.values())
+      .map((e) =>
+        e.qty > 1
+          ? `${e.name} x${e.qty} (+${formatPrice(e.price * e.qty)})`
+          : `${e.name} (+${formatPrice(e.price)})`,
+      )
       .join(', ');
     lines.push(`Adicionales: ${extras}`);
   }
