@@ -72,22 +72,29 @@ function elapsedLabel(order: KanbanOrder, now: Date) {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
-function playNewOrderSound() {
+function createAudioContext() {
   const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) return;
-  const context = new AudioContextClass();
+  return AudioContextClass ? new AudioContextClass() : null;
+}
+
+function playNewOrderSound(context: AudioContext) {
   const oscillator = context.createOscillator();
+  const secondOscillator = context.createOscillator();
   const gain = context.createGain();
-  oscillator.frequency.setValueAtTime(740, context.currentTime);
-  oscillator.frequency.setValueAtTime(920, context.currentTime + 0.12);
+  const now = context.currentTime;
+  oscillator.frequency.setValueAtTime(740, now);
+  oscillator.frequency.setValueAtTime(920, now + 0.14);
+  secondOscillator.frequency.setValueAtTime(1100, now + 0.3);
   gain.gain.setValueAtTime(0.0001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.32);
+  gain.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.58);
   oscillator.connect(gain);
+  secondOscillator.connect(gain);
   gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.34);
-  oscillator.addEventListener('ended', () => context.close());
+  oscillator.start(now);
+  secondOscillator.start(now + 0.28);
+  oscillator.stop(now + 0.3);
+  secondOscillator.stop(now + 0.56);
 }
 
 function OrderCard({ order, now, onOpen }: { order: KanbanOrder; now: Date; onOpen: () => void }) {
@@ -210,10 +217,9 @@ export default function OrdersKanban() {
   const [search, setSearch] = useState('');
   const [orderType, setOrderType] = useState<'all' | 'pickup' | 'delivery'>('all');
   const [mobileColumn, setMobileColumn] = useState('new');
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [alertsArmed, setAlertsArmed] = useState(false);
   const [now, setNow] = useState(new Date());
-  const soundEnabledRef = useRef(soundEnabled);
-  soundEnabledRef.current = soundEnabled;
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const fetchOrders = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
@@ -241,11 +247,32 @@ export default function OrdersKanban() {
     const timer = window.setInterval(() => setNow(new Date()), 30000);
     return () => window.clearInterval(timer);
   }, []);
+  const pendingOrders = useMemo(() => orders.filter((order) => order.status === 'pending'), [orders]);
+  useEffect(() => {
+    if (!alertsArmed || pendingOrders.length === 0 || !audioContextRef.current) return;
+    const ring = () => {
+      const context = audioContextRef.current;
+      if (!context) return;
+      if (context.state === 'suspended') context.resume();
+      playNewOrderSound(context);
+    };
+    ring();
+    const alarm = window.setInterval(ring, 12000);
+    return () => window.clearInterval(alarm);
+  }, [alertsArmed, pendingOrders.length]);
+  useEffect(() => {
+    const originalTitle = document.title;
+    if (pendingOrders.length > 0) document.title = `(${pendingOrders.length}) Pedidos nuevos · Ohana`;
+    return () => { document.title = originalTitle; };
+  }, [pendingOrders.length]);
+  useEffect(() => () => {
+    audioContextRef.current?.close();
+    audioContextRef.current = null;
+  }, []);
   useEffect(() => {
     const channel = supabase.channel('orders-kanban-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         if ((payload.new as { status?: string }).status === 'pending') {
-          if (soundEnabledRef.current) playNewOrderSound();
           toast.success('Nuevo pedido recibido', { duration: 8000 });
         }
         fetchOrders();
@@ -266,6 +293,21 @@ export default function OrdersKanban() {
   }, [orderType, orders, search]);
 
   const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? null;
+  const armAlerts = async () => {
+    if (!audioContextRef.current) audioContextRef.current = createAudioContext();
+    if (!audioContextRef.current) {
+      toast.error('Este navegador no permite reproducir alertas de sonido');
+      return;
+    }
+    await audioContextRef.current.resume();
+    playNewOrderSound(audioContextRef.current);
+    setAlertsArmed(true);
+    toast.success('Turno iniciado · alertas activas');
+  };
+  const pauseAlerts = () => {
+    setAlertsArmed(false);
+    toast.info('Alertas de sonido pausadas');
+  };
   const moveOrder = async (order: KanbanOrder, status: OrderStatus) => {
     setBusy(true);
     const { data, error } = await supabase.rpc('transition_order_status' as never, {
@@ -301,6 +343,44 @@ export default function OrdersKanban() {
 
   return (
     <div className="space-y-4">
+      {!alertsArmed ? (
+        <div className="flex flex-col gap-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between" role="alert">
+          <div className="flex items-start gap-3">
+            <span className="relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-400 text-amber-950">
+              <BellOff className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-bold">Las alertas están pausadas</p>
+              <p className="mt-1 text-sm opacity-80">Inicia el turno para escuchar los pedidos nuevos. El navegador requiere esta activación manual.</p>
+            </div>
+          </div>
+          <Button onClick={armAlerts} className="h-11 shrink-0 rounded-xl bg-amber-950 text-amber-50 hover:bg-amber-900 dark:bg-amber-400 dark:text-amber-950 dark:hover:bg-amber-300">
+            <Bell className="mr-2 h-4 w-4" />Iniciar turno y activar alertas
+          </Button>
+        </div>
+      ) : pendingOrders.length > 0 ? (
+        <div className="flex flex-col gap-4 rounded-2xl border-2 border-red-500 bg-red-50 p-4 text-red-950 shadow-sm dark:bg-red-950/30 dark:text-red-100 sm:flex-row sm:items-center sm:justify-between" role="alert" aria-live="assertive">
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-white motion-safe:animate-pulse">
+              <Bell className="h-5 w-5" />
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 font-mono text-[10px] font-black text-red-700">{pendingOrders.length}</span>
+            </span>
+            <div>
+              <p className="font-black">{pendingOrders.length === 1 ? 'Hay un pedido esperando aceptación' : `Hay ${pendingOrders.length} pedidos esperando aceptación`}</p>
+              <p className="mt-1 text-sm opacity-80">La alarma continuará hasta aceptar o cancelar todos los pedidos nuevos.</p>
+            </div>
+          </div>
+          <Button onClick={() => setSelectedOrderId(pendingOrders[0].id)} className="h-11 shrink-0 rounded-xl bg-red-600 text-white hover:bg-red-700">
+            Revisar primer pedido<ChevronRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
+          <span className="flex items-center gap-2 font-medium"><Bell className="h-4 w-4" />Alertas activas · no hay pedidos pendientes</span>
+          <button type="button" onClick={pauseAlerts} className="min-h-9 rounded-lg px-2 text-xs font-semibold underline-offset-4 hover:underline">Pausar</button>
+        </div>
+      )}
+
       <div className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -317,8 +397,8 @@ export default function OrdersKanban() {
                 <button key={value} onClick={() => setOrderType(value)} className={cn('min-h-9 rounded-lg px-3 font-medium', orderType === value && 'bg-background shadow-sm')}>{label}</button>
               ))}
             </div>
-            <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl" onClick={() => { setSoundEnabled((value) => !value); if (!soundEnabled) playNewOrderSound(); }} aria-label={soundEnabled ? 'Desactivar sonido' : 'Activar sonido'}>
-              {soundEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+            <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl" onClick={alertsArmed ? pauseAlerts : armAlerts} aria-label={alertsArmed ? 'Pausar sonido' : 'Activar sonido'}>
+              {alertsArmed ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
             </Button>
             <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl" onClick={() => fetchOrders(true)} aria-label="Actualizar pedidos"><RefreshCw className="h-4 w-4" /></Button>
           </div>
