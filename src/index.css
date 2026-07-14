@@ -381,6 +381,22 @@
   to { transform: translateY(0); }
 }
 
+/* ── Brand marquee (BrandMarquee.tsx) ───────────────────────────────────── */
+.marquee-track {
+  animation: marquee-scroll 30s linear infinite;
+}
+
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-33.3333%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
 /* Multi-line text truncation */
 .line-clamp-2 {
   display: -webkit-box;

@@ -11,6 +11,9 @@ import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import ProductImage from '@/components/products/ProductImage';
 import ProductDrawer from '@/components/products/ProductDrawer';
 import ScrollHero from '@/components/ohana/ScrollHero';
+import BrandMarquee from '@/components/ohana/BrandMarquee';
+import MagneticButton from '@/components/ui/MagneticButton';
+import { useGsapReveal } from '@/hooks/use-gsap-reveal';
 import {
   buildBusinessWhatsAppUrl,
   formatCompactHours,
@@ -148,6 +151,7 @@ function ProductRow({
 
 export default function OhanaPage() {
   const location = useLocation();
+  const pageRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const promotionsRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -262,15 +266,26 @@ export default function OhanaPage() {
     return () => observer.disconnect();
   }, [visibleCategories]);
 
-  // Scroll active tab into view in the tabs bar when activeSlug changes
+  // Scroll active tab into view in the tabs bar when activeSlug changes.
+  // Skipped on mount: block 'nearest' would vertically scroll the PAGE to the
+  // tab bar on load, yanking the user past the hero before they ever scroll.
+  const tabSyncReadyRef = useRef(false);
   useEffect(() => {
+    if (!tabSyncReadyRef.current) {
+      tabSyncReadyRef.current = true;
+      return;
+    }
     if (!tabsRef.current) return;
     const activeBtn = tabsRef.current.querySelector<HTMLElement>('[data-active="true"]');
     activeBtn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [activeSlug]);
 
+  // GSAP scroll-triggered entrances for [data-reveal] elements; re-scans as
+  // sections render (products load, search filters, view mode changes)
+  useGsapReveal(pageRef, [visibleCategories, searchQuery, compactView, isLoading]);
+
   return (
-    <div className="min-h-screen bg-background">
+    <div ref={pageRef} className="min-h-screen bg-background">
       <SEOHead
         title="Ohana Bowls — Menú"
         description="Bowls frescos, burgers, hot dogs, nachos y más. Arma tu bowl o elige entre nuestras opciones."
@@ -385,6 +400,9 @@ export default function OhanaPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Brand marquee strip ─────────────────────────────────────────── */}
+      <BrandMarquee />
 
       {/* ── SECTION 2: Promotions ───────────────────────────────────────── */}
       <div ref={promotionsRef}>
@@ -523,21 +541,28 @@ export default function OhanaPage() {
                   data-section={cat.slug}
                 >
                   {/* Category section header */}
-                  <AnimatedElement animation="fade-up">
-                    <div className="py-3 mb-2">
-                      <div className="flex items-center gap-3">
-                        <h2 className="font-display font-bold text-xl sm:text-2xl tracking-tight text-foreground dark:text-white">
-                          {cat.name}
-                        </h2>
-                        {isBowlBuilder && (
-                          <span className="text-xs bg-brand text-white px-2 py-0.5 rounded-full font-semibold">
-                            Personalizable
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 h-[3px] w-8 rounded-full bg-brand mb-4" />
+                  <div data-reveal className="py-3 mb-2">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="hero-title text-2xl sm:text-4xl tracking-tight text-foreground dark:text-white">
+                        {cat.name}
+                      </h2>
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 rounded-full shrink-0 translate-y-[-2px]"
+                        style={{ background: 'hsl(var(--maiz))' }}
+                      />
+                      {isBowlBuilder && (
+                        <span className="text-xs bg-brand text-white px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
+                          Personalizable
+                        </span>
+                      )}
                     </div>
-                  </AnimatedElement>
+                    {!isBowlBuilder && (
+                      <p className="mt-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        {products.length} {products.length === 1 ? 'opción' : 'opciones'}
+                      </p>
+                    )}
+                  </div>
 
                   {/* Bowl Builder section */}
                   {isBowlBuilder && (
@@ -566,15 +591,28 @@ export default function OhanaPage() {
         )}
       </div>
 
-      {/* ── WhatsApp CTA ─────────────────────────────────────────────────── */}
+      {/* ── WhatsApp CTA — back on the emerald tabletop ─────────────────── */}
       {whatsappHref ? (
-        <div className="container max-w-4xl px-4 pb-8">
-          <div className="flex items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-brand to-brand-dark p-5">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs text-white/80">📍 Cable Plaza · Piso 4 Terraza</p>
-              <h3 className="text-base font-semibold text-white">¿Listo para pedir?</h3>
+        <div className="hero-grain relative overflow-hidden mt-6" style={{ background: 'hsl(var(--mesa))' }}>
+          <div className="container max-w-4xl px-4 py-14 sm:py-20 flex flex-col items-center text-center gap-5">
+            <p data-reveal className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'hsl(var(--maiz))' }}>
+              📍 Cable Plaza · Piso 4 Terraza
+            </p>
+            <h3 data-reveal className="hero-title text-3xl sm:text-5xl text-white leading-tight max-w-xl">
+              ¿Listo para tu bowl?
+            </h3>
+            <div data-reveal>
+              <MagneticButton
+                as="a"
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 rounded-full bg-white px-8 py-3.5 text-sm font-bold text-brand-dark shadow-xl hover:shadow-2xl transition-shadow"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Pedir por WhatsApp
+              </MagneticButton>
             </div>
-            <span className="shrink-0 select-none text-5xl opacity-90">🥗</span>
           </div>
         </div>
       ) : null}
