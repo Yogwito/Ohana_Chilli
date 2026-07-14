@@ -4,8 +4,9 @@ import { resolveActiveMenuSection } from '@/domain/menuScrollSpy';
 const sections = [
   { slug: 'bowls', top: -640 },
   { slug: 'nachos', top: -120 },
-  { slug: 'bebidas', top: 360 },
-  { slug: 'adicionales', top: 620 },
+  { slug: 'combos', top: 260 },
+  { slug: 'adicionales', top: 520 },
+  { slug: 'bebidas', top: 760 },
 ];
 
 describe('resolveActiveMenuSection', () => {
@@ -17,12 +18,12 @@ describe('resolveActiveMenuSection', () => {
     })).toBe('nachos');
   });
 
-  it('selects the final category at the bottom even when it is too short to cross the activation line', () => {
+  it('selects Bebidas at the bottom on mobile or desktop even when the final section is short', () => {
     expect(resolveActiveMenuSection({
       sections,
       activationLine: 121,
       isAtPageEnd: true,
-    })).toBe('adicionales');
+    })).toBe('bebidas');
   });
 
   it('keeps the first category active before the menu reaches the navigation', () => {
