@@ -26,7 +26,9 @@ export function getIngredientExtraCharge(item: Ingredient): number {
   if (!isExtraItem) return 0;
 
   if (item.type === 'protein') return EXTRA_PROTEIN_PRICE;
-  if (item.type === 'acompanante' || item.type === 'topping') return EXTRA_TOPPING_PRICE;
+  if (item.type === 'acompanante' || item.type === 'topping' || item.type === 'sauce' || item.type === 'base') {
+    return EXTRA_TOPPING_PRICE;
+  }
 
   return 0;
 }

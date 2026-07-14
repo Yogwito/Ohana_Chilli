@@ -9,21 +9,19 @@ import SEOHead from '@/components/SEOHead';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import ProductImage from '@/components/products/ProductImage';
-import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
+import ProductDrawer from '@/components/products/ProductDrawer';
+import ScrollHero from '@/components/ohana/ScrollHero';
+import BrandMarquee from '@/components/ohana/BrandMarquee';
+import MagneticButton from '@/components/ui/MagneticButton';
+import { useGsapReveal } from '@/hooks/use-gsap-reveal';
 import {
   buildBusinessWhatsAppUrl,
   formatCompactHours,
   isBusinessOpenNow,
 } from '@/domain/businessSettings';
-import {
-  calculateProductUnitPrice,
-  isProductCustomizable,
-  normalizeProductCustomization,
-} from '@/domain/productCustomizations';
+import { formatPrice } from '@/domain/formatPrice';
 import { useBusinessSettings, useProducts, useCategories, usePromotions } from '@/hooks/use-catalog';
-import { useCart } from '@/context/CartContext';
-import { trackEvent } from '@/lib/analytics';
-import { toast } from 'sonner';
+import { useAddProduct } from '@/hooks/use-add-product';
 import { cn } from '@/lib/utils';
 import { Product, Category } from '@/types';
 
@@ -42,11 +40,6 @@ const VIRTUAL_BOWL_TAB: Category = {
 };
 const HEADER_OFFSET = 120;
 
-/** Colombian peso format: $ 24.900 */
-function formatCOP(cents: number): string {
-  return `$ ${cents.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
-}
-
 // ─── Product row skeleton ────────────────────────────────────────────────────
 
 function ProductRowSkeleton() {
@@ -64,11 +57,18 @@ function ProductRowSkeleton() {
 
 // ─── Product row (La Cocina style: text left, image right) ───────────────────
 
-function ProductRow({ product, category, index = 0 }: { product: Product; category?: Category; index?: number }) {
+function ProductRow({
+  product,
+  category,
+  index = 0,
+  compact = false,
+}: {
+  product: Product;
+  category?: Category;
+  index?: number;
+  compact?: boolean;
+}) {
   const { ref, isVisible } = useIntersection({ threshold: 0.05 });
-  const { addProduct } = useCart();
-  const [added, setAdded] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const productWithCategory = useMemo(
     () => ({
@@ -80,48 +80,8 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
     [category, product],
   );
 
-  const handleAddDirect = () => {
-    addProduct(product);
-    trackEvent({
-      type: 'add_to_cart',
-      productId: product.id,
-      productName: product.name,
-      brand: product.brand,
-      priceCents: product.price,
-    });
-    toast.success(`${product.name} agregado`);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 800);
-  };
-
-  const handleAddClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isProductCustomizable(productWithCategory)) {
-      setDrawerOpen(true);
-      return;
-    }
-
-    handleAddDirect();
-  };
-
-  const handleDrawerConfirm = (config: ProductConfig) => {
-    const customizations = normalizeProductCustomization(config);
-    const unitPrice = calculateProductUnitPrice(product.price, customizations);
-    const notes = customizations?.note || undefined;
-
-    addProduct(product, 1, notes, customizations);
-    trackEvent({
-      type: 'add_to_cart',
-      productId: product.id,
-      productName: product.name,
-      brand: product.brand,
-      priceCents: unitPrice,
-    });
-    toast.success(`${product.name} agregado`, { description: formatCOP(unitPrice) });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 800);
-  };
+  const { added, drawerOpen, setDrawerOpen, handleAddClick, handleDrawerConfirm } =
+    useAddProduct(product, productWithCategory);
 
   return (
     <>
@@ -143,12 +103,15 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
             </p>
           )}
           <p className="text-sm font-bold text-brand mt-1">
-            {formatCOP(product.price)}
+            {formatPrice(product.price)}
           </p>
         </div>
 
         {/* Right: image with add button */}
-        <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 overflow-hidden rounded-2xl shadow-md">
+        <div className={cn(
+          'relative shrink-0 overflow-hidden rounded-2xl shadow-md transition-all duration-200',
+          compact ? 'h-20 w-20 sm:h-24 sm:w-24' : 'h-28 w-28 sm:h-32 sm:w-32',
+        )}>
           <ProductImage
             product={product}
             ratio={1}
@@ -159,7 +122,10 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
 
           {/* Floating add button */}
           <button
-            onClick={handleAddClick}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddClick();
+            }}
             className={cn(
               'absolute bottom-2 right-2 w-9 h-9 rounded-full bg-brand text-white shadow-md',
               'flex items-center justify-center hover:bg-brand/90 hover:shadow-lg active:scale-90 transition-all duration-150',
@@ -185,9 +151,14 @@ function ProductRow({ product, category, index = 0 }: { product: Product; catego
 
 export default function OhanaPage() {
   const location = useLocation();
+  const pageRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const promotionsRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [activeSlug, setActiveSlug] = useState<string>('arma-tu-bowl');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [compactView, setCompactView] = useState(false);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -222,12 +193,22 @@ export default function OhanaPage() {
   // Products grouped by categoryId
   const productsByCategory = useMemo(() => {
     const map: Record<string, Product[]> = {};
-    for (const p of allProducts) {
+    const query = searchQuery.trim().toLowerCase();
+    const visibleProducts = query
+      ? allProducts.filter((product) => {
+        const category = categories.find((cat) => cat.id === product.categoryId);
+        return [product.name, product.description, category?.name]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(query));
+      })
+      : allProducts;
+
+    for (const p of visibleProducts) {
       if (!map[p.categoryId]) map[p.categoryId] = [];
       map[p.categoryId].push(p);
     }
     return map;
-  }, [allProducts]);
+  }, [allProducts, categories, searchQuery]);
 
   // Visible categories: bowl builder always shows; others when they have products
   const visibleCategories = useMemo(() => {
@@ -236,6 +217,16 @@ export default function OhanaPage() {
       return (productsByCategory[cat.id]?.length ?? 0) > 0;
     });
   }, [allTabs, productsByCategory]);
+
+  const totalVisibleProducts = useMemo(
+    () => Object.values(productsByCategory).reduce((sum, products) => sum + products.length, 0),
+    [productsByCategory],
+  );
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   const scrollToSection = useCallback((slug: string) => {
     const el = document.getElementById(slug);
@@ -275,15 +266,26 @@ export default function OhanaPage() {
     return () => observer.disconnect();
   }, [visibleCategories]);
 
-  // Scroll active tab into view in the tabs bar when activeSlug changes
+  // Scroll active tab into view in the tabs bar when activeSlug changes.
+  // Skipped on mount: block 'nearest' would vertically scroll the PAGE to the
+  // tab bar on load, yanking the user past the hero before they ever scroll.
+  const tabSyncReadyRef = useRef(false);
   useEffect(() => {
+    if (!tabSyncReadyRef.current) {
+      tabSyncReadyRef.current = true;
+      return;
+    }
     if (!tabsRef.current) return;
     const activeBtn = tabsRef.current.querySelector<HTMLElement>('[data-active="true"]');
     activeBtn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [activeSlug]);
 
+  // GSAP scroll-triggered entrances for [data-reveal] elements; re-scans as
+  // sections render (products load, search filters, view mode changes)
+  useGsapReveal(pageRef, [visibleCategories, searchQuery, compactView, isLoading]);
+
   return (
-    <div className="min-h-screen bg-background">
+    <div ref={pageRef} className="min-h-screen bg-background">
       <SEOHead
         title="Ohana Bowls — Menú"
         description="Bowls frescos, burgers, hot dogs, nachos y más. Arma tu bowl o elige entre nuestras opciones."
@@ -292,51 +294,14 @@ export default function OhanaPage() {
 
       {/* ── SECTION 1: Restaurant header ────────────────────────────────── */}
       <div>
-        {/* Hero strip */}
-        <div
-          className="hero-grain relative w-full overflow-hidden min-h-[320px] sm:min-h-[360px] flex items-center"
-          style={{ background: 'linear-gradient(135deg, #5a9e45 0%, #8CC878 50%, #a8d87a 100%)' }}
-        >
-          <div className="container max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-6 px-4 py-8 md:py-12">
-            {/* Left: copy + CTAs */}
-            <div className="flex flex-col gap-3 items-center text-center sm:items-start sm:text-left sm:max-w-xs">
-              <span className="inline-flex w-fit items-center rounded-full backdrop-blur-sm bg-white/20 border border-white/30 px-3 py-1 text-xs font-medium text-white">
-                🌿 Comida real. Sabor real.
-              </span>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight text-white leading-tight">
-                Eat Healthy, Live Happy
-              </h1>
-              <p className="text-sm sm:text-base text-white/85">
-                Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
-              </p>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-1 w-full sm:w-auto">
-                <button
-                  onClick={() => scrollToSection(BOWL_BUILDER_ID)}
-                  className="rounded-full bg-white px-4 py-2 sm:px-5 text-sm font-semibold text-brand-dark shadow-lg hover:bg-white/90 hover:shadow-xl transition-all duration-200 active:scale-95 w-full sm:w-auto"
-                >
-                  Arma tu Bowl
-                </button>
-                <button
-                  onClick={() => {
-                    const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
-                    scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
-                  }}
-                  className="rounded-full border-2 border-white/70 px-4 py-2 sm:px-5 text-sm font-semibold text-white hover:bg-white/10 transition-colors w-full sm:w-auto"
-                >
-                  Ver menú
-                </button>
-              </div>
-            </div>
-            {/* Right: image */}
-            <div className="flex items-center justify-center shrink-0">
-              <img
-                src="https://naoqsypqqgjhdudenevx.supabase.co/storage/v1/object/public/product-images/BowlLovers-cropped.png"
-                alt="Bowls Lovers"
-                className="w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 object-contain rounded-full"
-              />
-            </div>
-          </div>
-        </div>
+        {/* Scroll-driven hero (video scrubbing + staged text reveal) */}
+        <ScrollHero
+          onPrimaryClick={() => scrollToSection(BOWL_BUILDER_ID)}
+          onSecondaryClick={() => {
+            const first = allTabs.find((t) => t.id !== BOWL_BUILDER_ID);
+            scrollToSection(first?.slug ?? BOWL_BUILDER_ID);
+          }}
+        />
 
         {/* Info row */}
         <div className="bg-background px-4 pt-3 pb-5">
@@ -436,6 +401,9 @@ export default function OhanaPage() {
         </div>
       </div>
 
+      {/* ── Brand marquee strip ─────────────────────────────────────────── */}
+      <BrandMarquee />
+
       {/* ── SECTION 2: Promotions ───────────────────────────────────────── */}
       <div ref={promotionsRef}>
         <Suspense fallback={null}>
@@ -447,17 +415,29 @@ export default function OhanaPage() {
       <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm">
         <div className="container max-w-4xl">
           <div className="flex items-center gap-2">
-            {/* Left: action icons (visual only) */}
+            {/* Left: menu tools */}
             <div className="flex items-center gap-1 shrink-0 py-1">
               <button
+                type="button"
+                onClick={() => setSearchOpen((open) => !open)}
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                aria-label="Buscar"
+                aria-label={searchOpen ? 'Cerrar búsqueda' : 'Buscar en el menú'}
+                aria-expanded={searchOpen}
+                aria-controls="menu-search"
               >
                 <Search className="w-4 h-4" />
               </button>
               <button
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                aria-label="Ver como cuadrícula"
+                type="button"
+                onClick={() => setCompactView((value) => !value)}
+                className={cn(
+                  'p-2 rounded-lg transition-colors',
+                  compactView
+                    ? 'bg-brand/10 text-brand-dark'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                )}
+                aria-label={compactView ? 'Ver menú con imágenes grandes' : 'Ver menú compacto'}
+                aria-pressed={compactView}
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
@@ -498,6 +478,28 @@ export default function OhanaPage() {
               })}
             </div>
           </div>
+
+          {searchOpen && (
+            <div className="border-t border-border/40 py-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  ref={searchInputRef}
+                  id="menu-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Busca bowls, bebidas o ingredientes..."
+                  className="h-11 w-full rounded-full border border-border bg-card pl-10 pr-4 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+              </div>
+              {searchQuery.trim() ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {totalVisibleProducts} resultado{totalVisibleProducts === 1 ? '' : 's'} para “{searchQuery.trim()}”
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -512,6 +514,20 @@ export default function OhanaPage() {
               </div>
             ))}
           </div>
+        ) : searchQuery.trim() && totalVisibleProducts === 0 ? (
+          <div className="rounded-3xl border border-dashed bg-card p-8 text-center">
+            <p className="text-lg font-semibold text-foreground">No encontramos “{searchQuery.trim()}”</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Prueba con otro ingrediente, una bebida o vuelve a ver el menú completo.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="mt-5 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
+            >
+              Limpiar búsqueda
+            </button>
+          </div>
         ) : (
           <div className="space-y-10">
             {visibleCategories.map((cat) => {
@@ -525,21 +541,28 @@ export default function OhanaPage() {
                   data-section={cat.slug}
                 >
                   {/* Category section header */}
-                  <AnimatedElement animation="fade-up">
-                    <div className="py-3 mb-2">
-                      <div className="flex items-center gap-3">
-                        <h2 className="font-display font-bold text-xl sm:text-2xl tracking-tight text-foreground dark:text-white">
-                          {cat.name}
-                        </h2>
-                        {isBowlBuilder && (
-                          <span className="text-xs bg-brand text-white px-2 py-0.5 rounded-full font-semibold">
-                            Personalizable
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 h-[3px] w-8 rounded-full bg-brand mb-4" />
+                  <div data-reveal className="py-3 mb-2">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="hero-title text-2xl sm:text-4xl tracking-tight text-foreground dark:text-white">
+                        {cat.name}
+                      </h2>
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 rounded-full shrink-0 translate-y-[-2px]"
+                        style={{ background: 'hsl(var(--maiz))' }}
+                      />
+                      {isBowlBuilder && (
+                        <span className="text-xs bg-brand text-white px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
+                          Personalizable
+                        </span>
+                      )}
                     </div>
-                  </AnimatedElement>
+                    {!isBowlBuilder && (
+                      <p className="mt-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        {products.length} {products.length === 1 ? 'opción' : 'opciones'}
+                      </p>
+                    )}
+                  </div>
 
                   {/* Bowl Builder section */}
                   {isBowlBuilder && (
@@ -555,7 +578,9 @@ export default function OhanaPage() {
                     <div>
                       {isLoading
                         ? [1, 2, 3].map((i) => <ProductRowSkeleton key={i} />)
-                        : products.map((p, idx) => <ProductRow key={p.id} product={p} category={cat} index={idx} />)
+                        : products.map((p, idx) => (
+                          <ProductRow key={p.id} product={p} category={cat} index={idx} compact={compactView} />
+                        ))
                       }
                     </div>
                   )}
@@ -566,15 +591,28 @@ export default function OhanaPage() {
         )}
       </div>
 
-      {/* ── WhatsApp CTA ─────────────────────────────────────────────────── */}
+      {/* ── WhatsApp CTA — back on the emerald tabletop ─────────────────── */}
       {whatsappHref ? (
-        <div className="container max-w-4xl px-4 pb-8">
-          <div className="flex items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-brand to-brand-dark p-5">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs text-white/80">📍 Cable Plaza · Piso 4 Terraza</p>
-              <h3 className="text-base font-semibold text-white">¿Listo para pedir?</h3>
+        <div className="hero-grain relative overflow-hidden mt-6" style={{ background: 'hsl(var(--mesa))' }}>
+          <div className="container max-w-4xl px-4 py-14 sm:py-20 flex flex-col items-center text-center gap-5">
+            <p data-reveal className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'hsl(var(--maiz))' }}>
+              📍 Cable Plaza · Piso 4 Terraza
+            </p>
+            <h3 data-reveal className="hero-title text-3xl sm:text-5xl text-white leading-tight max-w-xl">
+              ¿Listo para tu bowl?
+            </h3>
+            <div data-reveal>
+              <MagneticButton
+                as="a"
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 rounded-full bg-white px-8 py-3.5 text-sm font-bold text-brand-dark shadow-xl hover:shadow-2xl transition-shadow"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Pedir por WhatsApp
+              </MagneticButton>
             </div>
-            <span className="shrink-0 select-none text-5xl opacity-90">🥗</span>
           </div>
         </div>
       ) : null}

@@ -7,18 +7,12 @@ import { cn } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics';
 import { toast } from 'sonner';
 import { Check, Plus } from 'lucide-react';
+import { formatPrice } from '@/domain/formatPrice';
 import type { Promotion, Product } from '@/types';
-
-function formatPrice(cents: number): string {
-  return `$ ${cents.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
-}
 
 function formatDiscountLabel(promo: Promotion): string | null {
   if (promo.discount_type === 'percentage') return `${promo.discount_value}% OFF`;
-  if (promo.discount_type === 'fixed') {
-    const formatted = promo.discount_value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return `-$${formatted}`;
-  }
+  if (promo.discount_type === 'fixed') return `-${formatPrice(promo.discount_value)}`;
   return null;
 }
 

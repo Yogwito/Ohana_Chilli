@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
@@ -32,7 +32,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
 
   const handleViewMenu = () => {
     onOpenChange(false);
-    navigate('/carta');
+    navigate('/#arma-tu-bowl');
   };
 
   return (
@@ -48,6 +48,9 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
               </span>
             )}
           </SheetTitle>
+          <SheetDescription>
+            Revisa tu pedido, ajusta cantidades y continúa al checkout.
+          </SheetDescription>
         </SheetHeader>
 
         {cart.items.length === 0 ? (
@@ -55,7 +58,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
             <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
               <ShoppingBag className="h-10 w-10 text-muted-foreground" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">Tu carrito esta vacio</h3>
+            <h3 className="mb-2 text-lg font-semibold">Tu carrito está vacío</h3>
             <p className="mb-6 text-sm text-muted-foreground">Agrega productos de Ohana Bowls para comenzar.</p>
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
               <Button onClick={handleContinueShopping} variant="outline" className="w-full sm:w-auto">
@@ -113,8 +116,8 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                           </div>
                           <button
                             onClick={() => removeItem(item.id)}
-                            className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                            aria-label="Eliminar"
+                            className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            aria-label={`Eliminar ${item.type === 'product' ? item.product?.name ?? 'producto' : 'bowl personalizado'}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -124,15 +127,15 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                              className="flex h-10 w-10 items-center justify-center rounded-full border transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                               aria-label="Reducir cantidad"
                             >
                               <Minus className="h-3 w-3" />
                             </button>
-                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                            <span className="w-8 text-center text-sm font-medium" aria-live="polite">{item.quantity}</span>
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                              className="flex h-10 w-10 items-center justify-center rounded-full border transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                               aria-label="Aumentar cantidad"
                             >
                               <Plus className="h-3 w-3" />

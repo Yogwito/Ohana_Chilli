@@ -15,8 +15,8 @@ interface LayoutProps {
 }
 
 const bottomNavItems = [
-  { href: '/', icon: House, label: 'Inicio' },
-  { href: '/', icon: UtensilsCrossed, label: 'Menú' },
+  { href: '/', icon: House, label: 'Inicio', exact: true },
+  { href: '/#arma-tu-bowl', icon: UtensilsCrossed, label: 'Menú', exact: false },
 ] as const;
 
 export default function Layout({ children }: LayoutProps) {
@@ -25,7 +25,9 @@ export default function Layout({ children }: LayoutProps) {
   const { getItemCount } = useCart();
   const itemCount = getItemCount();
 
-  const isActive = (path: string) => {
+  const isActive = (path: string, exact = false) => {
+    if (path.includes('#')) return location.pathname === '/' && location.hash === path.slice(path.indexOf('#'));
+    if (exact) return location.pathname === path && !location.hash;
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
@@ -39,14 +41,14 @@ export default function Layout({ children }: LayoutProps) {
       <Footer />
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-background/95 backdrop-blur-xl border-t border-border/40 flex items-stretch">
-        {bottomNavItems.map(({ href, icon: Icon, label }) => (
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 min-h-16 bg-background/95 backdrop-blur-xl border-t border-border/40 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+        {bottomNavItems.map(({ href, icon: Icon, label, exact }) => (
           <Link
-            key={href}
+            key={label}
             to={href}
             className={cn(
               'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
-              isActive(href) ? 'text-brand' : 'text-muted-foreground',
+              isActive(href, exact) ? 'text-brand' : 'text-muted-foreground',
             )}
           >
             <Icon className="h-5 w-5" />

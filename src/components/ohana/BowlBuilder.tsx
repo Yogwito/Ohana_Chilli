@@ -1240,17 +1240,19 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
             const EXTRA_SAUCE_PRICE = 2000;
             const SUGGESTED_SAUCES = ['Ohana Chipotle', 'Mayo Cilantro', 'BBQ Honey'];
             const maxSauces = selectedSize?.maxSauces ?? currentStepConfig.max;
+            const includedSauces = sauceOptions.filter(s => getIngredientExtraCharge(s) === 0);
+            const premiumSauces = sauceOptions.filter(s => getIngredientExtraCharge(s) > 0);
             // Exclude already-selected and already-extra sauces from suggestions
             const selectedSauceIds = new Set(selectedSauces.map(s => s.id));
             const extraSauceIds = new Set(extraSauceSelections.map(e => e.sauceId));
             const sauceSuggestions = SUGGESTED_SAUCES
-              .map(name => sauceOptions.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
+              .map(name => includedSauces.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
               .filter((s): s is Ingredient => s !== undefined && !selectedSauceIds.has(s.id) && !extraSauceIds.has(s.id))
               .slice(0, 3);
             return (
               <>
                 <StepPicker
-                  items={sauceOptions}
+                  items={includedSauces}
                   selectedItems={selectedSauces}
                   setSelectedItems={setSelectedSauces}
                   config={currentStepConfig}
@@ -1279,7 +1281,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   </div>
                 )}
 
-                {sauceSuggestions.length > 0 && (
+                {(sauceSuggestions.length > 0 || premiumSauces.some(s => !extraSauceIds.has(s.id))) && (
                   <div className="mt-5">
                     <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
                     <div className="flex flex-wrap gap-2">
@@ -1307,6 +1309,32 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                           {sauce.name}
                         </button>
                       ))}
+                      {/* Premium sauces — add directly as a paid extra, no flavor picker needed */}
+                      {premiumSauces
+                        .filter(s => !extraSauceIds.has(s.id))
+                        .map(premium => {
+                          const charge = getIngredientExtraCharge(premium);
+                          return (
+                            <button
+                              key={premium.id}
+                              type="button"
+                              onClick={() => {
+                                setExtraSauceSelections(prev => [...prev, {
+                                  uid: `extra-sauce-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                  sauceName: premium.name,
+                                  sauceId: premium.id,
+                                  charge,
+                                }]);
+                              }}
+                              className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 min-h-[44px] cursor-pointer hover:bg-brand/15 transition-colors"
+                            >
+                              {premium.name}
+                              <span className="text-xs bg-brand/10 text-brand rounded-full px-2 ml-1">
+                                +{formatPrice(charge)}
+                              </span>
+                            </button>
+                          );
+                        })}
                     </div>
                   </div>
                 )}

@@ -81,6 +81,7 @@ export default function CheckoutPage() {
   const [whatsappUrl, setWhatsappUrl] = useState<string>('');
   const [submitError, setSubmitError] = useState<string>('');
   const [selectedZoneId, setSelectedZoneId] = useState('');
+  const [deliveryZoneSearch, setDeliveryZoneSearch] = useState('');
   const [platform, setPlatform] = useState<'mobile' | 'desktop'>('mobile');
 
   // CHANGE 1 — delivery as default
@@ -105,13 +106,18 @@ export default function CheckoutPage() {
     : null;
   const continueShoppingPath = previousShoppingPath && !previousShoppingPath.startsWith('/checkout')
     ? previousShoppingPath
-    : '/carta';
+    : '/#arma-tu-bowl';
 
   const isDeliveryZoneQueryError = Boolean(deliveryZonesError);
   const selectedDeliveryZone = useMemo(
     () => findDeliveryZoneByIdOrName(deliveryZones, selectedZoneId),
     [deliveryZones, selectedZoneId],
   );
+  const filteredDeliveryZones = useMemo(() => {
+    const query = deliveryZoneSearch.trim().toLowerCase();
+    if (!query) return deliveryZones;
+    return deliveryZones.filter((zone) => zone.name.toLowerCase().includes(query));
+  }, [deliveryZones, deliveryZoneSearch]);
   const hasSelectedDeliveryZone = Boolean(selectedDeliveryZone);
   const deliveryFeeCents = form.orderType === 'delivery' ? selectedDeliveryZone?.feeCents ?? 0 : 0;
   const orderSubtotal = cart.subtotal;
@@ -177,6 +183,7 @@ export default function CheckoutPage() {
   const handleDeliveryZoneChange = (zoneId: string) => {
     setSelectedZoneId(zoneId);
     const zone = deliveryZones.find((item) => item.id === zoneId);
+    setDeliveryZoneSearch(zone?.name ?? '');
     updateField('deliveryZone', zone?.name ?? '');
   };
 
@@ -310,8 +317,9 @@ export default function CheckoutPage() {
               },
       }));
 
-      // Use SECURITY DEFINER RPC — bypasses RLS so anon users can insert orders.
-      // Direct inserts into orders/order_items are blocked by RLS (no anon policies).
+      // create_order_with_items keeps order + order_items inserts atomic.
+      // It's SECURITY INVOKER — anon inserts are already allowed by RLS
+      // (orders/order_items have public FOR INSERT WITH CHECK (true) policies).
       const { data: createdOrderId, error: createOrderError } = await supabase.rpc(
         'create_order_with_items',
         {
@@ -650,6 +658,20 @@ export default function CheckoutPage() {
                           </p>
                         ) : (
                           <>
+                            <Input
+                              id="delivery-zone-search"
+                              value={deliveryZoneSearch}
+                              onChange={(event) => {
+                                setDeliveryZoneSearch(event.target.value);
+                                if (selectedZoneId && event.target.value !== selectedDeliveryZone?.name) {
+                                  setSelectedZoneId('');
+                                  updateField('deliveryZone', '');
+                                }
+                              }}
+                              placeholder="Escribe tu barrio, ej: Cable Plaza"
+                              disabled={loadingDeliveryZones}
+                              className="rounded-xl h-11 mt-1"
+                            />
                             <Select
                               value={selectedZoneId}
                               onValueChange={handleDeliveryZoneChange}
@@ -657,14 +679,24 @@ export default function CheckoutPage() {
                             >
                               <SelectTrigger
                                 id="delivery-zone"
-                                className={cn('rounded-xl h-11 mt-1', errors.deliveryZone ? 'border-destructive' : '')}
+                                className={cn('rounded-xl h-11 mt-2', errors.deliveryZone ? 'border-destructive' : '')}
                               >
                                 <SelectValue
-                                  placeholder={loadingDeliveryZones ? 'Cargando zonas...' : 'Selecciona tu barrio/zona'}
+                                  placeholder={
+                                    loadingDeliveryZones
+                                      ? 'Cargando zonas...'
+                                      : filteredDeliveryZones.length === 0
+                                        ? 'Sin resultados'
+                                        : 'Selecciona tu barrio/zona'
+                                  }
                                 />
                               </SelectTrigger>
                               <SelectContent>
-                                {deliveryZones.map((zone) => (
+                                {filteredDeliveryZones.length === 0 ? (
+                                  <div className="px-3 py-3 text-sm text-muted-foreground">
+                                    No encontramos esa zona. Prueba con otro nombre.
+                                  </div>
+                                ) : filteredDeliveryZones.map((zone) => (
                                   <SelectItem key={zone.id} value={zone.id}>
                                     {zone.name} — {formatPrice(zone.feeCents)}
                                   </SelectItem>
@@ -790,26 +822,20 @@ export default function CheckoutPage() {
                     id="terms"
                     checked={termsAccepted}
                     onChange={(e) => setTermsAccepted(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-border accent-brand cursor-pointer shrink-0"
+                    className="mt-0.5 h-5 w-5 rounded border-border accent-brand cursor-pointer shrink-0"
                   />
-                  <label htmlFor="terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                    Acepto los{' '}
+                  <div className="text-sm text-muted-foreground leading-relaxed">
+                    <label htmlFor="terms" className="cursor-pointer">
+                      Acepto los términos y autorizo el tratamiento de mis datos personales.
+                    </label>{' '}
                     <button
                       type="button"
                       onClick={() => setTermsModalOpen(true)}
                       className="text-brand underline underline-offset-2 hover:text-brand-dark font-medium"
                     >
-                      Términos y Condiciones
+                      Leer términos
                     </button>
-                    {' '}y autorizo el{' '}
-                    <button
-                      type="button"
-                      onClick={() => setTermsModalOpen(true)}
-                      className="text-brand underline underline-offset-2 hover:text-brand-dark font-medium"
-                    >
-                      Tratamiento de mis Datos Personales
-                    </button>
-                  </label>
+                  </div>
                 </AnimatedElement>
 
                 <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-auto p-4 lg:p-0 bg-background/95 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none border-t lg:border-0 border-border/40 z-40 lg:z-auto space-y-2">
@@ -885,8 +911,8 @@ export default function CheckoutPage() {
                             <button
                               type="button"
                               onClick={() => removeItem(item.id)}
-                              className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                              aria-label="Eliminar producto"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                              aria-label={`Eliminar ${item.type === 'product' ? item.product?.name ?? 'producto' : 'bowl personalizado'}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -911,16 +937,16 @@ export default function CheckoutPage() {
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
+                                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 aria-label="Reducir cantidad"
                               >
                                 <Minus className="h-3 w-3" />
                               </button>
-                              <span className="w-5 text-center text-xs font-medium">{item.quantity}</span>
+                              <span className="w-6 text-center text-xs font-medium" aria-live="polite">{item.quantity}</span>
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
+                                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 aria-label="Aumentar cantidad"
                               >
                                 <Plus className="h-3 w-3" />
