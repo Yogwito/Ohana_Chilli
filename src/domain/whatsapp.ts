@@ -1,7 +1,10 @@
 import type { CartItem } from '@/types';
 import { formatPrice } from './formatPrice';
-import { formatBowlDetailLines } from './bowlSummary';
-import { formatProductCustomizationLines } from './productCustomizations';
+import {
+  canonicalFromCustomBowl,
+  canonicalFromLegacyProduct,
+  formatCustomizationSummary,
+} from './customization';
 
 interface OrderInfo {
   name: string;
@@ -49,18 +52,21 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
 
   items.forEach((item) => {
     const brand = '[Ohana]';
-    if (item.type === 'product' && item.product) {
-      lines.push(`• ${brand} ${item.quantity}x ${item.product.name} — ${formatPrice(item.totalPrice)}`);
-      formatProductCustomizationLines(item.customizations).forEach((line) => {
-        lines.push(`   ${line}`);
-      });
-    } else if (item.type === 'custom-bowl' && item.customBowl) {
-      lines.push(`• ${brand} 1x Bowl ${item.customBowl.size.name} — ${formatPrice(item.totalPrice)}`);
-      formatBowlDetailLines(item.customBowl).forEach((line) => {
-        lines.push(`   ${line}`);
-      });
-    }
-    if (item.notes && (item.type !== 'product' || !item.customizations)) {
+    // Único formatter compartido: lo que ve el operador en WhatsApp es
+    // exactamente lo que muestran el carrito, el checkout y el admin.
+    const canonical = item.customization
+      ?? (item.type === 'custom-bowl'
+        ? canonicalFromCustomBowl(item.customBowl)
+        : canonicalFromLegacyProduct(item.customizations));
+    const summaryLines = formatCustomizationSummary(canonical);
+
+    const itemName = item.type === 'product' && item.product
+      ? item.product.name
+      : `Bowl ${item.customBowl?.size.name ?? 'Personalizado'}`;
+    lines.push(`• ${brand} ${item.quantity}x ${itemName} — ${formatPrice(item.totalPrice)}`);
+    summaryLines.forEach((line) => lines.push(`   ${line}`));
+
+    if (item.notes && !canonical.note) {
       lines.push(`   Nota: ${item.notes}`);
     }
   });

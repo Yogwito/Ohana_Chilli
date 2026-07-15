@@ -116,14 +116,22 @@ export interface CustomBowl {
   notes?: string;
 }
 
+// Canonical customization (single source of truth for identity/price/summary)
+import type { CanonicalCustomization } from '@/domain/customization';
+export type { CanonicalCustomization };
+
 // Cart Item Types
 export interface CartItem {
   id: string;
   brand: Brand;
   type: 'product' | 'custom-bowl';
   product?: Product;
+  /** Datos del UI del builder (legacy; el canónico se deriva de aquí). */
   customBowl?: CustomBowl;
+  /** Forma legacy del drawer (extras expandidos). Ver adapters en customization.ts. */
   customizations?: ProductCustomization;
+  /** Customización canónica: única fuente para identidad, precio y resumen. */
+  customization?: CanonicalCustomization;
   modifiers?: Modifier[];
   quantity: number;
   notes?: string;

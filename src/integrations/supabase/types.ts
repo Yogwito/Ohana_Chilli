@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      addon_recommendations: {
+        Row: {
+          addon_id: string
+          category_id: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          addon_id: string
+          category_id: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          addon_id?: string
+          category_id?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addon_recommendations_addon_id_fkey"
+            columns: ["addon_id"]
+            isOneToOne: false
+            referencedRelation: "addons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addon_recommendations_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      addons: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          price_cents: number
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price_cents?: number
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_cents?: number
+          sort_order?: number
+        }
+        Relationships: []
+      }
       analytics_events: {
         Row: {
           created_at: string
@@ -224,6 +287,12 @@ export type Database = {
           id: string
           notes: string | null
           order_type: string
+          paid_at: string | null
+          payment_method: string | null
+          payment_provider: string | null
+          payment_reference: string | null
+          payment_status: string
+          payment_transaction_id: string | null
           phone: string
           status: string
           total_cents: number
@@ -239,6 +308,12 @@ export type Database = {
           id?: string
           notes?: string | null
           order_type: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_provider?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          payment_transaction_id?: string | null
           phone: string
           status?: string
           total_cents?: number
@@ -254,6 +329,12 @@ export type Database = {
           id?: string
           notes?: string | null
           order_type?: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_provider?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          payment_transaction_id?: string | null
           phone?: string
           status?: string
           total_cents?: number
@@ -261,6 +342,85 @@ export type Database = {
           whatsapp_sent?: boolean
         }
         Relationships: []
+      }
+      product_default_ingredients: {
+        Row: {
+          created_at: string | null
+          extra_price_cents: number
+          id: string
+          ingredient_name: string
+          is_extra: boolean
+          is_removable: boolean
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          extra_price_cents?: number
+          id?: string
+          ingredient_name: string
+          is_extra?: boolean
+          is_removable?: boolean
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string | null
+          extra_price_cents?: number
+          id?: string
+          ingredient_name?: string
+          is_extra?: boolean
+          is_removable?: boolean
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_default_ingredients_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_variants: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          price_delta_cents: number
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price_delta_cents?: number
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_delta_cents?: number
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -272,10 +432,10 @@ export type Database = {
           image_url: string | null
           ingredients_list: string[] | null
           is_active: boolean
-          is_gluten_free: boolean | null
-          is_new: boolean | null
-          is_popular: boolean | null
-          is_vegan: boolean | null
+          is_gluten_free: boolean
+          is_new: boolean
+          is_popular: boolean
+          is_vegan: boolean
           name: string
           price_cents: number
         }
@@ -288,10 +448,10 @@ export type Database = {
           image_url?: string | null
           ingredients_list?: string[] | null
           is_active?: boolean
-          is_gluten_free?: boolean | null
-          is_new?: boolean | null
-          is_popular?: boolean | null
-          is_vegan?: boolean | null
+          is_gluten_free?: boolean
+          is_new?: boolean
+          is_popular?: boolean
+          is_vegan?: boolean
           name: string
           price_cents?: number
         }
@@ -304,10 +464,10 @@ export type Database = {
           image_url?: string | null
           ingredients_list?: string[] | null
           is_active?: boolean
-          is_gluten_free?: boolean | null
-          is_new?: boolean | null
-          is_popular?: boolean | null
-          is_vegan?: boolean | null
+          is_gluten_free?: boolean
+          is_new?: boolean
+          is_popular?: boolean
+          is_vegan?: boolean
           name?: string
           price_cents?: number
         }
@@ -327,6 +487,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      promotions: {
+        Row: {
+          badge_text: string | null
+          created_at: string | null
+          cta_text: string | null
+          cta_url: string | null
+          days_of_week: number[] | null
+          description: string | null
+          discount_type: string
+          discount_value: number | null
+          ends_at: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          price_cents: number | null
+          sort_order: number | null
+          starts_at: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          badge_text?: string | null
+          created_at?: string | null
+          cta_text?: string | null
+          cta_url?: string | null
+          days_of_week?: number[] | null
+          description?: string | null
+          discount_type: string
+          discount_value?: number | null
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          price_cents?: number | null
+          sort_order?: number | null
+          starts_at?: string | null
+          title: string
+          type?: string
+        }
+        Update: {
+          badge_text?: string | null
+          created_at?: string | null
+          cta_text?: string | null
+          cta_url?: string | null
+          days_of_week?: number[] | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number | null
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          price_cents?: number | null
+          sort_order?: number | null
+          starts_at?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: []
       }
       settings: {
         Row: {
@@ -366,6 +586,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_order_with_items: {
+        Args: {
+          p_address?: string
+          p_customer_name: string
+          p_delivery_fee_cents?: number
+          p_delivery_zone?: string
+          p_items?: Json
+          p_notes?: string
+          p_order_type: string
+          p_payment_method?: string
+          p_phone: string
+          p_total_cents?: number
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -6,9 +6,12 @@ import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import { useCart } from '@/context/CartContext';
 import { Minus, Plus, Trash2, ShoppingBag, Leaf, Pencil } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
-import { formatProductCustomizationLines } from '@/domain/productCustomizations';
+import {
+  canonicalFromCustomBowl,
+  canonicalFromLegacyProduct,
+  formatCustomizationSummary,
+} from '@/domain/customization';
 import ProductDrawer, { type ProductConfig } from '@/components/products/ProductDrawer';
 import type { CartItem } from '@/types';
 
@@ -83,9 +86,12 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
             <ScrollArea className="-mx-6 flex-1 px-6">
               <div className="space-y-4 py-4">
                 {cart.items.map((item, index) => {
-                  const customizationLines = item.type === 'product'
-                    ? formatProductCustomizationLines(item.customizations)
-                    : [];
+                  // Único formatter compartido (carrito = checkout = WhatsApp = admin)
+                  const canonical = item.customization
+                    ?? (item.type === 'custom-bowl'
+                      ? canonicalFromCustomBowl(item.customBowl)
+                      : canonicalFromLegacyProduct(item.customizations));
+                  const customizationLines = formatCustomizationSummary(canonical);
 
                   return (
                     <AnimatedElement
@@ -107,11 +113,6 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                             <h4 className="mt-1 text-sm font-medium">
                               {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
                             </h4>
-                            {item.type === 'custom-bowl' && item.customBowl && (
-                              <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
-                                {formatBowlSummary(item.customBowl)}
-                              </p>
-                            )}
                             {customizationLines.length > 0 && (
                               <div className="mt-1 space-y-0.5">
                                 {customizationLines.map((line) => (

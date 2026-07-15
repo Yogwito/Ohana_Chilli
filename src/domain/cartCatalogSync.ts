@@ -66,7 +66,7 @@ function reconcileCartItem(
   productsById: Map<string, Product>,
   bowlRulesBySize: Map<string, BowlSizeRule>,
   ingredientsById: Map<string, Ingredient>,
-) {
+): CartItem | null {
   if (item.type === 'product') {
     const currentProduct = item.product?.id ? productsById.get(item.product.id) : null;
     if (!currentProduct) return null;

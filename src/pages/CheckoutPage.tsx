@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
 import { useActiveDeliveryZones, useBusinessSettings, useBusinessOpenStatus, useProductVariantsMap } from '@/hooks/use-catalog';
+import {
+  canonicalFromCustomBowl,
+  canonicalFromLegacyProduct,
+  formatCustomizationSummary,
+  serializeCustomizationForOrder,
+  validateCustomization,
+} from '@/domain/customization';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,8 +48,6 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatBusinessPhone, parseBusinessAddress } from '@/domain/businessSettings';
 import { formatPrice } from '@/domain/formatPrice';
-import { formatBowlSummary } from '@/domain/bowlSummary';
-import { formatProductCustomizationLines } from '@/domain/productCustomizations';
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
 import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { trackEvent } from '@/lib/analytics';
@@ -277,6 +282,21 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Validación de forma canónica (cantidades enteras > 0, precios ≥ 0)
+    for (const item of cart.items) {
+      const canonical = item.customization
+        ?? (item.type === 'custom-bowl'
+          ? canonicalFromCustomBowl(item.customBowl)
+          : canonicalFromLegacyProduct(item.customizations));
+      const issues = validateCustomization(canonical);
+      if (issues.length > 0) {
+        const message = `Revisa "${item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}": ${issues[0]}`;
+        setSubmitError(message);
+        toast.error(message);
+        return;
+      }
+    }
+
     setOrderStatus('submitting');
     trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
@@ -314,53 +334,23 @@ export default function CheckoutPage() {
       }
 
       const finalOrderTotal = orderSubtotal + resolvedDeliveryFeeCents;
+      // details de cada item vía el serializer canónico: bloque legible con
+      // cantidades para admin/historial + la proyección exacta que valida la
+      // RPC (customizations.extras expandidos, validation.ingredient_ids).
       const orderItems = cart.items.map((item) => {
-        if (item.type === 'custom-bowl' && item.customBowl) {
-          const allIngredients = [
-            ...item.customBowl.bases,
-            ...item.customBowl.proteins,
-            ...item.customBowl.acompanantes,
-            ...(item.customBowl.sauces ?? []),
-            ...(item.customBowl.complementos ?? []),
-          ];
-          return {
-            brand_id: item.brand,
-            name: 'Bowl Personalizado',
-            quantity: item.quantity,
-            unit_price_cents: item.unitPrice,
-            details: {
-              // Bloque legible para admin/historial (nombres)
-              size: item.customBowl.size.name,
-              bases: item.customBowl.bases.map((b) => b.name),
-              proteins: item.customBowl.proteins.map((p) => p.name),
-              acompanantes: item.customBowl.acompanantes.map((a) => a.name),
-              sauces: item.customBowl.sauces?.map((s) => s.name),
-              complementos: item.customBowl.complementos?.map((c) => c.name),
-              notes: item.notes,
-              // Bloque de validación server-side: la RPC recalcula el precio
-              // con estos ids contra el catálogo vivo y rechaza discrepancias.
-              validation: {
-                size: item.customBowl.size.size,
-                ingredient_ids: allIngredients
-                  .filter((ing) => !ing.id.startsWith('extra-'))
-                  .map((ing) => ing.id),
-                extras: allIngredients
-                  .filter((ing) => ing.id.startsWith('extra-'))
-                  .map((ing) => ({ name: ing.name, charge: ing.price ?? 0 })),
-              },
-            },
-          };
-        }
+        const canonical = item.customization
+          ?? (item.type === 'custom-bowl'
+            ? canonicalFromCustomBowl(item.customBowl)
+            : canonicalFromLegacyProduct(item.customizations));
         return {
           brand_id: item.brand,
-          name: item.product?.name ?? 'Producto',
+          name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
           quantity: item.quantity,
           unit_price_cents: item.unitPrice,
-          details: {
-            product_id: item.product?.id,
+          details: serializeCustomizationForOrder(canonical, {
+            productId: item.type === 'product' ? item.product?.id : undefined,
             notes: item.notes,
-            customizations: item.customizations ?? null,
-          },
+          }),
         };
       });
 
@@ -379,7 +369,7 @@ export default function CheckoutPage() {
           p_delivery_fee_cents: resolvedDeliveryFeeCents,
           p_notes: form.notes || null,
           p_total_cents: finalOrderTotal,
-          p_items: orderItems,
+          p_items: JSON.parse(JSON.stringify(orderItems)),
           p_payment_method: paymentMethod,
         }
       );
@@ -664,7 +654,7 @@ export default function CheckoutPage() {
 
                 {/* Recent orders */}
                 {form.phone.replace(/\D/g, '').length >= 10 && (
-                  <AnimatedElement as="div" animation="fade-up" delay={50}>
+                  <AnimatedElement as="div" animation="fade-up" delay={75}>
                     <RecentOrders phone={form.phone} />
                   </AnimatedElement>
                 )}
@@ -996,9 +986,13 @@ export default function CheckoutPage() {
 
                 <div className="space-y-4 mb-6">
                   {cart.items.map((item) => {
-                    const customizationLines = item.type === 'product'
-                      ? formatProductCustomizationLines(item.customizations)
-                      : [];
+                    // Único formatter compartido (carrito = checkout = WhatsApp = admin)
+                    const customizationLines = formatCustomizationSummary(
+                      item.customization
+                        ?? (item.type === 'custom-bowl'
+                          ? canonicalFromCustomBowl(item.customBowl)
+                          : canonicalFromLegacyProduct(item.customizations)),
+                    );
 
                     return (
                       <div key={item.id} className="group flex gap-3">
@@ -1019,11 +1013,6 @@ export default function CheckoutPage() {
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
-                          {item.type === 'custom-bowl' && item.customBowl && (
-                            <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
-                              {formatBowlSummary(item.customBowl)}
-                            </p>
-                          )}
                           {customizationLines.length > 0 && (
                             <div className="mt-1 space-y-0.5">
                               {customizationLines.map((line) => (

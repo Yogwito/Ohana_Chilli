@@ -2,19 +2,25 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { CartItem, CartState, Product, CustomBowl, Brand, ProductCustomization } from '@/types';
 import { reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
-import { calculateBowlPrice } from '@/domain/bowlPricing';
-import { getCustomBowlSignature } from '@/domain/bowlSignature';
 import {
-  calculateProductUnitPrice,
-  getProductCustomizationKey,
-  normalizeProductCustomization,
-} from '@/domain/productCustomizations';
+  calculateCustomizationTotal,
+  canonicalFromCustomBowl,
+  canonicalFromLegacyProduct,
+  createCustomizationSignature,
+} from '@/domain/customization';
+import { normalizeProductCustomization } from '@/domain/productCustomizations';
 import { useBowlRules, useIngredients, useProducts } from '@/hooks/use-catalog';
 import { z } from 'zod';
 import { toast } from 'sonner';
 
 // ─── Cart validation schema (versioned) ─────────────────
-const CART_VERSION = 'cart:v3';
+// v4: cada item persiste su customización CANÓNICA (`customization`) junto a
+// los campos legacy del UI. Los carritos v3 (o sin versión) se migran al
+// restaurar: el canónico se deriva con los adapters y los precios se
+// re-derivan — nunca se confían precios guardados en localStorage (la
+// reconciliación con catálogo vivo ya los recalcula además).
+const CART_VERSION = 'cart:v4';
+const LEGACY_CART_VERSIONS = new Set(['cart:v3', undefined]);
 const CART_STORAGE_KEY = 'ohana-bowls-cart';
 
 const productCustomizationSchema = z.object({
@@ -40,6 +46,7 @@ const cartItemSchema = z.object({
   product: z.any().optional().nullable(),
   customBowl: z.any().optional().nullable(),
   customizations: productCustomizationSchema.optional().nullable(),
+  customization: z.any().optional().nullable(), // canónico (v4); se re-deriva al cargar
   quantity: z.number().int().positive(),
   notes: z.string().optional().nullable(),
   unitPrice: z.number(),
@@ -47,7 +54,7 @@ const cartItemSchema = z.object({
 });
 
 const cartStateSchema = z.object({
-  version: z.literal(CART_VERSION).optional(),
+  version: z.string().optional(),
   items: z.array(cartItemSchema),
   subtotal: z.number(),
   total: z.number(),
@@ -73,8 +80,37 @@ const calculateTotals = (items: CartItem[]) => {
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-function getProductNotesKey(customizations: ProductCustomization | undefined, notes: string | null | undefined) {
-  return customizations?.note || notes?.trim() || '';
+// ── Puente al modelo canónico: ÚNICA identidad y ÚNICO cálculo de precio ──
+// para todos los tipos de item. Los campos legacy (customizations/customBowl)
+// siguen siendo lo que emite el UI; aquí se elevan al canónico una sola vez.
+
+type ItemLike = Pick<CartItem, 'type' | 'product' | 'customBowl' | 'customizations' | 'notes'>;
+
+function canonicalOf(item: ItemLike) {
+  if (item.type === 'custom-bowl') return canonicalFromCustomBowl(item.customBowl);
+  const canonical = canonicalFromLegacyProduct(item.customizations);
+  // addProduct(product, qty, notes) sin customizations (p.ej. "repetir
+  // pedido"): la nota igualmente distingue al item.
+  if (!canonical.note && item.notes?.trim()) {
+    return { ...canonical, note: item.notes.trim() };
+  }
+  return canonical;
+}
+
+function signatureOf(item: ItemLike) {
+  const productKey = item.type === 'product' ? item.product?.id ?? '' : 'custom-bowl';
+  return createCustomizationSignature(productKey, canonicalOf(item));
+}
+
+function unitPriceOf(item: ItemLike) {
+  return calculateCustomizationTotal(item.product?.price ?? 0, canonicalOf(item));
+}
+
+/** Re-deriva canónico y precios de un item (post-reconciliación / carga). */
+function withDerivedFields(item: CartItem): CartItem {
+  const customization = canonicalOf(item);
+  const unitPrice = calculateCustomizationTotal(item.product?.price ?? 0, customization);
+  return { ...item, customization, unitPrice, totalPrice: unitPrice * item.quantity };
 }
 
 const cartReducer = (state: CartState, action: CartAction): CartState => {
@@ -82,17 +118,12 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     case 'ADD_PRODUCT': {
       const { product, quantity, notes } = action.payload;
       const customizations = normalizeProductCustomization(action.payload.customizations);
-      const customizationKey = getProductCustomizationKey(customizations);
-      const normalizedNotes = getProductNotesKey(customizations, notes);
-      const unitPrice = calculateProductUnitPrice(product.price, customizations);
+      const draft: ItemLike = { type: 'product', product, customizations, notes };
+      const customization = canonicalOf(draft);
+      const signature = signatureOf(draft);
+      const unitPrice = unitPriceOf(draft);
       const existingIndex = state.items.findIndex(
-        item => {
-          if (item.type !== 'product' || item.product?.id !== product.id) return false;
-
-          const itemCustomizations = normalizeProductCustomization(item.customizations);
-          return getProductCustomizationKey(itemCustomizations) === customizationKey
-            && getProductNotesKey(itemCustomizations, item.notes) === normalizedNotes;
-        }
+        item => item.type === 'product' && signatureOf(item) === signature,
       );
       let newItems: CartItem[];
       if (existingIndex >= 0) {
@@ -106,7 +137,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       } else {
         newItems = [...state.items, {
           id: generateId(), brand: product.brand, type: 'product', product, quantity,
-          customizations, notes: normalizedNotes || undefined,
+          customizations, customization, notes: customization.note || undefined,
           unitPrice, totalPrice: unitPrice * quantity,
         }];
       }
@@ -114,14 +145,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     }
     case 'ADD_CUSTOM_BOWL': {
       const { customBowl, notes } = action.payload;
-      const unitPrice = calculateBowlPrice(customBowl);
-      // Identical configurations merge by quantity (deterministic signature:
-      // sorted ingredient ids + extras by name|charge + size + notes).
-      const signature = getCustomBowlSignature(customBowl);
+      const draft: ItemLike = { type: 'custom-bowl', customBowl, notes };
+      const customization = canonicalOf(draft);
+      const unitPrice = unitPriceOf(draft);
+      // Configuraciones idénticas se fusionan por cantidad (firma canónica
+      // única: misma implementación que los productos).
+      const signature = signatureOf(draft);
       const existingIndex = state.items.findIndex(
-        item => item.type === 'custom-bowl'
-          && item.customBowl
-          && getCustomBowlSignature(item.customBowl) === signature,
+        item => item.type === 'custom-bowl' && signatureOf(item) === signature,
       );
       let newItems: CartItem[];
       if (existingIndex >= 0) {
@@ -135,7 +166,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       } else {
         newItems = [...state.items, {
           id: generateId(), brand: 'ohana' as Brand, type: 'custom-bowl' as const,
-          customBowl, quantity: 1, notes, unitPrice, totalPrice: unitPrice,
+          customBowl, customization, quantity: 1, notes, unitPrice, totalPrice: unitPrice,
         }];
       }
       return { items: newItems, ...calculateTotals(newItems) };
@@ -149,16 +180,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       if (!target || target.type !== 'product' || !target.product) return state;
 
       const customizations = normalizeProductCustomization(rawCustomizations);
-      const customizationKey = getProductCustomizationKey(customizations);
-      const normalizedNotes = getProductNotesKey(customizations, undefined);
-      const unitPrice = calculateProductUnitPrice(target.product.price, customizations);
+      const draft: ItemLike = { type: 'product', product: target.product, customizations };
+      const customization = canonicalOf(draft);
+      const signature = signatureOf(draft);
+      const unitPrice = unitPriceOf(draft);
 
-      const twin = state.items.find(item => {
-        if (item.id === itemId || item.type !== 'product' || item.product?.id !== target.product!.id) return false;
-        const itemCustomizations = normalizeProductCustomization(item.customizations);
-        return getProductCustomizationKey(itemCustomizations) === customizationKey
-          && getProductNotesKey(itemCustomizations, item.notes) === normalizedNotes;
-      });
+      const twin = state.items.find(
+        item => item.id !== itemId && item.type === 'product' && signatureOf(item) === signature,
+      );
 
       let newItems: CartItem[];
       if (twin) {
@@ -173,7 +202,8 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           ? {
               ...item,
               customizations,
-              notes: normalizedNotes || undefined,
+              customization,
+              notes: customization.note || undefined,
               unitPrice,
               totalPrice: unitPrice * item.quantity,
             }
@@ -196,8 +226,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       const newItems = state.items.filter(item => item.id !== action.payload.itemId);
       return { items: newItems, ...calculateTotals(newItems) };
     }
-    case 'RECONCILE_CATALOG':
-      return reconcileCartWithCatalog(state, action.payload);
+    case 'RECONCILE_CATALOG': {
+      const reconciled = reconcileCartWithCatalog(state, action.payload);
+      if (reconciled === state) return state;
+      // La reconciliación actualiza los campos legacy con el catálogo vivo;
+      // el canónico y los precios se re-derivan del único cálculo compartido.
+      const items = reconciled.items.map(withDerivedFields);
+      return { items, ...calculateTotals(items) };
+    }
     case 'CLEAR_CART':
       return initialState;
     case 'LOAD_CART':
@@ -226,18 +262,44 @@ interface CartActionsContextType {
 const CartStateContext = createContext<CartStateContextType | undefined>(undefined);
 const CartActionsContext = createContext<CartActionsContextType | undefined>(undefined);
 
-function loadCartFromStorage(): CartState {
+interface LoadedCart {
+  state: CartState;
+  migratedFromLegacy: boolean;
+}
+
+/**
+ * Restaura el carrito con migración de esquema: los carritos v3 (extras
+ * expandidos, sin canónico) se elevan al modelo v4 derivando la customización
+ * canónica y recalculando precios con el cálculo compartido — nunca se
+ * confían precios guardados. JSON malformado o esquema desconocido → carrito
+ * vacío, sin crashear. La reconciliación con catálogo vivo corre después y
+ * elimina referencias inactivas con aviso al usuario.
+ */
+function loadCartFromStorage(): LoadedCart {
   try {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
-    if (!raw) return initialState;
+    if (!raw) return { state: initialState, migratedFromLegacy: false };
     const parsed = JSON.parse(raw);
     const result = cartStateSchema.safeParse(parsed);
-    if (result.success) return { items: result.data.items as CartItem[], subtotal: result.data.subtotal, total: result.data.total };
-    localStorage.removeItem(CART_STORAGE_KEY);
-    return initialState;
+    if (!result.success) {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      return { state: initialState, migratedFromLegacy: false };
+    }
+    const version = result.data.version;
+    if (version !== CART_VERSION && !LEGACY_CART_VERSIONS.has(version)) {
+      // Versión futura/desconocida: preferible vaciar a interpretar mal.
+      localStorage.removeItem(CART_STORAGE_KEY);
+      return { state: initialState, migratedFromLegacy: false };
+    }
+    const items = (result.data.items as CartItem[]).map(withDerivedFields);
+    const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+    return {
+      state: { items, subtotal, total: subtotal },
+      migratedFromLegacy: version !== CART_VERSION && items.length > 0,
+    };
   } catch {
     localStorage.removeItem(CART_STORAGE_KEY);
-    return initialState;
+    return { state: initialState, migratedFromLegacy: false };
   }
 }
 
@@ -250,7 +312,15 @@ function saveCartToStorage(cart: CartState) {
 }
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [cart, dispatch] = useReducer(cartReducer, initialState, () => loadCartFromStorage());
+  const [loaded] = React.useState<LoadedCart>(() => loadCartFromStorage());
+  const [cart, dispatch] = useReducer(cartReducer, loaded.state);
+
+  useEffect(() => {
+    if (loaded.migratedFromLegacy) {
+      toast.info('Actualizamos tu carrito guardado al nuevo formato.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { data: products = [], isSuccess: productsReady } = useProducts();
   const { data: bowlRules = [], isSuccess: bowlRulesReady } = useBowlRules();
   const { data: ingredients = [], isSuccess: ingredientsReady } = useIngredients();

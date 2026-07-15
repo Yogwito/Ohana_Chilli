@@ -195,6 +195,7 @@ export default function ProductsAdmin() {
       .single();
     const { error } = await supabase.from('categories').insert({
       id: slug,
+      brand_id: 'ohana',
       name: newCatName.trim(),
       sort_order: (maxOrder?.sort_order ?? 0) + 1,
     });

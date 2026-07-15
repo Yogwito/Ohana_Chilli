@@ -322,10 +322,11 @@ export function usePromotions() {
         .order('sort_order');
       if (error) throw error;
       const today = new Date().getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
-      return (data ?? []).filter((p: Promotion) => {
+      const rows = (data ?? []) as unknown as Promotion[];
+      return rows.filter((p) => {
         if (!p.days_of_week || p.days_of_week.length === 0) return true;
         return p.days_of_week.includes(today);
-      }) as Promotion[];
+      });
     },
     staleTime: 5 * 60 * 1000,
   });

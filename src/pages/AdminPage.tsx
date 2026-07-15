@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner';
 import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deliveryZones';
 import { formatPrice } from '@/domain/formatPrice';
+import { customizationFromOrderDetails, formatCustomizationSummary } from '@/domain/customization';
 import {
   LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
   Search, Truck, Upload, BarChart3, Plus, Tag, Trash2,
@@ -179,14 +180,58 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 };
 
+interface OrderItemRow {
+  id: string;
+  order_id: string;
+  name: string;
+  quantity: number;
+  unit_price_cents: number;
+  details: unknown;
+}
+
+/** Desglose de un item con el formatter compartido: entiende detalles
+ *  canónicos (addons con cantidad) y legacy (extras expandidos / arrays de
+ *  nombres de bowls) sin migrar filas históricas. */
+function OrderItemLine({ item }: { item: OrderItemRow }) {
+  const lines = formatCustomizationSummary(customizationFromOrderDetails(item.details));
+  return (
+    <div className="rounded-lg bg-muted/40 px-3 py-2">
+      <div className="flex justify-between gap-2 text-sm">
+        <span className="font-medium">{item.quantity}x {item.name}</span>
+        <span className="shrink-0">{formatPrice(item.unit_price_cents * item.quantity)}</span>
+      </div>
+      {lines.length > 0 && (
+        <div className="mt-0.5 space-y-0.5">
+          {lines.map((line) => (
+            <p key={line} className="text-xs text-muted-foreground">{line}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrdersAdmin() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [itemsByOrder, setItemsByOrder] = useState<Record<string, OrderItemRow[]>>({});
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = async () => {
     setLoading(true);
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(50);
-    setOrders((data ?? []) as OrderRow[]);
+    const rows = (data ?? []) as OrderRow[];
+    setOrders(rows);
+    if (rows.length > 0) {
+      const { data: itemRows } = await supabase
+        .from('order_items')
+        .select('id, order_id, name, quantity, unit_price_cents, details')
+        .in('order_id', rows.map(o => o.id));
+      const grouped: Record<string, OrderItemRow[]> = {};
+      for (const item of (itemRows ?? []) as OrderItemRow[]) {
+        (grouped[item.order_id] ??= []).push(item);
+      }
+      setItemsByOrder(grouped);
+    }
     setLoading(false);
   };
 
@@ -229,6 +274,11 @@ function OrdersAdmin() {
             <div>
               <p className="font-semibold">{order.customer_name}</p>
               <p className="text-xs text-muted-foreground">{order.phone} • {new Date(order.created_at).toLocaleString('es-CO')}</p>
+            </div>
+            <div className="w-full order-last space-y-1.5">
+              {(itemsByOrder[order.id] ?? []).map(item => (
+                <OrderItemLine key={item.id} item={item} />
+              ))}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-primary">{formatPrice(order.total_cents)}</span>
@@ -323,9 +373,10 @@ function CategoriesAdmin() {
   const createCategory = async () => {
     if (!newForm.name) { toast.error('Nombre requerido'); return; }
     const { error } = await supabase.from('categories').insert({
+      id: toSlug(newForm.name),
+      brand_id: 'ohana',
       name: newForm.name,
       slug: toSlug(newForm.name),
-      brand_id: 'ohana',
       sort_order: newForm.sort_order !== '' ? Number(newForm.sort_order) : null,
     });
     if (error) { toast.error('Error al crear categoría'); return; }
