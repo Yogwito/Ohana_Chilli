@@ -8,6 +8,11 @@ const BARE_FILENAME_RE = /^[^/]+\.(png|jpe?g|webp|avif|gif|svg)$/i;
 // Product-specific overrides live here until catalog images are fully managed in admin.
 const KNOWN_BAD_PRODUCT_IMAGE_IDS = new Set<string>([
   'chilli-burger-veggie',
+  'be1fa199-5029-433f-7ccf-8fce38116665', // TERIYAKI Bowl stock-photo placeholder
+  '1232c37b-9b66-78d2-43af-285c23ddcd7b', // Salchipapa stock-photo placeholder
+  '446beb63-71b7-7242-3797-db75472451d9', // Hamburguesa VEGGIE stock-photo placeholder
+  'edfc2bdb-d986-d364-5080-a7868f942bf4', // Hamburguesa VEGGIE stock-photo placeholder
+  '2422e354-e353-b8ca-626d-a97d577ca8cc', // Hot Dog Americano stock-photo placeholder
 ]);
 
 // ID-based overrides: local images take priority over any Supabase image_url.

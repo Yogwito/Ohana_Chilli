@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-catalog', () => ({
   useBowlRules: () => ({ data: [mocks.bowlRule], isLoading: false }),
   useIngredients: (type?: Ingredient['type']) => ({
-    data: type ? mocks.ingredientMap[type] : [],
+    data: type ? mocks.ingredientMap[type] : Object.values(mocks.ingredientMap).flat(),
     isLoading: false,
   }),
   useProducts: () => ({ data: [], isLoading: false }),

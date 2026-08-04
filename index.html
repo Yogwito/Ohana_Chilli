@@ -83,10 +83,46 @@
     }
     </script>
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,700;0,900;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <!-- Critical hero assets -->
+    <link rel="preload" href="/fonts/bricolage-grotesque-latin-600-800.woff2" as="font" type="font/woff2" crossorigin />
+    <link
+      rel="preload"
+      as="image"
+      href="/images/bowl-hero-poster-start-mobile-v2.webp"
+      media="(max-width: 767px)"
+      type="image/webp"
+      fetchpriority="high"
+    />
+    <style>
+      #critical-hero-poster {
+        position: absolute;
+        inset: 56px 0 auto;
+        z-index: 1;
+        width: 100%;
+        height: calc(100svh - 56px);
+        overflow: hidden;
+        background: #15312d;
+      }
+      #critical-hero-poster img { width: 100%; height: 100%; object-fit: cover; }
+      #critical-hero-poster::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(to top, rgba(0, 0, 0, .6), transparent 50%),
+          rgba(0, 0, 0, .72);
+      }
+      html.hero-video-active #critical-hero-poster::after { display: none; }
+      #root { position: relative; z-index: 2; }
+    </style>
+    <link
+      rel="preload"
+      as="image"
+      href="/images/bowl-hero-poster-start-v2.webp"
+      media="(min-width: 768px)"
+      type="image/webp"
+      fetchpriority="high"
+    />
 
     <!-- Anti-flash dark mode script -->
     <script>
@@ -101,6 +137,17 @@
   </head>
 
   <body>
+    <picture id="critical-hero-poster" aria-hidden="true">
+      <source media="(max-width: 767px)" srcset="/images/bowl-hero-poster-start-mobile-v2.webp" type="image/webp" />
+      <source media="(max-width: 767px)" srcset="/images/bowl-hero-poster-start-mobile-v2.jpg" type="image/jpeg" />
+      <source srcset="/images/bowl-hero-poster-start-v2.webp" type="image/webp" />
+      <img src="/images/bowl-hero-poster-start-v2.jpg" alt="" width="1440" height="778" fetchpriority="high" />
+    </picture>
+    <script>
+      if (!['/', '/ohana', '/chilli', '/carta'].includes(location.pathname)) {
+        document.getElementById('critical-hero-poster').hidden = true;
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

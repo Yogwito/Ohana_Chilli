@@ -1,5 +1,4 @@
 import { useCallback, useRef, type ReactNode, type ComponentPropsWithoutRef, type ElementType } from 'react';
-import { gsap } from 'gsap';
 import { cn } from '@/lib/utils';
 
 type MagneticButtonProps<T extends ElementType> = {
@@ -24,8 +23,6 @@ export default function MagneticButton<T extends ElementType = 'button'>({
 }: MagneticButtonProps<T>) {
   const Tag = (as ?? 'button') as ElementType;
   const ref = useRef<HTMLElement>(null);
-  const quickX = useRef<gsap.QuickToFunc | null>(null);
-  const quickY = useRef<gsap.QuickToFunc | null>(null);
 
   const isMagnetic = () =>
     typeof window !== 'undefined' &&
@@ -36,15 +33,11 @@ export default function MagneticButton<T extends ElementType = 'button'>({
     (e: React.PointerEvent) => {
       const el = ref.current;
       if (!el || !isMagnetic()) return;
-      if (!quickX.current) {
-        quickX.current = gsap.quickTo(el, 'x', { duration: 0.35, ease: 'power3.out' });
-        quickY.current = gsap.quickTo(el, 'y', { duration: 0.35, ease: 'power3.out' });
-      }
       const rect = el.getBoundingClientRect();
       const relX = (e.clientX - rect.left) / rect.width - 0.5;
       const relY = (e.clientY - rect.top) / rect.height - 0.5;
-      quickX.current(relX * strength * 2);
-      quickY.current?.(relY * strength * 2);
+      el.style.transition = 'transform 350ms cubic-bezier(0.22, 1, 0.36, 1)';
+      el.style.transform = `translate3d(${relX * strength * 2}px, ${relY * strength * 2}px, 0)`;
     },
     [strength],
   );
@@ -52,7 +45,8 @@ export default function MagneticButton<T extends ElementType = 'button'>({
   const handleLeave = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    gsap.to(el, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.4)' });
+    el.style.transition = 'transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+    el.style.transform = 'translate3d(0, 0, 0)';
   }, []);
 
   return (

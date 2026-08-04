@@ -1,6 +1,4 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
@@ -11,9 +9,9 @@ import Layout from "@/components/layout/Layout";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import NotFound from "./pages/NotFound";
 import OhanaPage from "./pages/OhanaPage";
-import CheckoutPage from "./pages/CheckoutPage";
 
 // Lazy-loaded routes
+const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const BeveragesPage = lazy(() => import("./pages/BeveragesPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
@@ -47,10 +45,8 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <CatalogSyncBridge />
       <CartProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+        <Sonner />
+        <BrowserRouter>
             <Routes>
               {/* Admin routes without Layout */}
               <Route path="/admin/login" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><AdminLoginPage /></Suspense></ErrorBoundary>} />
@@ -68,8 +64,7 @@ const App = () => (
               <Route path="/carta" element={<Navigate to="/" replace />} />
               <Route path="*" element={<Layout><NotFound /></Layout>} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+        </BrowserRouter>
       </CartProvider>
     </QueryClientProvider>
   </HelmetProvider>

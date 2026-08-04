@@ -371,19 +371,19 @@ export function useBannerSettings() {
 
 export function useProductDefaultIngredients(productId: string | null) {
   return useQuery({
-    queryKey: ['product-default-ingredients', productId],
+    queryKey: ['product-default-ingredients'],
     queryFn: async () => {
-      if (!productId) return [];
       const { data, error } = await supabase
         .from('product_default_ingredients')
         .select('*')
-        .eq('product_id', productId)
+        .order('product_id')
         .order('sort_order');
       if (error) throw error;
       return data ?? [];
     },
     enabled: !!productId,
     staleTime: 1000 * 60 * 10,
+    select: (rows) => productId ? rows.filter((row) => row.product_id === productId) : [],
   });
 }
 

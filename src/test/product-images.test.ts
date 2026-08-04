@@ -27,4 +27,21 @@ describe('product image resolution', () => {
       imageUrl: 'https://cdn.example.com/wrong-burger.jpg',
     })).toBeUndefined();
   });
+
+  it('suppresses catalog stock-photo placeholders', () => {
+    const placeholderIds = [
+      'be1fa199-5029-433f-7ccf-8fce38116665',
+      '1232c37b-9b66-78d2-43af-285c23ddcd7b',
+      '446beb63-71b7-7242-3797-db75472451d9',
+      'edfc2bdb-d986-d364-5080-a7868f942bf4',
+      '2422e354-e353-b8ca-626d-a97d577ca8cc',
+    ];
+
+    for (const id of placeholderIds) {
+      expect(resolveProductImageUrl({
+        id,
+        imageUrl: 'https://images.unsplash.com/placeholder?w=400&q=80',
+      })).toBeUndefined();
+    }
+  });
 });

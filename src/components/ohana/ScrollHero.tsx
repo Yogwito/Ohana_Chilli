@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import MagneticButton from '@/components/ui/MagneticButton';
-
-gsap.registerPlugin(ScrollTrigger);
 
 const VIDEO_SRC = '/videos/bowl-hero-v2.mp4';
 const MOBILE_VIDEO_SRC = '/videos/bowl-hero-mobile-v2.mp4';
+const AV1_VIDEO_SRC = '/videos/bowl-hero-v2-av1.mp4';
+const AV1_MOBILE_VIDEO_SRC = '/videos/bowl-hero-mobile-v2-av1.mp4';
 // Shown before the video buffers and while scrubbing hasn't started yet —
 // the empty bowl, so the page loads "unassembled" and scrolling is what
 // reveals the commercial, never the other way around.
-const POSTER_START_SRC = '/images/bowl-hero-poster-start-v2.jpg';
 // Only used for the reduced-motion / video-failed static fallback, where
 // there's no scroll to reveal anything — the finished bowl is the payoff.
 const POSTER_FINAL_SRC = '/images/bowl-hero-poster-v2.jpg';
@@ -25,72 +22,87 @@ interface ScrollHeroProps {
 /**
  * Scroll-driven hero, three acts:
  *
- * 1. Preload — the full video downloads through a streaming fetch that feeds
- *    a real progress bar; the page opens on a branded loading veil. Serving
- *    the video from a local blob makes scroll-scrubbing deterministic (no
+ * 1. Preload — the responsive poster paints immediately while the full video
+ *    downloads through a streaming fetch. Serving the video from a local blob
+ *    makes scroll-scrubbing deterministic (no
  *    network seeks mid-scroll, the historical cause of "the animation
  *    doesn't load").
- * 2. Intro — when the video is ready the veil lifts and the copy staggers in
- *    word by word (GSAP timeline).
- * 3. Scrub — a pinned ScrollTrigger maps scroll progress to video.currentTime,
+ * 2. Scrub — the sticky section maps scroll progress to video.currentTime,
  *    assembling the bowl as the user scrolls, while the shadow overlay lifts.
  *
  * prefers-reduced-motion skips all three acts: static final poster, copy
- * visible, no pin. A failed fetch falls back to the poster and removes the
- * veil immediately — the veil can never trap the page.
+ * visible, no pin. A failed fetch falls back to the final poster.
  */
 export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollHeroProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const veilRef = useRef<HTMLDivElement>(null);
-  const progressBarRef = useRef<HTMLDivElement>(null);
   const pendingSeekRef = useRef<number | null>(null);
   const blobUrlRef = useRef<string | null>(null);
-  const startedRef = useRef(false);
-  const gsapCtxRef = useRef<gsap.Context | null>(null);
+  const interactionStartedRef = useRef(false);
+  const scrubStartedRef = useRef(false);
+  const scrollCleanupRef = useRef<(() => void) | null>(null);
 
   const [isMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches);
   const [reducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [videoFailed, setVideoFailed] = useState(false);
-  const [loadPct, setLoadPct] = useState(0);
+  const [videoActive, setVideoActive] = useState(false);
 
   const staticHero = reducedMotion || videoFailed;
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('hero-video-active', videoActive);
+    return () => document.documentElement.classList.remove('hero-video-active');
+  }, [videoActive]);
 
   // ── Act 1: streaming download with real progress ──────────────────────────
   useEffect(() => {
     if (reducedMotion) return;
 
     const controller = new AbortController();
-    const src = isMobile ? MOBILE_VIDEO_SRC : VIDEO_SRC;
+    const video = videoRef.current;
+    const supportsAv1 = Boolean(video?.canPlayType('video/mp4; codecs="av01.0.08M.08"'));
+    const src = isMobile
+      ? (supportsAv1 ? AV1_MOBILE_VIDEO_SRC : MOBILE_VIDEO_SRC)
+      : (supportsAv1 ? AV1_VIDEO_SRC : VIDEO_SRC);
+
+    const removeInteractionListeners = () => {
+      window.removeEventListener('scroll', handleInteraction);
+      window.removeEventListener('pointerdown', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+    const attachBufferedVideo = () => {
+      if (!interactionStartedRef.current || !blobUrlRef.current || !video || video.src) return;
+      video.src = blobUrlRef.current;
+      video.load();
+      removeInteractionListeners();
+    };
+    function handleInteraction() {
+      interactionStartedRef.current = true;
+      attachBufferedVideo();
+    }
+
+    window.addEventListener('scroll', handleInteraction, { passive: true });
+    window.addEventListener('pointerdown', handleInteraction, { passive: true });
+    window.addEventListener('touchstart', handleInteraction, { passive: true });
 
     (async () => {
       try {
         const res = await fetch(src, { signal: controller.signal });
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-        const total = Number(res.headers.get('content-length')) || 0;
         const reader = res.body.getReader();
         const chunks: BlobPart[] = [];
-        let received = 0;
 
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
           chunks.push(value);
-          received += value.byteLength;
-          if (total > 0) setLoadPct(Math.min(99, Math.round((received / total) * 100)));
         }
 
         const blobUrl = URL.createObjectURL(new Blob(chunks, { type: 'video/mp4' }));
         blobUrlRef.current = blobUrl;
-        setLoadPct(100);
-
-        const video = videoRef.current;
-        if (video) {
-          video.src = blobUrl;
-          video.load();
-        }
+        attachBufferedVideo();
       } catch {
         if (!controller.signal.aborted) setVideoFailed(true); // drops the veil with the static fallback
       }
@@ -98,17 +110,11 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
 
     return () => {
       controller.abort();
+      removeInteractionListeners();
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Mirror load % into the bar without re-rendering GSAP-managed nodes
-  useEffect(() => {
-    if (progressBarRef.current) {
-      gsap.to(progressBarRef.current, { scaleX: loadPct / 100, duration: 0.3, ease: 'power2.out' });
-    }
-  }, [loadPct]);
 
   const handleSeeked = useCallback(() => {
     const video = videoRef.current;
@@ -118,79 +124,76 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
     }
   }, []);
 
-  // ── Act 2 + 3: intro timeline, then pinned scrub ──────────────────────────
+  // Once buffered, enable deterministic scroll scrubbing.
   const handleVideoReady = useCallback(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+    if (scrubStartedRef.current) return;
+    scrubStartedRef.current = true;
+    setVideoActive(true);
 
     const video = videoRef.current;
     if (video) video.currentTime = 0;
 
-    const hero = heroRef.current;
-    if (!hero) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const wrapper = wrapperRef.current;
+      const v = videoRef.current;
+      if (!wrapper || !v) return;
 
-    gsapCtxRef.current = gsap.context(() => {
-      const intro = gsap.timeline({ defaults: { ease: 'power3.out' } });
-      intro
-        .to(veilRef.current, { yPercent: -100, duration: 0.9, ease: 'power4.inOut' })
-        .from('[data-hero-badge]', { y: 24, autoAlpha: 0, duration: 0.5 }, '-=0.35')
-        .from('[data-hero-word]', { yPercent: 120, duration: 0.7, stagger: 0.09, ease: 'power4.out' }, '-=0.3')
-        .from('[data-hero-sub]', { y: 18, autoAlpha: 0, duration: 0.5 }, '-=0.4')
-        .from('[data-hero-cta]', { y: 18, autoAlpha: 0, duration: 0.5, stagger: 0.08 }, '-=0.35')
-        .from('[data-hero-hint]', { autoAlpha: 0, duration: 0.4 }, '-=0.2')
-        .set(veilRef.current, { display: 'none' });
+      const wrapperTop = wrapper.getBoundingClientRect().top + window.scrollY;
+      const scrollDistance = Math.max(wrapper.offsetHeight - window.innerHeight, 1);
+      const progress = Math.min(1, Math.max(0, (window.scrollY - wrapperTop) / scrollDistance));
 
-      ScrollTrigger.create({
-        trigger: wrapperRef.current,
-        start: 'top top',
-        end: 'bottom bottom',
-        scrub: true,
-        onUpdate: (self) => {
-          const v = videoRef.current;
-          if (v && v.duration) {
-            const target = self.progress * (v.duration - 0.05);
-            if (v.seeking) {
-              pendingSeekRef.current = target; // applied on 'seeked' so fast scrolling never wedges
-            } else {
-              v.currentTime = target;
-            }
-          }
-          if (overlayRef.current) {
-            overlayRef.current.style.opacity = String(0.72 - self.progress * 0.37);
-          }
-          if (v) {
-            v.style.transform = `scale(${1.06 - self.progress * 0.06})`;
-          }
-        },
-      });
-    }, hero);
+      if (v.duration) {
+        const target = progress * (v.duration - 0.05);
+        if (v.seeking) pendingSeekRef.current = target;
+        else v.currentTime = target;
+      }
+      if (overlayRef.current) overlayRef.current.style.opacity = String(0.72 - progress * 0.37);
+      v.style.transform = `scale(${1.06 - progress * 0.06})`;
+      // The responsive poster is the first frame and remains the paint
+      // candidate until the visitor actually starts the scrub.
+      v.style.display = progress > 0.002 ? 'block' : 'none';
+    };
+    const requestUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+
+    window.addEventListener('scroll', requestUpdate, { passive: true });
+    window.addEventListener('resize', requestUpdate);
+    scrollCleanupRef.current = () => {
+      window.removeEventListener('scroll', requestUpdate);
+      window.removeEventListener('resize', requestUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+    update();
   }, []);
 
-  useEffect(() => () => gsapCtxRef.current?.revert(), []);
+  useEffect(() => () => scrollCleanupRef.current?.(), []);
 
   return (
     <div ref={wrapperRef} className={staticHero ? '' : 'h-[200vh] sm:h-[250vh]'}>
       <div
         ref={heroRef}
         className={
-          'hero-grain relative w-full overflow-hidden flex items-center justify-center ' +
+          ((staticHero || videoActive) ? 'hero-grain ' : '') +
+          'relative w-full overflow-hidden flex items-center justify-center ' +
           (staticHero ? 'min-h-[480px]' : 'sticky top-0 h-screen')
         }
-        style={{ background: 'hsl(var(--mesa))' }}
+        style={{ background: staticHero ? 'hsl(var(--mesa))' : 'transparent' }}
       >
-        {/* Background media: scrubbed video (blob-fed), poster fallback */}
+        {/* The critical poster is parsed in index.html; video overlays it after interaction. */}
         {!staticHero ? (
           <video
             ref={videoRef}
-            poster={POSTER_START_SRC}
             muted
             playsInline
             preload="none"
             onLoadedData={handleVideoReady}
             onSeeked={handleSeeked}
             onError={() => setVideoFailed(true)}
-            className="absolute inset-0 w-full h-full object-cover will-change-transform"
-            style={{ transform: 'scale(1.06)' }}
+            className="absolute inset-0 z-[2] w-full h-full object-cover will-change-transform"
+            style={{ transform: 'scale(1.06)', display: 'none' }}
           />
         ) : (
           <img
@@ -201,12 +204,16 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
         )}
 
         {/* Shadow overlay the scene emerges from as you scroll */}
-        <div
-          ref={overlayRef}
-          className="absolute inset-0 bg-black"
-          style={{ opacity: staticHero ? 0.35 : 0.72 }}
-        />
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
+        {(staticHero || videoActive) && (
+          <>
+            <div
+              ref={overlayRef}
+              className="absolute inset-0 z-[3] bg-black"
+              style={{ opacity: staticHero ? 0.35 : 0.72 }}
+            />
+            <div className="absolute inset-x-0 bottom-0 z-[3] h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
+          </>
+        )}
 
         {/* Copy */}
         <div className="relative z-10 container max-w-5xl px-4 flex flex-col items-center text-center gap-4">
@@ -219,14 +226,20 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
           <h1 className="hero-title text-[13vw] sm:text-6xl md:text-7xl lg:text-8xl text-white leading-[0.95] drop-shadow-lg">
             {TITLE_WORDS.map((word, i) => (
               <span key={i} className="inline-block overflow-hidden align-bottom pb-[0.08em]">
-                <span data-hero-word className="inline-block">
+                <span
+                  data-hero-word
+                  className="inline-block"
+                >
                   {word}
                 </span>
                 {i < TITLE_WORDS.length - 1 ? <span aria-hidden="true">&nbsp;</span> : null}
               </span>
             ))}
           </h1>
-          <p data-hero-sub className="text-sm sm:text-lg text-white/90 max-w-md drop-shadow">
+          <p
+            data-hero-sub
+            className="text-sm sm:text-lg text-white/90 max-w-md drop-shadow"
+          >
             Arma tu bowl perfecto o elige uno de nuestros sugeridos. Cable Plaza, Piso 4.
           </p>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-2 w-full sm:w-auto">
@@ -258,28 +271,6 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
           </div>
         )}
 
-        {/* Loading veil — branded, with real download progress. GSAP owns its
-            exit; React keeps it mounted so the lift animation can't be cut. */}
-        {!staticHero && (
-          <div
-            ref={veilRef}
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6"
-            style={{ background: 'hsl(var(--mesa))' }}
-          >
-            <p className="hero-title text-3xl sm:text-4xl text-white">
-              <span className="font-extrabold">Ohana</span>{' '}
-              <span className="font-semibold text-white/80">Bowls</span>
-            </p>
-            <div className="w-56 sm:w-72 h-[3px] rounded-full bg-white/15 overflow-hidden">
-              <div
-                ref={progressBarRef}
-                className="h-full w-full origin-left rounded-full"
-                style={{ background: 'hsl(var(--maiz))', transform: 'scaleX(0)' }}
-              />
-            </div>
-            <p className="text-white/60 text-xs tabular-nums tracking-widest">{loadPct}%</p>
-          </div>
-        )}
       </div>
     </div>
   );

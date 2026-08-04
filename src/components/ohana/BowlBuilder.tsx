@@ -138,14 +138,35 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   };
 
   const { data: bowlSizes = [], isLoading: sizesLoading, error: sizesError } = useBowlRules();
-  const { data: bebidasOptions = [], isLoading: bebidasLoading } = useProducts({ categoryId: 'ohana-bebidas' });
-  const { data: baseOptions = [], isLoading: basesLoading, error: basesError } = useIngredients('base');
-  const { data: proteinOptions = [], isLoading: proteinsLoading, error: proteinsError } = useIngredients('protein');
-  const { data: acompananteOptions = [], isLoading: acompLoading, error: acompError } = useIngredients('acompanante');
-  const { data: sauceOptions = [], isLoading: saucesLoading, error: saucesError } = useIngredients('sauce');
-  const { data: complementoOptions = [], isLoading: complLoading, error: complError } = useIngredients('topping');
-  const dataLoading = sizesLoading || basesLoading || proteinsLoading || acompLoading || saucesLoading || complLoading;
-  const dataError = sizesError || basesError || proteinsError || acompError || saucesError || complError;
+  const { data: catalogProducts = [], isLoading: productsLoading, error: productsError } = useProducts();
+  const { data: catalogIngredients = [], isLoading: ingredientsLoading, error: ingredientsError } = useIngredients();
+  const bebidasOptions = useMemo(
+    () => catalogProducts.filter((product) => product.categoryId === 'ohana-bebidas'),
+    [catalogProducts],
+  );
+  const baseOptions = useMemo(
+    () => catalogIngredients.filter((ingredient) => ingredient.type === 'base'),
+    [catalogIngredients],
+  );
+  const proteinOptions = useMemo(
+    () => catalogIngredients.filter((ingredient) => ingredient.type === 'protein'),
+    [catalogIngredients],
+  );
+  const acompananteOptions = useMemo(
+    () => catalogIngredients.filter((ingredient) => ingredient.type === 'acompanante'),
+    [catalogIngredients],
+  );
+  const sauceOptions = useMemo(
+    () => catalogIngredients.filter((ingredient) => ingredient.type === 'sauce'),
+    [catalogIngredients],
+  );
+  const complementoOptions = useMemo(
+    () => catalogIngredients.filter((ingredient) => ingredient.type === 'topping'),
+    [catalogIngredients],
+  );
+  const bebidasLoading = productsLoading;
+  const dataLoading = sizesLoading || productsLoading || ingredientsLoading;
+  const dataError = sizesError || productsError || ingredientsError;
 
   const [currentStep, setCurrentStep] = useState<BowlBuilderStep>('size');
   const [selectedSize, setSelectedSize] = useState<BowlSizeRule | null>(null);

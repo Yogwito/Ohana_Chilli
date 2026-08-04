@@ -1,8 +1,4 @@
 import { useEffect } from 'react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-
-gsap.registerPlugin(ScrollTrigger);
 
 /**
  * Scroll-triggered entrance for every `[data-reveal]` descendant of `scope`.
@@ -20,20 +16,28 @@ export function useGsapReveal(scope: React.RefObject<HTMLElement>, deps: unknown
     if (targets.length === 0) return;
     targets.forEach((el) => el.setAttribute('data-revealed', ''));
 
-    const ctx = gsap.context(() => {
-      ScrollTrigger.batch(targets, {
-        start: 'top 88%',
-        once: true,
-        onEnter: (batch) =>
-          gsap.fromTo(
-            batch,
-            { y: 28, autoAlpha: 0 },
-            { y: 0, autoAlpha: 1, duration: 0.7, stagger: 0.08, ease: 'power3.out', overwrite: true },
-          ),
+    const observer = new IntersectionObserver((entries) => {
+      const entering = entries.filter((entry) => entry.isIntersecting);
+      entering.forEach((entry, index) => {
+        const target = entry.target as HTMLElement;
+        target.animate(
+          [
+            { transform: 'translateY(28px)', opacity: 0 },
+            { transform: 'translateY(0)', opacity: 1 },
+          ],
+          {
+            duration: 700,
+            delay: index * 80,
+            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            fill: 'both',
+          },
+        );
+        observer.unobserve(target);
       });
-    }, root);
+    }, { rootMargin: '0px 0px -12% 0px' });
 
-    return () => ctx.revert();
+    targets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

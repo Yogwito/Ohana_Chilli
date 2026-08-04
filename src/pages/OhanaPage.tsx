@@ -9,7 +9,6 @@ import SEOHead from '@/components/SEOHead';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import ProductImage from '@/components/products/ProductImage';
-import ProductDrawer from '@/components/products/ProductDrawer';
 import ScrollHero from '@/components/ohana/ScrollHero';
 import BrandMarquee from '@/components/ohana/BrandMarquee';
 import MagneticButton from '@/components/ui/MagneticButton';
@@ -27,6 +26,7 @@ import { Product, Category } from '@/types';
 
 const BowlBuilder = lazy(() => import('@/components/ohana/BowlBuilder'));
 const PromotionsSection = lazy(() => import('@/components/ohana/PromotionsSection'));
+const ProductDrawer = lazy(() => import('@/components/products/ProductDrawer'));
 
 // Virtual bowl-builder tab — always first, regardless of DB order
 const BOWL_BUILDER_ID = 'arma-tu-bowl';
@@ -138,12 +138,16 @@ function ProductRow({
         </div>
       </div>
 
-      <ProductDrawer
-        product={product}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onConfirm={handleDrawerConfirm}
-      />
+      {drawerOpen ? (
+        <Suspense fallback={null}>
+          <ProductDrawer
+            product={product}
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            onConfirm={handleDrawerConfirm}
+          />
+        </Suspense>
+      ) : null}
     </>
   );
 }
@@ -164,7 +168,11 @@ export default function OhanaPage() {
   useEffect(() => setMounted(true), []);
 
   const { data: categories = [], error: categoriesError } = useCategories('ohana');
-  const { data: allProducts = [], isLoading, error: productsError } = useProducts({ brandId: 'ohana' });
+  const { data: allProducts = [], isLoading, error: productsError } = useProducts();
+  const ohanaProducts = useMemo(
+    () => allProducts.filter((product) => product.brand === 'ohana'),
+    [allProducts],
+  );
   const { data: businessSettings } = useBusinessSettings();
   const { data: activePromotions = [] } = usePromotions();
   const hasActivePromotions = activePromotions.length > 0;
@@ -195,20 +203,20 @@ export default function OhanaPage() {
     const map: Record<string, Product[]> = {};
     const query = searchQuery.trim().toLowerCase();
     const visibleProducts = query
-      ? allProducts.filter((product) => {
+      ? ohanaProducts.filter((product) => {
         const category = categories.find((cat) => cat.id === product.categoryId);
         return [product.name, product.description, category?.name]
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(query));
       })
-      : allProducts;
+      : ohanaProducts;
 
     for (const p of visibleProducts) {
       if (!map[p.categoryId]) map[p.categoryId] = [];
       map[p.categoryId].push(p);
     }
     return map;
-  }, [allProducts, categories, searchQuery]);
+  }, [ohanaProducts, categories, searchQuery]);
 
   // Visible categories: bowl builder always shows; others when they have products
   const visibleCategories = useMemo(() => {
@@ -285,7 +293,7 @@ export default function OhanaPage() {
   useGsapReveal(pageRef, [visibleCategories, searchQuery, compactView, isLoading]);
 
   return (
-    <div ref={pageRef} className="min-h-screen bg-background">
+    <div ref={pageRef} className="min-h-screen">
       <SEOHead
         title="Ohana Bowls — Menú"
         description="Bowls frescos, burgers, hot dogs, nachos y más. Arma tu bowl o elige entre nuestras opciones."
