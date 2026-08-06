@@ -1,122 +1,41 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  BUSINESS_SETTING_DEFINITIONS,
   EMPTY_BUSINESS_SETTINGS,
   mapBusinessSettings,
   isBusinessOpenNow,
 } from '@/domain/businessSettings';
-import { resolveProductImageUrl } from '@/domain/productImages';
-import type { BowlSizeRule, Brand, Category, DeliveryZone, Ingredient, Product, Promotion } from '@/types';
+import {
+  isBeverageCategory,
+  mapPublicCatalogResponse,
+  type PublicCatalog,
+} from '@/domain/publicCatalog';
+import type { Brand, DeliveryZone, Ingredient, Promotion } from '@/types';
 
-interface ProductQueryRow {
-  id: string;
-  name: string;
-  description: string | null;
-  price_cents: number;
-  brand_id: string;
-  category_id: string;
-  image_url: string | null;
-  ingredients_list: string[] | null;
-  calories: number | null;
-  is_vegan: boolean | null;
-  is_gluten_free: boolean | null;
-  is_popular: boolean | null;
-  is_new: boolean | null;
-  is_active: boolean;
-}
-
-interface CategoryQueryRow {
-  id: string;
-  name: string;
-  brand_id: string;
-  slug: string | null;
-  icon: string | null;
-  sort_order: number | null;
-}
-
-interface IngredientQueryRow {
-  id: string;
-  name: string;
-  type: string;
-  price_cents: number;
-  calories: number | null;
-  is_vegan: boolean | null;
-  is_gluten_free: boolean | null;
-  is_active: boolean;
-}
-
-interface SettingQueryRow {
-  key: string;
-  value: string;
-}
-
-function mapProduct(row: ProductQueryRow): Product {
-  const rawImageUrl = row.image_url ?? undefined;
-
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? '',
-    price: row.price_cents,
-    brand: row.brand_id as Brand,
-    categoryId: row.category_id,
-    imageUrl: resolveProductImageUrl({ id: row.id, imageUrl: rawImageUrl }),
-    ingredients: row.ingredients_list ?? undefined,
-    calories: row.calories ?? undefined,
-    isVegan: row.is_vegan ?? false,
-    isGlutenFree: row.is_gluten_free ?? false,
-    isPopular: row.is_popular ?? false,
-    isNew: row.is_new ?? false,
-  };
-}
-
-function toCategorySlug(row: Pick<CategoryQueryRow, 'id' | 'name' | 'slug'>) {
-  if (row.slug?.trim()) return row.slug;
-
-  const derivedSlug = row.name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-
-  return derivedSlug || row.id;
-}
-
-function mapCategory(row: CategoryQueryRow): Category {
-  return {
-    id: row.id,
-    name: row.name,
-    brand: row.brand_id as Brand,
-    slug: toCategorySlug(row),
-    icon: row.icon ?? undefined,
-  };
-}
-
-function mapIngredient(row: IngredientQueryRow): Ingredient {
-  return {
-    id: row.id,
-    name: row.name,
-    type: row.type as Ingredient['type'],
-    price: row.price_cents > 0 ? row.price_cents : undefined,
-    calories: row.calories ?? undefined,
-    isVegan: row.is_vegan ?? false,
-    isGlutenFree: row.is_gluten_free ?? false,
-  };
-}
-
-function isBeverageCategory(category: Pick<CategoryQueryRow, 'slug' | 'name'>) {
-  const slug = (category.slug ?? '').toLowerCase();
-  const name = category.name.toLowerCase();
-  return slug.includes('bebida') || slug.includes('cafe') || name.includes('bebida') || name.includes('cafe');
-}
+export const PUBLIC_CATALOG_QUERY_KEY = ['public-catalog'] as const;
 
 const liveCatalogQueryOptions = {
   staleTime: 0,
   refetchOnMount: 'always' as const,
   refetchOnWindowFocus: true,
 };
+
+async function fetchPublicCatalog(): Promise<PublicCatalog> {
+  const { data, error } = await supabase.rpc('get_public_catalog');
+  if (error) throw error;
+  return mapPublicCatalogResponse(data);
+}
+
+function usePublicCatalog<T>(select: (catalog: PublicCatalog) => T, options?: { enabled?: boolean; staleTime?: number }) {
+  return useQuery({
+    queryKey: PUBLIC_CATALOG_QUERY_KEY,
+    queryFn: fetchPublicCatalog,
+    select,
+    ...liveCatalogQueryOptions,
+    enabled: options?.enabled,
+    staleTime: options?.staleTime ?? liveCatalogQueryOptions.staleTime,
+  });
+}
 
 export function useBrands() {
   return useQuery({
@@ -131,113 +50,47 @@ export function useBrands() {
 }
 
 export function useCategories(brandId?: Brand) {
-  return useQuery({
-    queryKey: ['categories', brandId],
-    queryFn: async () => {
-      let query = supabase.from('categories').select('*').order('sort_order').order('name');
-      if (brandId) query = query.eq('brand_id', brandId);
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []).map((category) => mapCategory(category as CategoryQueryRow));
-    },
-    ...liveCatalogQueryOptions,
-  });
+  return usePublicCatalog(
+    (catalog) => brandId
+      ? catalog.categories.filter((category) => category.brand === brandId)
+      : catalog.categories,
+  );
 }
 
 export function useProducts(opts?: { brandId?: Brand; categoryId?: string }) {
-  return useQuery({
-    queryKey: ['products', opts?.brandId, opts?.categoryId],
-    queryFn: async () => {
-      let query = supabase.from('products').select('*').eq('is_active', true).order('name');
-      if (opts?.brandId) query = query.eq('brand_id', opts.brandId);
-      if (opts?.categoryId) query = query.eq('category_id', opts.categoryId);
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []).map((product) => mapProduct(product as ProductQueryRow));
-    },
-    ...liveCatalogQueryOptions,
-  });
+  return usePublicCatalog((catalog) => catalog.products.filter((product) => {
+    if (opts?.brandId && product.brand !== opts.brandId) return false;
+    if (opts?.categoryId && product.categoryId !== opts.categoryId) return false;
+    return true;
+  }));
 }
 
 export function useFeaturedProducts() {
-  return useQuery({
-    queryKey: ['products', 'featured'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .or('is_popular.eq.true,is_new.eq.true')
-        .limit(6);
-      if (error) throw error;
-      return (data ?? []).map((product) => mapProduct(product as ProductQueryRow));
-    },
-    ...liveCatalogQueryOptions,
-  });
+  return usePublicCatalog((catalog) => catalog.products
+    .filter((product) => product.isPopular || product.isNew)
+    .slice(0, 6));
 }
 
 export function useBeverages() {
-  return useQuery({
-    queryKey: ['products', 'beverages'],
-    queryFn: async () => {
-      const { data: categories, error: categoriesError } = await supabase.from('categories').select('*');
-      if (categoriesError) throw categoriesError;
-
-      const beverageCategoryIds = (categories ?? [])
-        .filter((category) => isBeverageCategory(category as CategoryQueryRow))
-        .map((category) => category.id);
-
-      if (beverageCategoryIds.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .in('category_id', beverageCategoryIds)
-        .order('name');
-      if (error) throw error;
-      return (data ?? []).map((product) => mapProduct(product as ProductQueryRow));
-    },
-    ...liveCatalogQueryOptions,
+  return usePublicCatalog((catalog) => {
+    const beverageCategoryIds = new Set(
+      catalog.categories.filter(isBeverageCategory).map((category) => category.id),
+    );
+    return catalog.products.filter((product) => beverageCategoryIds.has(product.categoryId));
   });
 }
 
 export function useIngredients(type?: Ingredient['type'], options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: ['ingredients', type],
-    queryFn: async () => {
-      let query = supabase.from('ingredients').select('*').eq('is_active', true).order('name');
-      if (type) query = query.eq('type', type);
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []).map((ingredient) => mapIngredient(ingredient as IngredientQueryRow));
-    },
-    ...liveCatalogQueryOptions,
-    enabled: options?.enabled,
-  });
+  return usePublicCatalog(
+    (catalog) => type
+      ? catalog.ingredients.filter((ingredient) => ingredient.type === type)
+      : catalog.ingredients,
+    options,
+  );
 }
 
 export function useBowlRules() {
-  return useQuery({
-    queryKey: ['bowl_rules'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('bowl_rules').select('*').order('price_cents');
-      if (error) throw error;
-      return (data ?? []).map(
-        (rule): BowlSizeRule => ({
-          size: rule.size as BowlSizeRule['size'],
-          name: rule.name,
-          price: rule.price_cents,
-          maxBases: rule.bases,
-          maxProteins: rule.proteins,
-          maxAcompanantes: rule.accompaniments,
-          maxSauces: rule.size === 'large' ? 3 : rule.size === 'medium' ? 2 : 1,
-          maxComplementos: rule.size === 'large' ? 3 : rule.size === 'medium' ? 2 : 1,
-        }),
-      );
-    },
-    ...liveCatalogQueryOptions,
-  });
+  return usePublicCatalog((catalog) => catalog.bowlRules);
 }
 
 export function useWhatsAppNumber() {
@@ -261,17 +114,7 @@ export function useFacebookUrl() {
 }
 
 export function useBeverageCategories() {
-  return useQuery({
-    queryKey: ['categories', 'beverages'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('categories').select('*').order('name');
-      if (error) throw error;
-      return (data ?? [])
-        .filter((category) => isBeverageCategory(category as CategoryQueryRow))
-        .map((category) => mapCategory(category as CategoryQueryRow));
-    },
-    ...liveCatalogQueryOptions,
-  });
+  return usePublicCatalog((catalog) => catalog.categories.filter(isBeverageCategory));
 }
 
 export function useActiveDeliveryZones() {
@@ -296,77 +139,40 @@ export function useActiveDeliveryZones() {
 }
 
 export function useSettingValue(key: string) {
-  return useQuery({
-    queryKey: ['setting', key],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', key)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.value ?? null;
-    },
-    ...liveCatalogQueryOptions,
+  return usePublicCatalog(
+    (catalog) => catalog.settings.find((setting) => setting.key === key)?.value ?? null,
+  );
+}
+
+function activePromotionsForToday(promotions: Promotion[]) {
+  const today = new Date().getDay();
+  return promotions.filter((promotion) => {
+    if (!promotion.days_of_week || promotion.days_of_week.length === 0) return true;
+    return promotion.days_of_week.includes(today);
   });
 }
 
 export function usePromotions() {
-  return useQuery({
-    queryKey: ['promotions'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('promotions')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
-      if (error) throw error;
-      const today = new Date().getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
-      return (data ?? []).filter((p: Promotion) => {
-        if (!p.days_of_week || p.days_of_week.length === 0) return true;
-        return p.days_of_week.includes(today);
-      }) as Promotion[];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  return usePublicCatalog(
+    (catalog) => activePromotionsForToday(catalog.promotions),
+    { staleTime: 5 * 60 * 1000 },
+  );
 }
 
 export function useBusinessSettings() {
-  return useQuery({
-    queryKey: ['settings', 'business'],
-    queryFn: async () => {
-      const keys = BUSINESS_SETTING_DEFINITIONS.map((setting) => setting.key);
-      const { data, error } = await supabase
-        .from('settings')
-        .select('key,value')
-        .in('key', keys)
-        .order('key');
-      if (error) throw error;
-      return mapBusinessSettings((data as SettingQueryRow[] | null) ?? []);
-    },
-    placeholderData: EMPTY_BUSINESS_SETTINGS,
-    ...liveCatalogQueryOptions,
-  });
+  const query = usePublicCatalog((catalog) => mapBusinessSettings(catalog.settings));
+  return { ...query, data: query.data ?? EMPTY_BUSINESS_SETTINGS };
 }
 
 export function useBannerSettings() {
-  return useQuery({
-    queryKey: ['banner-settings'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('key, value')
-        .in('key', ['banner_enabled', 'banner_message', 'banner_color']);
-      if (error) throw error;
-      const map = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
-      return {
-        enabled: map['banner_enabled'] === 'true',
-        message: map['banner_message'] ?? 'Estamos cerrados por ahora.',
-        color: map['banner_color'] ?? 'warning',
-      };
-    },
-    staleTime: 1000 * 30,
-  });
+  return usePublicCatalog((catalog) => {
+    const settings = Object.fromEntries(catalog.settings.map((setting) => [setting.key, setting.value]));
+    return {
+      enabled: settings.banner_enabled === 'true',
+      message: settings.banner_message ?? 'Estamos cerrados por ahora.',
+      color: settings.banner_color ?? 'warning',
+    };
+  }, { staleTime: 1000 * 30 });
 }
 
 export function useProductDefaultIngredients(productId: string | null) {

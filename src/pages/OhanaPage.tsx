@@ -12,6 +12,7 @@ import ProductImage from '@/components/products/ProductImage';
 import ScrollHero from '@/components/ohana/ScrollHero';
 import BrandMarquee from '@/components/ohana/BrandMarquee';
 import MagneticButton from '@/components/ui/MagneticButton';
+import DeferredSection from '@/components/ui/DeferredSection';
 import { useGsapReveal } from '@/hooks/use-gsap-reveal';
 import {
   buildBusinessWhatsAppUrl,
@@ -413,11 +414,18 @@ export default function OhanaPage() {
       <BrandMarquee />
 
       {/* ── SECTION 2: Promotions ───────────────────────────────────────── */}
-      <div ref={promotionsRef}>
-        <Suspense fallback={null}>
-          <PromotionsSection />
-        </Suspense>
-      </div>
+      {hasActivePromotions ? (
+        <div ref={promotionsRef}>
+          <DeferredSection
+            rootMargin="250px 0px"
+            fallback={<Skeleton className="mx-auto my-4 h-[248px] w-full max-w-4xl rounded-2xl" />}
+          >
+            <Suspense fallback={<Skeleton className="mx-auto my-4 h-[248px] w-full max-w-4xl rounded-2xl" />}>
+              <PromotionsSection />
+            </Suspense>
+          </DeferredSection>
+        </div>
+      ) : null}
 
       {/* ── SECTION 3: Sticky category tabs ────────────────────────────── */}
       <div className="sticky top-14 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm">
@@ -575,9 +583,14 @@ export default function OhanaPage() {
                   {/* Bowl Builder section */}
                   {isBowlBuilder && (
                     <AnimatedElement animation="scale-up" threshold={0.05} className="rounded-2xl border bg-card p-4 md:p-6 mt-4">
-                      <Suspense fallback={<Skeleton className="h-[520px] rounded-xl" />}>
-                        <BowlBuilder />
-                      </Suspense>
+                      <DeferredSection
+                        rootMargin="500px 0px"
+                        fallback={<Skeleton className="h-[520px] rounded-xl" />}
+                      >
+                        <Suspense fallback={<Skeleton className="h-[520px] rounded-xl" />}>
+                          <BowlBuilder />
+                        </Suspense>
+                      </DeferredSection>
                     </AnimatedElement>
                   )}
 

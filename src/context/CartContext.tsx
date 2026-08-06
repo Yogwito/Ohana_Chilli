@@ -9,43 +9,10 @@ import {
   normalizeProductCustomization,
 } from '@/domain/productCustomizations';
 import { useBowlRules, useIngredients, useProducts } from '@/hooks/use-catalog';
-import { z } from 'zod';
+import { CART_VERSION, parsePersistedCart } from '@/domain/cartPersistence';
 import { toast } from 'sonner';
 
-// ─── Cart validation schema (versioned) ─────────────────
-const CART_VERSION = 'cart:v3';
 const CART_STORAGE_KEY = 'ohana-bowls-cart';
-
-const productCustomizationSchema = z.object({
-  removedIngredients: z.array(z.string()),
-  extras: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    price: z.number(),
-  })),
-  note: z.string(),
-  extraTotal: z.number(),
-});
-
-const cartItemSchema = z.object({
-  id: z.string(),
-  brand: z.enum(['ohana']),
-  type: z.enum(['product', 'custom-bowl']),
-  product: z.any().optional().nullable(),
-  customBowl: z.any().optional().nullable(),
-  customizations: productCustomizationSchema.optional().nullable(),
-  quantity: z.number().int().positive(),
-  notes: z.string().optional().nullable(),
-  unitPrice: z.number(),
-  totalPrice: z.number(),
-});
-
-const cartStateSchema = z.object({
-  version: z.literal(CART_VERSION).optional(),
-  items: z.array(cartItemSchema),
-  subtotal: z.number(),
-  total: z.number(),
-});
 
 // ─── Actions ─────────────────────────────────────────────
 type CartAction =
@@ -162,9 +129,8 @@ function loadCartFromStorage(): CartState {
   try {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
     if (!raw) return initialState;
-    const parsed = JSON.parse(raw);
-    const result = cartStateSchema.safeParse(parsed);
-    if (result.success) return { items: result.data.items as CartItem[], subtotal: result.data.subtotal, total: result.data.total };
+    const parsed = parsePersistedCart(JSON.parse(raw));
+    if (parsed) return parsed;
     localStorage.removeItem(CART_STORAGE_KEY);
     return initialState;
   } catch {

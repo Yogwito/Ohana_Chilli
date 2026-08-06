@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
 import { formatPrice } from '@/domain/formatPrice';
+import { buildProductImageStoragePath, optimizeProductImage } from '@/domain/productImageUpload';
 import { cn } from '@/lib/utils';
 
 interface UnsplashPhoto {
@@ -124,17 +125,28 @@ export default function ProductsAdmin() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const ext = file.name.split('.').pop();
-    const prefix = editingProduct?.id ?? `new-${Date.now()}`;
-    const path = `${prefix}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from('product-images')
-      .upload(path, file, { upsert: true });
-    if (error) { toast.error('Error al subir imagen'); setUploading(false); return; }
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-    setForm(f => ({ ...f, image_url: data.publicUrl }));
-    setImgPreviewError(false);
-    setUploading(false);
+    try {
+      const optimizedFile = await optimizeProductImage(file);
+      const path = buildProductImageStoragePath(editingProduct?.id ?? null);
+      const { error } = await supabase.storage
+        .from('product-images')
+        .upload(path, optimizedFile, {
+          cacheControl: '31536000',
+          contentType: 'image/webp',
+          upsert: false,
+        });
+      if (error) throw error;
+
+      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+      setForm(f => ({ ...f, image_url: data.publicUrl }));
+      setImgPreviewError(false);
+      toast.success('Imagen optimizada y subida');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al subir imagen');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
   };
 
   const searchUnsplash = async () => {
@@ -176,7 +188,7 @@ export default function ProductsAdmin() {
       setSaving(false);
       return;
     }
-    await queryClient.invalidateQueries({ queryKey: ['products'] });
+    await queryClient.invalidateQueries({ queryKey: ['public-catalog'] });
     toast.success(editingProduct ? 'Producto actualizado' : 'Producto creado');
     setSheetOpen(false);
     fetchProducts();
@@ -199,7 +211,7 @@ export default function ProductsAdmin() {
       sort_order: (maxOrder?.sort_order ?? 0) + 1,
     });
     if (error) { toast.error('Error al crear categoría'); setSavingCat(false); return; }
-    await queryClient.invalidateQueries({ queryKey: ['categories'] });
+    await queryClient.invalidateQueries({ queryKey: ['public-catalog'] });
     toast.success('Categoría creada');
     setCatDialogOpen(false);
     setNewCatName('');
@@ -367,7 +379,7 @@ export default function ProductsAdmin() {
                   />
                   {uploading && (
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Subiendo imagen...</p>
+                      <p className="text-xs text-muted-foreground">Optimizando y subiendo imagen...</p>
                       <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                         <div className="h-full bg-primary animate-pulse rounded-full w-2/3" />
                       </div>

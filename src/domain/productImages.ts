@@ -18,12 +18,12 @@ const KNOWN_BAD_PRODUCT_IMAGE_IDS = new Set<string>([
 // ID-based overrides: local images take priority over any Supabase image_url.
 // Used for products whose catalog image_url points to a generic/incorrect stock photo.
 const PRODUCT_IMAGE_OVERRIDES: Record<string, string> = {
-  '23e44c1b-fe27-251a-0759-74f798d65e53': '/images/adicionales/03_guacamole.png',     // Guacamole
-  '3d9f5e71-d95c-7b13-5898-33a0c9e8e04e': '/images/adicionales/04_papas_francesa.png', // Papa Francesa
-  '978c1802-ff11-1e54-8ea9-7995664d91a9': '/images/adicionales/05_pepinillos.png',      // Pepinillos
-  '178e8c3b-d5c8-8faf-271f-8b785a801e07': '/images/adicionales/01_queso.png',           // Queso
-  '12135ae7-32db-9903-7179-f48581e8b8cc': '/images/adicionales/02_queso_frito.png',     // Queso Frito
-  '7e9a2544-4712-8633-f844-0766c82a2a01': '/images/adicionales/06_tocineta.png',        // Tocineta
+  '23e44c1b-fe27-251a-0759-74f798d65e53': '/images/adicionales/03_guacamole.webp',     // Guacamole
+  '3d9f5e71-d95c-7b13-5898-33a0c9e8e04e': '/images/adicionales/04_papas_francesa.webp', // Papa Francesa
+  '978c1802-ff11-1e54-8ea9-7995664d91a9': '/images/adicionales/05_pepinillos.webp',      // Pepinillos
+  '178e8c3b-d5c8-8faf-271f-8b785a801e07': '/images/adicionales/01_queso.webp',           // Queso
+  '12135ae7-32db-9903-7179-f48581e8b8cc': '/images/adicionales/02_queso_frito.webp',     // Queso Frito
+  '7e9a2544-4712-8633-f844-0766c82a2a01': '/images/adicionales/06_tocineta.webp',        // Tocineta
 };
 
 type ProductImageSource = Pick<Product, 'id' | 'imageUrl'>;
@@ -69,15 +69,15 @@ function normalizeIngredientName(name: string): string {
 }
 
 const ADDITIONAL_INGREDIENT_IMAGE_MAP: Record<string, string> = {
-  'guacamole': '/images/adicionales/03_guacamole.png',
-  'papa francesa': '/images/adicionales/04_papas_francesa.png',
-  'papas francesas': '/images/adicionales/04_papas_francesa.png',
-  'papas a la francesa': '/images/adicionales/04_papas_francesa.png',
-  'pepinillos': '/images/adicionales/05_pepinillos.png',
-  'queso': '/images/adicionales/01_queso.png',
-  'queso rallado': '/images/adicionales/01_queso.png',
-  'queso frito': '/images/adicionales/02_queso_frito.png',
-  'tocineta': '/images/adicionales/06_tocineta.png',
+  'guacamole': '/images/adicionales/03_guacamole.webp',
+  'papa francesa': '/images/adicionales/04_papas_francesa.webp',
+  'papas francesas': '/images/adicionales/04_papas_francesa.webp',
+  'papas a la francesa': '/images/adicionales/04_papas_francesa.webp',
+  'pepinillos': '/images/adicionales/05_pepinillos.webp',
+  'queso': '/images/adicionales/01_queso.webp',
+  'queso rallado': '/images/adicionales/01_queso.webp',
+  'queso frito': '/images/adicionales/02_queso_frito.webp',
+  'tocineta': '/images/adicionales/06_tocineta.webp',
 };
 
 export function getAdditionalIngredientImageUrl(name: string): string | undefined {

@@ -61,7 +61,7 @@ export default function SettingsAdmin() {
       .upsert({ key: 'business_hours_enforce', value: String(value) }, { onConflict: 'key' });
     setHoursEnforceSaving(false);
     if (error) { toast.error('Error al guardar'); return; }
-    await queryClient.invalidateQueries({ queryKey: ['setting', 'business_hours_enforce'] });
+    await queryClient.invalidateQueries({ queryKey: ['public-catalog'] });
     toast.success(value ? 'Bloqueo activado' : 'Bloqueo desactivado');
   };
 

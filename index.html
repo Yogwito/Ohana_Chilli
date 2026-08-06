@@ -84,7 +84,6 @@
     </script>
 
     <!-- Critical hero assets -->
-    <link rel="preload" href="/fonts/bricolage-grotesque-latin-600-800.woff2" as="font" type="font/woff2" crossorigin />
     <link
       rel="preload"
       as="image"
@@ -93,6 +92,15 @@
       type="image/webp"
       fetchpriority="high"
     />
+    <link
+      rel="preload"
+      as="image"
+      href="/images/bowl-hero-poster-start-v2.webp"
+      media="(min-width: 768px)"
+      type="image/webp"
+      fetchpriority="high"
+    />
+    <link rel="preload" href="/fonts/bricolage-grotesque-latin-600-800.woff2" as="font" type="font/woff2" crossorigin />
     <style>
       #critical-hero-poster {
         position: absolute;
@@ -115,15 +123,6 @@
       html.hero-video-active #critical-hero-poster::after { display: none; }
       #root { position: relative; z-index: 2; }
     </style>
-    <link
-      rel="preload"
-      as="image"
-      href="/images/bowl-hero-poster-start-v2.webp"
-      media="(min-width: 768px)"
-      type="image/webp"
-      fetchpriority="high"
-    />
-
     <!-- Anti-flash dark mode script -->
     <script>
       (function() {

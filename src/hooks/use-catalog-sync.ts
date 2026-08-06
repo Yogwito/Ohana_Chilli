@@ -21,13 +21,13 @@ const CATALOG_SYNC_CHANNEL = 'ohana-catalog-sync';
 const INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const CATALOG_QUERY_KEYS: Record<CatalogTable, QueryKey[]> = {
-  products: [['products']],
-  categories: [['categories'], ['products', 'beverages']],
-  ingredients: [['ingredients']],
-  bowl_rules: [['bowl_rules']],
+  products: [['public-catalog']],
+  categories: [['public-catalog']],
+  ingredients: [['public-catalog']],
+  bowl_rules: [['public-catalog']],
   delivery_zones: [['delivery_zones']],
-  settings: [['settings'], ['setting']],
-  promotions: [['promotions']],
+  settings: [['public-catalog']],
+  promotions: [['public-catalog']],
 };
 
 function normalizeTables(tables: CatalogTable[]) {

@@ -61,6 +61,8 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
     if (reducedMotion) return;
 
     const controller = new AbortController();
+    let downloadStarted = false;
+    let backgroundTimer = 0;
     const video = videoRef.current;
     const supportsAv1 = Boolean(video?.canPlayType('video/mp4; codecs="av01.0.08M.08"'));
     const src = isMobile
@@ -80,6 +82,7 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
     };
     function handleInteraction() {
       interactionStartedRef.current = true;
+      startDownload();
       attachBufferedVideo();
     }
 
@@ -87,7 +90,7 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
     window.addEventListener('pointerdown', handleInteraction, { passive: true });
     window.addEventListener('touchstart', handleInteraction, { passive: true });
 
-    (async () => {
+    const downloadVideo = async () => {
       try {
         const res = await fetch(src, { signal: controller.signal });
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -106,10 +109,25 @@ export default function ScrollHero({ onPrimaryClick, onSecondaryClick }: ScrollH
       } catch {
         if (!controller.signal.aborted) setVideoFailed(true); // drops the veil with the static fallback
       }
-    })();
+    };
+
+    function startDownload() {
+      if (downloadStarted) return;
+      downloadStarted = true;
+      void downloadVideo();
+    }
+
+    const scheduleBackgroundDownload = () => {
+      backgroundTimer = window.setTimeout(startDownload, 1500);
+    };
+
+    if (document.readyState === 'complete') scheduleBackgroundDownload();
+    else window.addEventListener('load', scheduleBackgroundDownload, { once: true });
 
     return () => {
       controller.abort();
+      window.clearTimeout(backgroundTimer);
+      window.removeEventListener('load', scheduleBackgroundDownload);
       removeInteractionListeners();
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     };

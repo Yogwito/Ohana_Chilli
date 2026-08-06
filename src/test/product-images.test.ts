@@ -44,4 +44,11 @@ describe('product image resolution', () => {
       })).toBeUndefined();
     }
   });
+
+  it('uses optimized local WebP overrides instead of external placeholders', () => {
+    expect(resolveProductImageUrl({
+      id: '12135ae7-32db-9903-7179-f48581e8b8cc',
+      imageUrl: 'https://images.unsplash.com/placeholder?w=400&q=80',
+    })).toBe('/images/adicionales/02_queso_frito.webp');
+  });
 });
