@@ -149,5 +149,18 @@
     </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if (location.hostname === 'ohanabowls.com' || location.hostname === 'www.ohanabowls.com') {
+        window.addEventListener('load', function () {
+          window.setTimeout(function () {
+            var beacon = document.createElement('script');
+            beacon.type = 'module';
+            beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+            beacon.setAttribute('data-cf-beacon', '{"token":"b2440327dc294961b17d6a26adee7207","spa":true}');
+            document.body.appendChild(beacon);
+          }, 3000);
+        }, { once: true });
+      }
+    </script>
   </body>
 </html>
