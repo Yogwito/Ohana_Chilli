@@ -152,13 +152,25 @@
     <script>
       if (location.hostname === 'ohanabowls.com' || location.hostname === 'www.ohanabowls.com') {
         window.addEventListener('load', function () {
-          window.setTimeout(function () {
+          var events = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+          var beaconLoaded = false;
+          var loadBeacon = function () {
+            if (beaconLoaded) return;
+            beaconLoaded = true;
+            events.forEach(function (eventName) {
+              window.removeEventListener(eventName, loadBeacon);
+            });
             var beacon = document.createElement('script');
             beacon.type = 'module';
             beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
             beacon.setAttribute('data-cf-beacon', '{"token":"b2440327dc294961b17d6a26adee7207","spa":true}');
             document.body.appendChild(beacon);
-          }, 3000);
+          };
+
+          events.forEach(function (eventName) {
+            window.addEventListener(eventName, loadBeacon, { once: true, passive: true });
+          });
+          window.setTimeout(loadBeacon, 30000);
         }, { once: true });
       }
     </script>
