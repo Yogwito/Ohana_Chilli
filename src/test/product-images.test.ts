@@ -27,4 +27,11 @@ describe('product image resolution', () => {
       imageUrl: 'https://cdn.example.com/wrong-burger.jpg',
     })).toBeUndefined();
   });
+
+  it('uses the audited local menu image before a remote catalog url', () => {
+    expect(resolveProductImageUrl({
+      id: '7460dcd8-cfe1-e147-4be0-2b66c4d1da62',
+      imageUrl: 'https://cdn.example.com/old-paisa.jpg',
+    })).toBe('/images/menu/paisa-bowl.webp');
+  });
 });

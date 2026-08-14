@@ -19,7 +19,7 @@ import { formatPrice } from '@/domain/formatPrice';
 import { customizationFromOrderDetails, formatCustomizationSummary } from '@/domain/customization';
 import {
   LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
-  Search, Truck, Upload, BarChart3, Plus, Tag, Trash2,
+  Search, Truck, Upload, BarChart3, Plus, Tag, Trash2, GlassWater, BadgePercent,
 } from 'lucide-react';
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 import PromotionsAdmin from '@/components/admin/PromotionsAdmin';
@@ -85,7 +85,7 @@ export default function AdminPage() {
   if (user && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
-        <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+        <div className="w-full max-w-md rounded-md border bg-card p-8 text-center">
           <h1 className="text-xl font-bold">Acceso no autorizado</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Tu sesión está activa, pero no tiene permisos de administrador.
@@ -114,13 +114,12 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="container flex h-14 items-center justify-between">
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-brand font-display font-black">Ohana Bowls</span>
-            <span className="text-muted-foreground font-normal hidden sm:inline">—</span>
-            <span className="text-sm text-muted-foreground font-normal hidden sm:inline">Panel de Administración</span>
-          </h1>
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur-xl">
+        <div className="container flex h-16 items-center justify-between">
+          <div className="flex items-end gap-3">
+            <span className="font-display text-3xl font-black leading-none text-brand-dark dark:text-brand">OHANA</span>
+            <span className="mb-0.5 hidden font-utility text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground sm:inline">Administración</span>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:block">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate('/'); }}>
@@ -130,18 +129,18 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="container py-4 sm:py-6">
+      <div className="container py-5 sm:py-7">
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="mb-4 sm:mb-6 flex w-full overflow-x-auto h-auto flex-nowrap justify-start rounded-lg bg-muted p-1 gap-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="mb-5 flex h-auto w-full flex-nowrap justify-start gap-1 overflow-x-auto rounded-md border bg-card p-1.5 [scrollbar-width:none] sm:mb-7 [&::-webkit-scrollbar]:hidden">
             <TabsTrigger value="orders" title="Pedidos" className="flex shrink-0 items-center gap-1.5"><ClipboardList className="w-4 h-4" /><span className="hidden sm:inline">Pedidos</span></TabsTrigger>
             <TabsTrigger value="products" title="Productos" className="flex shrink-0 items-center gap-1.5"><Package className="w-4 h-4" /><span className="hidden sm:inline">Productos</span></TabsTrigger>
             <TabsTrigger value="categories" title="Categorías" className="flex shrink-0 items-center gap-1.5"><Tag className="w-4 h-4" /><span className="hidden sm:inline">Categorías</span></TabsTrigger>
             <TabsTrigger value="ingredients" title="Ingredientes" className="flex shrink-0 items-center gap-1.5"><Salad className="w-4 h-4" /><span className="hidden sm:inline">Ingredientes</span></TabsTrigger>
             <TabsTrigger value="bowl_rules" title="Bowl Rules" className="flex shrink-0 items-center gap-1.5"><Ruler className="w-4 h-4" /><span className="hidden sm:inline">Bowls</span></TabsTrigger>
-            <TabsTrigger value="variants_addons" title="Variantes y Adicionales" className="flex shrink-0 items-center gap-1.5">🥤<span className="hidden sm:inline">Variantes</span></TabsTrigger>
+            <TabsTrigger value="variants_addons" title="Variantes y Adicionales" className="flex shrink-0 items-center gap-1.5"><GlassWater className="h-4 w-4" /><span className="hidden sm:inline">Variantes</span></TabsTrigger>
             <TabsTrigger value="delivery_zones" title="Domicilios" className="flex shrink-0 items-center gap-1.5"><Truck className="w-4 h-4" /><span className="hidden sm:inline">Domicilios</span></TabsTrigger>
             <TabsTrigger value="settings" title="Configuración" className="flex shrink-0 items-center gap-1.5"><Settings className="w-4 h-4" /><span className="hidden sm:inline">Config</span></TabsTrigger>
-            <TabsTrigger value="promotions" title="Promociones" className="flex shrink-0 items-center gap-1.5">🏷️<span className="hidden sm:inline">Promos</span></TabsTrigger>
+            <TabsTrigger value="promotions" title="Promociones" className="flex shrink-0 items-center gap-1.5"><BadgePercent className="h-4 w-4" /><span className="hidden sm:inline">Promos</span></TabsTrigger>
             <TabsTrigger value="analytics" title="Analytics" className="flex shrink-0 items-center gap-1.5"><BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">Analytics</span></TabsTrigger>
           </TabsList>
 

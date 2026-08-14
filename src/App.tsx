@@ -11,9 +11,11 @@ import Layout from "@/components/layout/Layout";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import NotFound from "./pages/NotFound";
 import OhanaPage from "./pages/OhanaPage";
-import CheckoutPage from "./pages/CheckoutPage";
 
 // Lazy-loaded routes
+// Checkout es la única ruta que quedaba estática: arrastraba su formulario y
+// validación al bundle inicial aunque solo se visita al final del pedido.
+const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const BeveragesPage = lazy(() => import("./pages/BeveragesPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));

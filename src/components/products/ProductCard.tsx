@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Check, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductImage from '@/components/products/ProductImage';
@@ -56,23 +56,29 @@ export default function ProductCard({ product, variant = 'default', categoryName
   const { added, drawerOpen, setDrawerOpen, handleAddClick, handleDrawerConfirm } =
     useAddProduct(product, productWithCategory);
 
+  // Latch: una vez abierto el drawer permanece montado (ver más abajo).
+  const [hasOpenedDrawer, setHasOpenedDrawer] = useState(false);
+  useEffect(() => {
+    if (drawerOpen) setHasOpenedDrawer(true);
+  }, [drawerOpen]);
+
   const isCompact = variant === 'compact';
 
   if (isCompact) {
     return (
       <article
         className={cn(
-          'group flex items-center gap-3 rounded-xl border bg-card p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+          'group flex items-center gap-3 rounded-md border bg-card p-3 transition-colors duration-150',
           'border-ohana/15 hover:border-ohana/40',
         )}
       >
-        <div className="w-12 shrink-0 overflow-hidden rounded-lg">
+        <div className="w-12 shrink-0 overflow-hidden rounded-sm">
           <ProductImage
             product={product}
             ratio={1}
-            className="rounded-lg"
+            className="rounded-sm"
             imageClassName="group-hover:scale-105"
-            fallbackClassName="rounded-lg"
+            fallbackClassName="rounded-sm"
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -82,7 +88,7 @@ export default function ProductCard({ product, variant = 'default', categoryName
         <Button
           onClick={handleAddClick}
           size="icon"
-          className="rounded-full h-8 w-8 min-h-[44px] min-w-[44px] shrink-0 transition-all duration-200 bg-ohana/10 text-ohana-dark hover:bg-ohana hover:text-white"
+          className="min-h-[44px] min-w-[44px] shrink-0 rounded-md bg-brand-muted text-brand-dark transition-colors hover:bg-primary hover:text-primary-foreground"
         >
           {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
         </Button>
@@ -94,18 +100,20 @@ export default function ProductCard({ product, variant = 'default', categoryName
     <>
       <article
         className={cn(
-          'group flex flex-col rounded-2xl overflow-hidden border border-border/60 bg-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-brand/30',
+          'group flex flex-col overflow-hidden rounded-md border bg-card transition-colors duration-150 hover:border-foreground/30',
         )}
       >
         <ProductImage
           product={product}
           ratio={4 / 3}
           imageClassName="group-hover:scale-105"
+          /* Tarjeta ancha de rejilla, no la miniatura de 108 px de la home. */
+          sizes="(min-width: 1024px) 300px, (min-width: 640px) 45vw, 90vw"
         />
 
         <div className="flex flex-col flex-1 p-4 gap-2">
           {/* Name */}
-          <h3 className="font-display font-bold text-sm sm:text-base leading-snug tracking-tight text-foreground">{product.name}</h3>
+          <h3 className="text-sm font-extrabold leading-snug text-foreground sm:text-base">{product.name}</h3>
 
           {/* Description */}
           {hasDetailContent && (
@@ -127,13 +135,13 @@ export default function ProductCard({ product, variant = 'default', categoryName
           {/* Price row + add button */}
           <div className="flex items-center justify-between mt-auto pt-2">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-base text-brand-dark">{formatPrice(product.price)}</span>
+              <span className="font-utility text-sm font-semibold text-brand-dark dark:text-brand">{formatPrice(product.price)}</span>
               <div className="flex items-center gap-1">
                 {product.isVegan && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Vegano" />}
                 {product.isGlutenFree && <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Sin gluten" />}
                 {product.isPopular && <Star className="w-3 h-3 text-amber-500 fill-amber-500" />}
                 {product.isNew && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium border border-blue-200">
+                  <span className="rounded-sm border border-blue-200 bg-blue-100 px-1.5 py-0.5 font-utility text-[9px] font-medium text-blue-600">
                     nuevo
                   </span>
                 )}
@@ -145,8 +153,8 @@ export default function ProductCard({ product, variant = 'default', categoryName
               onClick={handleAddClick}
               size="icon"
               className={cn(
-                'hidden sm:flex h-9 w-9 rounded-full bg-brand text-white shadow-md hover:bg-brand/90 hover:shadow-lg active:scale-90 transition-all duration-150 shrink-0',
-                added && 'scale-110',
+                'hidden h-10 w-10 shrink-0 rounded-md bg-primary text-primary-foreground transition-colors hover:bg-[hsl(var(--mesa-light))] sm:flex',
+                added && 'bg-brand',
               )}
               aria-label="Agregar al carrito"
             >
@@ -158,8 +166,8 @@ export default function ProductCard({ product, variant = 'default', categoryName
           <Button
             onClick={handleAddClick}
             className={cn(
-              'sm:hidden w-full h-10 rounded-xl font-semibold bg-brand/10 text-brand-dark hover:bg-brand hover:text-white transition-all duration-200',
-              added && 'scale-[1.02]',
+              'h-10 w-full rounded-md bg-brand-muted font-bold text-brand-dark transition-colors hover:bg-primary hover:text-primary-foreground sm:hidden',
+              added && 'bg-brand text-white',
             )}
           >
             {added ? <Check className="h-4 w-4 mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}
@@ -196,13 +204,20 @@ export default function ProductCard({ product, variant = 'default', categoryName
         </Dialog>
       )}
 
-      {/* Customization drawer */}
-      <ProductDrawer
-        product={product}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onConfirm={handleDrawerConfirm}
-      />
+      {/* Customization drawer.
+          Se monta la primera vez que se abre, no con la card. Montarlo siempre
+          hacía que cada card disparase su propia consulta de ingredientes por
+          defecto: con 35 productos en la home eran 35 queries (+35 preflights
+          CORS) antes de que el usuario tocara nada. Una vez abierto se queda
+          montado, así que reabrir es instantáneo. */}
+      {hasOpenedDrawer && (
+        <ProductDrawer
+          product={product}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          onConfirm={handleDrawerConfirm}
+        />
+      )}
     </>
   );
 }

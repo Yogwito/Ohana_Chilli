@@ -467,15 +467,16 @@ export default function CheckoutPage() {
   // CHANGE 4 — Empty cart state
   if (cart.items.length === 0 && orderStatus === 'idle') {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12">
-        <div className="text-center max-w-sm px-4 animate-scale-in">
-          <div className="flex items-center justify-center mb-8">
-            <div className="w-16 h-16 rounded-full border-4 border-ohana/30 flex items-center justify-center bg-ohana/5">
-              <div className="w-8 h-8 rounded-full bg-ohana/25" />
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="max-w-sm text-center animate-scale-in">
+          <div className="mb-6 flex items-center justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-md bg-brand-muted text-brand-dark">
+              <ShoppingCart className="h-6 w-6" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold mb-2">Tu carrito está vacío</h2>
-          <p className="text-muted-foreground mb-8">Elige tus platos favoritos y empieza a armar tu orden.</p>
+          <p className="section-kicker">Tu selección</p>
+          <h2 className="mt-2 text-4xl">Tu pedido está vacío</h2>
+          <p className="mb-8 mt-3 text-sm leading-relaxed text-muted-foreground">Elige un plato listo o arma un bowl con tus ingredientes.</p>
           <div className="flex flex-col gap-3 justify-center sm:flex-row">
             <Button onClick={handleContinueShopping} className="btn-ohana w-full sm:w-auto">
               <ShoppingCart className="w-4 h-4 mr-2" />
@@ -497,13 +498,13 @@ export default function CheckoutPage() {
         <div className="max-w-md w-full space-y-6 text-center">
 
           {/* Animated checkmark */}
-          <div className="w-20 h-20 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-md bg-brand-muted">
             <CheckCircle className="w-10 h-10 text-brand" />
           </div>
 
           {/* Order reference */}
           <div>
-            <h2 className="text-2xl font-display font-bold">¡Pedido creado!</h2>
+            <h2 className="text-4xl">Pedido creado</h2>
             {formattedOrderRef && (
               <p className="text-sm text-muted-foreground mt-1">
                 Referencia:{' '}
@@ -521,7 +522,7 @@ export default function CheckoutPage() {
               : 'Toca el botón para enviar tu pedido por WhatsApp.'}
           </p>
 
-          <div className="rounded-2xl border bg-card/60 px-4 py-3 text-left text-sm text-muted-foreground">
+          <div className="rounded-md border bg-card px-4 py-3 text-left text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Siguiente paso</p>
             <p>
               Tu pedido ya fue creado. Solo falta enviar el mensaje en WhatsApp para confirmarlo con el equipo de Ohana.
@@ -533,7 +534,7 @@ export default function CheckoutPage() {
             <a
               href={whatsappUrl}
               className={cn(
-                'w-full h-12 rounded-full text-base font-semibold',
+                'h-12 w-full rounded-md text-base font-semibold',
                 'flex items-center justify-center gap-2',
                 'text-white transition-colors',
               )}
@@ -545,7 +546,7 @@ export default function CheckoutPage() {
           ) : (
             <Button
               onClick={() => openWhatsAppHandoff(whatsappNumber!, whatsappMessage)}
-              className="w-full h-12 rounded-full text-base font-semibold"
+              className="h-12 w-full rounded-md text-base font-semibold"
               style={{ backgroundColor: '#25D366', color: 'white' }}
             >
               <MessageCircle className="w-5 h-5 mr-2" />
@@ -596,10 +597,7 @@ export default function CheckoutPage() {
   return (
     <>
       <div className="min-h-screen py-8 sm:py-12">
-        {/* Branded top bar */}
-        <div className="fixed top-14 left-0 right-0 h-0.5 bg-brand z-40 pointer-events-none" />
-
-        <div className="container max-w-5xl">
+        <div className="container max-w-6xl">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -607,9 +605,10 @@ export default function CheckoutPage() {
           >
             <ArrowLeft className="w-4 h-4" /> Volver
           </button>
-          <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+          <p className="section-kicker">Último paso</p>
+          <h1 className="mb-8 mt-2 text-5xl sm:text-6xl">Completa tu pedido</h1>
 
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-5 lg:gap-12">
             {/* Form */}
             <div className="lg:col-span-3 order-2 lg:order-1">
               <form onSubmit={handleSubmit} className="space-y-8 pb-32 lg:pb-0">
@@ -624,7 +623,7 @@ export default function CheckoutPage() {
                 {/* Contact info */}
                 <AnimatedElement as="div" animation="fade-up" delay={0} className="relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-ohana" />
-                  <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Información de contacto</h3>
+                  <h3 className="section-kicker mb-4">Información de contacto</h3>
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="name">Nombre completo</Label>
@@ -633,7 +632,7 @@ export default function CheckoutPage() {
                         value={form.name}
                         onChange={(e) => updateField('name', e.target.value)}
                         placeholder="Tu nombre"
-                        className={cn('rounded-xl h-11 mt-1', errors.name ? 'border-destructive' : '')}
+                        className={cn('mt-1 h-12 rounded-md', errors.name ? 'border-destructive' : '')}
                       />
                       {errors.name && <p className="text-sm text-destructive mt-1">{errors.name}</p>}
                     </div>
@@ -645,7 +644,7 @@ export default function CheckoutPage() {
                         value={form.phone}
                         onChange={(e) => updateField('phone', e.target.value)}
                         placeholder="+57 300 123 4567"
-                        className={cn('rounded-xl h-11 mt-1', errors.phone ? 'border-destructive' : '')}
+                        className={cn('mt-1 h-12 rounded-md', errors.phone ? 'border-destructive' : '')}
                       />
                       {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone}</p>}
                     </div>
@@ -662,7 +661,7 @@ export default function CheckoutPage() {
                 {/* Order type */}
                 <AnimatedElement as="div" animation="fade-up" delay={75} className="relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-ohana" />
-                  <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Tipo de orden</h3>
+                  <h3 className="section-kicker mb-4">Tipo de orden</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       {
@@ -685,9 +684,9 @@ export default function CheckoutPage() {
                         type="button"
                         onClick={() => handleOrderTypeChange(value)}
                         className={cn(
-                          'flex flex-col items-center gap-2 p-4 rounded-xl border-2 text-center transition-all duration-200',
+                          'flex min-h-36 flex-col items-center justify-center gap-2 rounded-md border p-4 text-center transition-colors',
                           form.orderType === value
-                            ? 'ring-2 ring-ohana border-ohana bg-ohana/5'
+                            ? 'border-primary bg-brand-muted'
                             : 'border-border hover:border-ohana/40',
                         )}
                       >
@@ -708,7 +707,7 @@ export default function CheckoutPage() {
                           onChange={(e) => updateField('address', e.target.value)}
                           placeholder="Calle, número, complemento, ciudad..."
                           rows={3}
-                          className={cn('rounded-xl mt-1', errors.address ? 'border-destructive' : '')}
+                          className={cn('mt-1 rounded-md', errors.address ? 'border-destructive' : '')}
                         />
                         {errors.address && <p className="text-sm text-destructive mt-1">{errors.address}</p>}
                       </div>
@@ -733,7 +732,7 @@ export default function CheckoutPage() {
                               }}
                               placeholder="Escribe tu barrio, ej: Cable Plaza"
                               disabled={loadingDeliveryZones}
-                              className="rounded-xl h-11 mt-1"
+                              className="mt-1 h-12 rounded-md"
                             />
                             <Select
                               value={selectedZoneId}
@@ -742,7 +741,7 @@ export default function CheckoutPage() {
                             >
                               <SelectTrigger
                                 id="delivery-zone"
-                                className={cn('rounded-xl h-11 mt-2', errors.deliveryZone ? 'border-destructive' : '')}
+                                className={cn('mt-2 h-12 rounded-md', errors.deliveryZone ? 'border-destructive' : '')}
                               >
                                 <SelectValue
                                   placeholder={
@@ -768,7 +767,7 @@ export default function CheckoutPage() {
                             </Select>
 
                             {selectedDeliveryZone && (
-                              <div className="flex items-center gap-1.5 mt-2 text-xs text-ohana-dark bg-ohana/10 border border-ohana/20 rounded-full px-3 py-1.5 w-fit animate-fade-in">
+                              <div className="mt-2 flex w-fit items-center gap-1.5 rounded-sm bg-brand-muted px-3 py-1.5 font-utility text-[10px] font-semibold uppercase text-brand-dark animate-fade-in">
                                 <MapPin className="w-3 h-3 shrink-0" />
                                 <span>{selectedDeliveryZone.name} · Domicilio: {formatPrice(deliveryFeeCents)}</span>
                               </div>
@@ -782,16 +781,16 @@ export default function CheckoutPage() {
                 </AnimatedElement>
 
                 {/* CHANGE 2 — Payment method */}
-                <AnimatedElement as="div" animation="fade-up" delay={150} className="bg-card rounded-xl p-6 border">
+                <AnimatedElement as="div" animation="fade-up" delay={150} className="rounded-md border bg-card p-5 sm:p-6">
                   <h3 className="font-semibold mb-4">Método de pago</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('cash')}
                       className={cn(
-                        'flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all duration-200',
+                        'flex min-h-32 flex-col items-center justify-center gap-2 rounded-md border p-4 text-center transition-colors',
                         paymentMethod === 'cash'
-                          ? 'ring-2 ring-brand bg-brand/5 dark:bg-brand/10'
+                          ? 'border-primary bg-brand-muted'
                           : 'border hover:border-brand/50',
                       )}
                     >
@@ -804,9 +803,9 @@ export default function CheckoutPage() {
                       type="button"
                       onClick={() => setPaymentMethod('transfer')}
                       className={cn(
-                        'flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all duration-200',
+                        'flex min-h-32 flex-col items-center justify-center gap-2 rounded-md border p-4 text-center transition-colors',
                         paymentMethod === 'transfer'
-                          ? 'ring-2 ring-brand bg-brand/5 dark:bg-brand/10'
+                          ? 'border-primary bg-brand-muted'
                           : 'border hover:border-brand/50',
                       )}
                     >
@@ -819,9 +818,9 @@ export default function CheckoutPage() {
                       type="button"
                       onClick={() => setPaymentMethod('wompi')}
                       className={cn(
-                        'flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all duration-200',
+                        'flex min-h-32 flex-col items-center justify-center gap-2 rounded-md border p-4 text-center transition-colors',
                         paymentMethod === 'wompi'
-                          ? 'ring-2 ring-brand bg-brand/5 dark:bg-brand/10'
+                          ? 'border-primary bg-brand-muted'
                           : 'border hover:border-brand/50',
                       )}
                     >
@@ -832,13 +831,13 @@ export default function CheckoutPage() {
                   </div>
 
                   {paymentMethod === 'wompi' && (
-                    <div className="mt-4 rounded-xl border border-brand/20 bg-brand/5 p-4 text-sm text-muted-foreground animate-fade-in">
+                    <div className="mt-4 rounded-md border border-brand/20 bg-brand-muted/50 p-4 text-sm text-muted-foreground animate-fade-in">
                       Pagarás de forma segura en Wompi. Tu pedido se confirmará automáticamente cuando recibamos la aprobación del pago.
                     </div>
                   )}
 
                   {paymentMethod === 'transfer' && (
-                    <div className="mt-4 rounded-xl bg-brand/5 dark:bg-brand/10 border border-brand/20 dark:border-brand/30 p-4 space-y-3 animate-fade-in">
+                    <div className="mt-4 space-y-3 rounded-md border border-brand/20 bg-brand-muted/50 p-4 animate-fade-in">
                       <p className="text-sm font-medium text-brand-dark">
                         Con el fin de verificar el pago inmediatamente, SOLO aceptamos
                         transferencias realizadas desde Davivienda, Bancolombia, Nequi
@@ -889,18 +888,18 @@ export default function CheckoutPage() {
                 {/* Notes */}
                 <AnimatedElement as="div" animation="fade-up" delay={225} className="relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-muted" />
-                  <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Notas adicionales (opcional)</h3>
+                  <h3 className="section-kicker mb-4">Notas adicionales (opcional)</h3>
                   <Textarea
                     value={form.notes}
                     onChange={(e) => updateField('notes', e.target.value)}
                     placeholder="Instrucciones especiales, alergias, etc."
                     rows={3}
-                    className="rounded-xl"
+                    className="rounded-md"
                   />
                 </AnimatedElement>
 
                 {/* CHANGE 5 — Terms checkbox */}
-                <AnimatedElement as="div" animation="fade-up" delay={300} className="flex items-start gap-3 p-4 bg-muted/40 rounded-xl border border-border/60">
+                <AnimatedElement as="div" animation="fade-up" delay={300} className="flex items-start gap-3 rounded-md border bg-muted/40 p-4">
                   <input
                     type="checkbox"
                     id="terms"
@@ -924,8 +923,7 @@ export default function CheckoutPage() {
 
                 <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-auto p-4 lg:p-0 bg-background/95 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none border-t lg:border-0 border-border/40 z-40 lg:z-auto space-y-2">
                   {submitBlockedByClosed && (
-                    <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-4 py-3 text-sm">
-                      <span className="text-lg leading-none mt-0.5">🔒</span>
+                    <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm dark:border-red-900 dark:bg-red-950/30">
                       <div>
                         <p className="font-semibold text-red-800 dark:text-red-300">Estamos cerrados</p>
                         <p className="text-red-700 dark:text-red-400 text-xs mt-0.5">
@@ -940,7 +938,7 @@ export default function CheckoutPage() {
                   <Button
                     type="submit"
                     disabled={orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || !termsAccepted}
-                    className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2 disabled:bg-muted disabled:text-muted-foreground"
+                    className="h-12 w-full gap-2 rounded-md bg-primary font-bold text-primary-foreground transition-colors hover:bg-[hsl(var(--mesa-light))] disabled:bg-muted disabled:text-muted-foreground"
                     size="lg"
                   >
                     {paymentMethod === 'wompi'
@@ -976,10 +974,10 @@ export default function CheckoutPage() {
 
             {/* Order summary sidebar */}
             <div className="lg:col-span-2 order-1 lg:order-2">
-              <AnimatedElement animation="scale-up" delay={75} className="bg-card rounded-xl border p-4 sm:p-6 sticky top-20">
+              <AnimatedElement animation="scale-up" delay={75} className="sticky top-24 rounded-md border bg-card p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="font-semibold">Tu orden</h3>
-                  <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-medium">
+                  <span className="rounded-sm bg-muted px-2 py-1 font-utility text-[10px] font-semibold text-muted-foreground">
                     {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
                   </span>
                 </div>
@@ -996,7 +994,7 @@ export default function CheckoutPage() {
 
                     return (
                       <div key={item.id} className="group flex gap-3">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-ohana/10">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-muted">
                           <Leaf className="h-4 w-4 text-ohana" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1007,7 +1005,7 @@ export default function CheckoutPage() {
                             <button
                               type="button"
                               onClick={() => removeItem(item.id)}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                               aria-label={`Eliminar ${item.type === 'product' ? item.product?.name ?? 'producto' : 'bowl personalizado'}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1024,11 +1022,11 @@ export default function CheckoutPage() {
                             <p className="mt-1 text-xs text-muted-foreground">Nota: {item.notes}</p>
                           )}
                           <div className="flex items-center justify-between mt-2">
-                            <div className="flex items-center gap-1 border rounded-full px-1 py-0.5">
+                            <div className="flex items-center gap-1 rounded-md border px-1 py-0.5">
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                className="flex h-8 w-8 items-center justify-center rounded-sm transition-colors hover:bg-muted"
                                 aria-label="Reducir cantidad"
                               >
                                 <Minus className="h-3 w-3" />
@@ -1037,7 +1035,7 @@ export default function CheckoutPage() {
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                className="flex h-8 w-8 items-center justify-center rounded-sm transition-colors hover:bg-muted"
                                 aria-label="Aumentar cantidad"
                               >
                                 <Plus className="h-3 w-3" />
@@ -1066,7 +1064,7 @@ export default function CheckoutPage() {
                   )}
                   <div className="flex justify-between font-bold text-base pt-1">
                     <span>Total</span>
-                    <span className="text-ohana-dark">{formatPrice(orderTotal)}</span>
+                    <span className="font-utility text-brand-dark dark:text-brand">{formatPrice(orderTotal)}</span>
                   </div>
                 </div>
 

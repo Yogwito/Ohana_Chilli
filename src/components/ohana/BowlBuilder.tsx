@@ -564,8 +564,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     return (
       <div
         className={cn(
-          'rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300',
-          isComplete ? 'bg-ohana text-ohana-foreground scale-105' : 'bg-muted text-muted-foreground',
+          'rounded-sm px-2 py-1 font-utility text-[10px] font-semibold uppercase transition-colors',
+          isComplete ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
         )}
       >
         {config.label} {current}/{config.max}{config.min === 0 ? ' opcional' : ''}
@@ -597,10 +597,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     return (
       <div
         className={cn(
-          'rounded-2xl border bg-card p-3 sm:p-4 shadow-sm transition-all duration-150',
+          'rounded-md border bg-card p-3 transition-colors duration-150 sm:p-4',
           count > 0
-            ? 'border-brand bg-brand/5 shadow-sm'
-            : 'border-border/60 hover:border-brand/40 hover:shadow-md',
+            ? 'border-primary bg-brand-muted'
+            : 'border-border hover:border-primary/40',
           isMaxedForNewSelection && 'opacity-60',
         )}
       >
@@ -613,7 +613,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           </div>
           <span
             className={cn(
-              'inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold transition-colors shadow-sm',
+              'inline-flex h-6 w-6 items-center justify-center rounded-sm font-utility text-xs font-bold transition-colors',
               count > 0 ? 'bg-brand text-white' : 'border border-border bg-muted/50 text-muted-foreground',
             )}
           >
@@ -636,7 +636,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               size="icon"
               onClick={onRemove}
               disabled={count === 0}
-              className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full border border-border hover:border-brand hover:text-brand transition-colors"
+              className="min-h-[44px] min-w-[44px] rounded-md border hover:border-brand hover:text-brand"
               aria-label={`Quitar ${ingredient.name}`}
             >
               <Minus className="h-4 w-4" />
@@ -647,7 +647,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               size="icon"
               onClick={onAdd}
               disabled={isAddDisabled}
-              className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full border border-border hover:border-brand hover:text-brand transition-colors"
+              className="min-h-[44px] min-w-[44px] rounded-md border hover:border-brand hover:text-brand"
               aria-label={`Agregar ${ingredient.name}`}
             >
               <Plus className="h-4 w-4" />
@@ -685,7 +685,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               </p>
             ) : null}
           </div>
-          <div className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-md border-l-4 border-l-[hsl(var(--maiz))] bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
             <p>{getStepHint(config, selectedItems.length)}</p>
             <p className="mt-2 font-medium text-foreground">
               Selección actual: {formatGroupedIngredients(selectedItems)}
@@ -696,7 +696,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed bg-muted/20 p-6 text-center text-sm text-muted-foreground">
           No hay ingredientes disponibles en esta sección por ahora.
         </div>
       ) : (
@@ -725,23 +725,23 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   );
 
   const SizeSelector = () => (
-    <section className="border-b bg-muted/20 px-6 py-6">
+    <section className="border-b bg-muted/30 px-4 py-5 sm:px-6 sm:py-6">
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Paso 1</p>
+          <p className="section-kicker">Paso 1</p>
           <h3 className="text-xl font-semibold">Elige el tamaño de tu bowl</h3>
           <p className="text-sm text-muted-foreground">
             El tamaño define el precio base y cuántas selecciones puedes hacer en cada sección.
           </p>
         </div>
         {selectedSize ? (
-          <div className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
+          <div className="rounded-sm bg-primary px-3 py-1.5 font-utility text-[10px] font-semibold uppercase text-primary-foreground">
             Seleccionado: {selectedSize.name}
           </div>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 scrollbar-hide sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0">
         {bowlSizes.map((size) => {
           const isSelected = selectedSize?.size === size.size;
 
@@ -752,19 +752,19 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               onClick={() => handleSizeSelect(size)}
               aria-pressed={isSelected}
               className={cn(
-                'rounded-2xl border bg-card p-5 text-left shadow-sm transition-all duration-200',
+                'w-[78vw] max-w-[280px] shrink-0 snap-start rounded-md border bg-card p-4 text-left transition-colors duration-150 sm:w-auto sm:max-w-none sm:p-5',
                 isSelected
-                  ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
-                  : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
+                  ? 'border-primary bg-brand-muted'
+                  : 'border-border hover:border-primary/45',
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-lg font-semibold text-foreground">{size.name}</p>
-                  <p className="mt-1 text-2xl font-bold text-ohana-dark">{formatPrice(size.price)}</p>
+                  <p className="mt-1 font-utility text-lg font-semibold text-brand-dark dark:text-brand">{formatPrice(size.price)}</p>
                 </div>
                 {isSelected ? (
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
                     ✓
                   </span>
                 ) : null}
@@ -788,7 +788,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
   if (dataLoading) {
     return (
-      <div className="flex min-h-[300px] items-center justify-center overflow-hidden rounded-[2rem] border bg-card p-12 shadow-lg">
+      <div className="flex min-h-[300px] items-center justify-center overflow-hidden rounded-md border bg-card p-8">
         <div className="space-y-2 text-center">
           <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-ohana border-t-transparent" />
           <p className="text-sm text-muted-foreground">Cargando ingredientes...</p>
@@ -799,13 +799,13 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
   if (dataError) {
     return (
-      <div className="flex min-h-[300px] items-center justify-center overflow-hidden rounded-[2rem] border bg-card p-12 shadow-lg">
+      <div className="flex min-h-[300px] items-center justify-center overflow-hidden rounded-md border bg-card p-8">
         <div className="space-y-3 text-center">
           <p className="text-base font-semibold text-foreground">No pudimos cargar el menú</p>
           <p className="text-sm text-muted-foreground">Revisa tu conexión e intenta de nuevo.</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-2 rounded-full border border-ohana px-5 py-2 text-sm font-medium text-ohana transition-colors hover:bg-ohana/10"
+            className="mt-2 rounded-md border border-ohana px-5 py-2 text-sm font-medium text-ohana transition-colors hover:bg-ohana/10"
           >
             Reintentar
           </button>
@@ -815,15 +815,15 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   }
 
   return (
-    <div ref={builderRef} className="overflow-hidden rounded-[2rem] border bg-card shadow-lg">
-      <div className="h-0.5 bg-muted">
+    <div ref={builderRef} className="bowl-station overflow-hidden rounded-md border bg-card">
+      <div className="h-1 bg-muted">
         <div
-          className="h-full bg-ohana transition-all duration-500 ease-out"
+          className="h-full bg-[hsl(var(--maiz))] transition-all duration-500 ease-out"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
 
-      <div className="border-b px-4 pb-3 pt-3">
+      <div className="border-b bg-[hsl(var(--mesa))] px-4 py-3 text-white">
         <div className="flex items-center gap-2">
           <div ref={stepsTabsRef} className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap pb-1" role="tablist">
             {steps.map((step, index) => {
@@ -841,10 +841,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   onClick={() => available && setCurrentStep(step.id)}
                   disabled={!available}
                   className={cn(
-                    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium transition-all duration-200',
-                    isCurrent && 'bg-ohana text-white shadow-sm',
-                    isCompleted && !isCurrent && 'bg-ohana/10 text-ohana/70',
-                    isUpcoming && 'cursor-default opacity-40',
+                    'inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-sm border border-white/15 px-2 py-1 text-xs font-semibold transition-colors sm:px-3 sm:text-sm',
+                    isCurrent && 'border-[hsl(var(--maiz))] bg-[hsl(var(--maiz))] text-[hsl(var(--maiz-foreground))]',
+                    isCompleted && !isCurrent && 'bg-white/10 text-white/75',
+                    isUpcoming && 'cursor-default border-transparent text-white/35',
                   )}
                 >
                   {step.label}
@@ -852,7 +852,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
               );
             })}
           </div>
-          <span className="ml-1 shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+          <span className="ml-1 shrink-0 whitespace-nowrap font-utility text-[10px] text-white/55">
             {currentStepIndex + 1}/{steps.length}
           </span>
         </div>
@@ -860,7 +860,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
       <SizeSelector />
 
-      <div ref={stepContentRef} className="p-6" role="tabpanel" style={{ scrollMarginTop: '80px' }}>
+      <div ref={stepContentRef} className="p-4 sm:p-6" role="tabpanel" style={{ scrollMarginTop: '80px' }}>
         <div className={cn('scroll-fade-up', stepVisible && 'in-view')}>
           {currentStep === 'size' ? (
             <div className="space-y-4">
@@ -1747,7 +1747,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
           {/* Mobile: collapsed header toggle */}
           <button
             type="button"
-            className="sm:hidden w-full rounded-2xl border bg-card px-4 py-3 flex items-center justify-between gap-3 mb-2"
+          className="mb-2 flex w-full items-center justify-between gap-3 rounded-md border bg-card px-4 py-3 sm:hidden"
             onClick={() => setBowlExpanded(v => !v)}
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -1762,7 +1762,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
 
           {/* Full panel: always on sm+, toggleable on mobile */}
           <div className={cn(
-            'rounded-2xl border border-border/60 bg-card p-4 shadow-sm',
+            'rounded-md border bg-card p-4',
             'hidden sm:block',
             bowlExpanded && '!block max-h-48 overflow-y-auto',
           )}>
@@ -1792,7 +1792,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-4 border-t p-4">
+      <div className="flex items-center justify-between gap-3 border-t bg-background p-3 sm:p-4">
         <Button variant="ghost" onClick={goBack} disabled={currentStepIndex === 0} className="gap-1 min-h-[44px] min-w-[44px]">
           <ChevronLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Anterior</span>
@@ -1844,7 +1844,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                 onClick={() => goNext()}
                 disabled={currentStep === 'size' && !canProceed}
                 className={cn(
-                  'btn-ohana gap-2 min-h-[44px] rounded-2xl px-6 py-3 font-semibold shadow-md hover:shadow-lg hover:bg-brand/90 active:scale-95 transition-all',
+                  'btn-ohana min-h-[44px] gap-2 px-5 py-3',
                   !canProceed && 'opacity-60',
                 )}
               >

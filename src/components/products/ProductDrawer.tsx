@@ -9,6 +9,7 @@ import {
   useAddonRecommendations,
 } from '@/hooks/use-catalog';
 import { isProductCustomizable } from '@/domain/productCustomizations';
+import { getProductImageSrcSet } from '@/domain/productImages';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
 import type { Addon, Product, ProductCustomization } from '@/types';
@@ -130,11 +131,11 @@ export default function ProductDrawer({
     return (
       <div
         key={addon.id}
-        className="flex items-center justify-between border border-dashed border-brand/40 bg-brand/5 rounded-xl px-4 py-3"
+        className="flex items-center justify-between rounded-md border bg-brand-muted/60 px-4 py-3"
       >
         <div>
           <p className="text-sm font-medium text-foreground">{addon.name}</p>
-          <span className="text-xs bg-brand/10 text-brand rounded-full px-2 py-0.5 mt-0.5 inline-block">
+          <span className="mt-1 inline-block font-utility text-[10px] font-semibold text-brand-dark">
             +{formatPrice(addon.price)}
           </span>
         </div>
@@ -143,7 +144,7 @@ export default function ProductDrawer({
             type="button"
             onClick={() => changeAddonQty(addon.id, -1)}
             disabled={qty === 0}
-            className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-md border hover:bg-muted disabled:opacity-30"
             aria-label={`Quitar ${addon.name}`}
           >
             <Minus className="w-3.5 h-3.5" />
@@ -152,7 +153,7 @@ export default function ProductDrawer({
           <button
             type="button"
             onClick={() => changeAddonQty(addon.id, 1)}
-            className="w-8 h-8 rounded-full border border-brand bg-brand/10 text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-brand bg-background text-brand transition-colors hover:bg-brand hover:text-white"
             aria-label={`Agregar ${addon.name}`}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -166,12 +167,12 @@ export default function ProductDrawer({
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent
         side="bottom"
-        className="sm:side-right h-[90dvh] sm:h-full sm:max-w-md sm:left-auto rounded-t-2xl sm:rounded-none p-0 flex flex-col"
+        className="flex h-[92dvh] flex-col rounded-t-md p-0 sm:left-auto sm:h-full sm:max-w-lg sm:rounded-none"
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-background/80 backdrop-blur flex items-center justify-center shadow border border-border hover:bg-muted transition-colors"
+          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-md border bg-background/90 backdrop-blur transition-colors hover:bg-muted"
           aria-label="Cerrar"
         >
           <X className="w-5 h-5" />
@@ -181,12 +182,16 @@ export default function ProductDrawer({
           {product.imageUrl && (
             <img
               src={product.imageUrl}
+              srcSet={getProductImageSrcSet(product.imageUrl)}
+              sizes="(min-width: 640px) 480px, 100vw"
               alt={product.name}
-              className="w-full h-40 object-cover rounded-t-2xl sm:rounded-none"
+              loading="lazy"
+              decoding="async"
+              className="h-52 w-full object-cover sm:h-60"
             />
           )}
 
-          <div className="p-5 space-y-6">
+          <div className="space-y-7 p-5 sm:p-6">
             <div>
               <SheetTitle className="text-xl font-bold text-foreground">{product.name}</SheetTitle>
               <SheetDescription>
@@ -194,7 +199,7 @@ export default function ProductDrawer({
                   ? 'Elige tu sabor y personaliza antes de agregar al carrito.'
                   : 'Personaliza el producto antes de agregarlo al carrito.'}
               </SheetDescription>
-              <p className="text-brand font-bold mt-1">{formatPrice(product.price)}</p>
+              <p className="mt-2 font-utility text-base font-semibold text-brand-dark dark:text-brand">{formatPrice(product.price)}</p>
             </div>
 
             {isLoading ? (
@@ -222,7 +227,7 @@ export default function ProductDrawer({
                             aria-checked={isSelected}
                             onClick={() => setVariantId(variant.id)}
                             className={cn(
-                              'w-full flex items-center justify-between rounded-xl border px-4 py-2.5 text-sm text-left transition-all',
+                              'flex min-h-11 w-full items-center justify-between rounded-md border px-4 py-2.5 text-left text-sm transition-colors',
                               isSelected
                                 ? 'border-brand bg-brand/10 font-semibold text-brand-dark'
                                 : 'border-border bg-background hover:border-brand/40',
@@ -253,7 +258,7 @@ export default function ProductDrawer({
                             type="button"
                             onClick={() => toggleRemoved(ing.ingredient_name)}
                             className={cn(
-                              'rounded-full border px-3 py-1 text-xs cursor-pointer transition-all',
+                              'min-h-10 cursor-pointer rounded-md border px-3 py-1 text-xs transition-colors',
                               isRemoved
                                 ? 'bg-red-50 border-red-300 text-red-500 line-through'
                                 : 'bg-background border-border text-foreground hover:border-red-200',
@@ -307,7 +312,7 @@ export default function ProductDrawer({
         </div>
 
         {/* Footer fijo */}
-        <div className="border-t bg-background p-5 space-y-3 shrink-0">
+        <div className="shrink-0 space-y-3 border-t bg-background p-5">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Total</span>
             <span className="text-lg font-bold text-brand">{formatPrice(totalPrice)}</span>
@@ -316,7 +321,7 @@ export default function ProductDrawer({
             <button
               type="button"
               disabled
-              className="w-full bg-muted text-muted-foreground py-3 rounded-xl font-semibold text-sm cursor-not-allowed"
+              className="w-full cursor-not-allowed rounded-md bg-muted py-3 text-sm font-semibold text-muted-foreground"
             >
               Cargando opciones...
             </button>
@@ -326,7 +331,7 @@ export default function ProductDrawer({
               onClick={handleConfirm}
               disabled={!canConfirm}
               className={cn(
-                'w-full py-3 rounded-xl font-semibold text-sm transition-colors',
+                'w-full rounded-md py-3 text-sm font-bold transition-colors',
                 canConfirm
                   ? 'bg-brand text-white hover:bg-brand/90'
                   : 'bg-muted text-muted-foreground cursor-not-allowed',

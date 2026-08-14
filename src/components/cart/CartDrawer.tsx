@@ -49,29 +49,29 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
-        <SheetHeader>
+      <SheetContent className="flex w-full flex-col border-l p-0 sm:max-w-lg">
+        <SheetHeader className="border-b px-5 py-5 text-left sm:px-6">
           <SheetTitle className="flex items-center gap-2">
             <ShoppingBag className="h-5 w-5" />
-            Tu Carrito
+            Tu pedido
             {cart.items.length > 0 && (
-              <span className="text-sm font-normal text-muted-foreground">
-                ({cart.items.reduce((sum, item) => sum + item.quantity, 0)} items)
+              <span className="rounded-sm bg-brand-muted px-2 py-1 font-utility text-[10px] font-semibold uppercase text-brand-dark">
+                {cart.items.reduce((sum, item) => sum + item.quantity, 0)} productos
               </span>
             )}
           </SheetTitle>
           <SheetDescription>
-            Revisa tu pedido, ajusta cantidades y continúa al checkout.
+            Revisa cantidades y personalizaciones antes de continuar.
           </SheetDescription>
         </SheetHeader>
 
         {cart.items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-md border bg-muted">
               <ShoppingBag className="h-10 w-10 text-muted-foreground" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">Tu carrito está vacío</h3>
-            <p className="mb-6 text-sm text-muted-foreground">Agrega productos de Ohana Bowls para comenzar.</p>
+            <h3 className="mb-2">Tu pedido está vacío</h3>
+            <p className="mb-6 max-w-xs text-sm text-muted-foreground">Elige un plato listo o arma un bowl con tus ingredientes.</p>
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
               <Button onClick={handleContinueShopping} variant="outline" className="w-full sm:w-auto">
                 Seguir comprando
@@ -83,8 +83,8 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
           </div>
         ) : (
           <>
-            <ScrollArea className="-mx-6 flex-1 px-6">
-              <div className="space-y-4 py-4">
+            <ScrollArea className="flex-1 px-5 sm:px-6">
+              <div className="divide-y py-2">
                 {cart.items.map((item, index) => {
                   // Único formatter compartido (carrito = checkout = WhatsApp = admin)
                   const canonical = item.customization
@@ -98,16 +98,16 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                       key={item.id}
                       animation="fade-up"
                       delay={Math.min(index * 75, 300) as 0 | 75 | 150 | 225 | 300}
-                      className="flex gap-3 rounded-lg bg-muted/50 p-3"
+                      className="flex gap-3 py-4"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ohana/10">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-muted">
                         <Leaf className="h-5 w-5 text-ohana" />
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="rounded px-1.5 py-0.5 text-2xs font-medium badge-ohana">
+                            <span className="badge-ohana">
                               Ohana
                             </span>
                             <h4 className="mt-1 text-sm font-medium">
@@ -128,7 +128,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                             {item.type === 'product' && item.product && (
                               <button
                                 onClick={() => setEditingItem(item)}
-                                className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-brand/10 hover:text-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-brand-muted hover:text-brand-dark"
                                 aria-label={`Editar ${item.product.name}`}
                               >
                                 <Pencil className="h-4 w-4" />
@@ -136,7 +136,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                             )}
                             <button
                               onClick={() => removeItem(item.id)}
-                              className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                               aria-label={`Eliminar ${item.type === 'product' ? item.product?.name ?? 'producto' : 'bowl personalizado'}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -148,7 +148,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="flex h-10 w-10 items-center justify-center rounded-full border transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              className="flex h-10 w-10 items-center justify-center rounded-md border transition-colors hover:bg-muted"
                               aria-label="Reducir cantidad"
                             >
                               <Minus className="h-3 w-3" />
@@ -156,7 +156,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                             <span className="w-8 text-center text-sm font-medium" aria-live="polite">{item.quantity}</span>
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="flex h-10 w-10 items-center justify-center rounded-full border transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              className="flex h-10 w-10 items-center justify-center rounded-md border transition-colors hover:bg-muted"
                               aria-label="Aumentar cantidad"
                             >
                               <Plus className="h-3 w-3" />
@@ -172,17 +172,17 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
               </div>
             </ScrollArea>
 
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t bg-muted/30 px-5 py-5 sm:px-6">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-semibold">{formatPrice(cart.subtotal)}</span>
               </div>
               <div className="flex items-center justify-between text-lg">
                 <span className="font-semibold">Total</span>
-                <span className="font-bold text-ohana">{formatPrice(cart.total)}</span>
+                <span className="font-utility font-semibold text-brand-dark dark:text-brand">{formatPrice(cart.total)}</span>
               </div>
               <Button onClick={handleCheckout} className="w-full btn-ohana" size="lg">
-                Ir a Checkout
+                Continuar pedido
               </Button>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button onClick={handleContinueShopping} variant="outline" className="w-full">

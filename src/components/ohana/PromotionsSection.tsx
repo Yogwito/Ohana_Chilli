@@ -57,9 +57,8 @@ function PromotionCard({ promo }: { promo: Promotion }) {
   return (
     <div
       className={cn(
-        'bg-card rounded-2xl overflow-hidden border border-border/50',
-        'shadow-md hover:shadow-xl transition-shadow duration-200',
-        'flex flex-col',
+        'flex flex-col overflow-hidden rounded-md border bg-card',
+        'transition-colors duration-150 hover:border-foreground/30',
       )}
     >
       {/* Image */}
@@ -69,30 +68,30 @@ function PromotionCard({ promo }: { promo: Promotion }) {
             <img
               src={promo.image_url}
               alt={promo.title}
-              className="w-full h-36 object-cover rounded-t-xl"
+              className="h-44 w-full object-cover"
               loading="lazy"
             />
-            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/30 to-transparent rounded-t-none" />
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/30 to-transparent" />
           </>
         ) : (
-          <div className="w-full h-36 bg-brand/20 rounded-t-xl flex items-center justify-center">
-            <span className="text-4xl" aria-hidden="true">🏷️</span>
+          <div className="flex h-44 w-full items-center justify-center bg-brand-muted">
+            <span className="font-display text-5xl font-black text-brand-dark/35" aria-hidden="true">OHANA</span>
           </div>
         )}
         {/* Discount chip */}
         {discountLabel && promo.discount_type !== 'label' && (
-          <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+          <span className="absolute left-3 top-3 rounded-sm bg-[hsl(var(--tomate))] px-2 py-1 font-utility text-[10px] font-bold uppercase text-white">
             {discountLabel}
           </span>
         )}
       </div>
 
       {/* Content */}
-      <div className="p-3.5 space-y-1.5 flex flex-col flex-1">
+      <div className="flex flex-1 flex-col space-y-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-bold text-base leading-tight text-foreground">{promo.title}</p>
+          <p className="text-base font-extrabold leading-tight text-foreground">{promo.title}</p>
           {displayBadge && (
-            <span className="shrink-0 bg-brand text-white text-xs px-2 py-0.5 rounded-full whitespace-nowrap">
+            <span className="shrink-0 whitespace-nowrap rounded-sm bg-brand-muted px-2 py-1 font-utility text-[9px] font-semibold uppercase text-brand-dark">
               {displayBadge}
             </span>
           )}
@@ -112,16 +111,16 @@ function PromotionCard({ promo }: { promo: Promotion }) {
           {/* Precio + botón agregar (combos con precio) */}
           {isAddable && (
             <div className="flex items-center justify-between gap-2">
-              <span className="font-bold text-lg text-brand">
+              <span className="font-utility text-base font-semibold text-brand-dark dark:text-brand">
                 {formatPrice(promo.price_cents!)}
               </span>
               <button
                 onClick={handleAddToCart}
                 className={cn(
-                  'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200',
+                  'flex min-h-10 items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold transition-colors',
                   added
-                    ? 'bg-brand-dark text-white scale-95'
-                    : 'bg-brand text-white hover:bg-brand/90 active:scale-95',
+                    ? 'bg-brand text-white'
+                    : 'bg-primary text-primary-foreground hover:bg-[hsl(var(--mesa-light))]',
                 )}
               >
                 {added ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -137,12 +136,12 @@ function PromotionCard({ promo }: { promo: Promotion }) {
                 href={promo.cta_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg w-full text-center hover:bg-brand/90 transition-colors"
+                className="block w-full rounded-md bg-primary px-4 py-2 text-center text-sm font-bold text-primary-foreground transition-colors hover:bg-[hsl(var(--mesa-light))]"
               >
                 {promo.cta_text}
               </a>
             ) : (
-              <div className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg w-full text-center">
+              <div className="w-full rounded-md bg-primary px-4 py-2 text-center text-sm font-bold text-primary-foreground">
                 {promo.cta_text}
               </div>
             )
@@ -155,8 +154,8 @@ function PromotionCard({ promo }: { promo: Promotion }) {
 
 function PromotionCardSkeleton() {
   return (
-    <div className="bg-card rounded-2xl overflow-hidden border border-border/50 shadow-sm">
-      <Skeleton className="w-full h-36 rounded-t-xl" />
+    <div className="overflow-hidden rounded-md border bg-card">
+      <Skeleton className="h-44 w-full rounded-none" />
       <div className="p-3.5 space-y-2">
         <Skeleton className="h-5 w-3/4 rounded" />
         <Skeleton className="h-4 w-full rounded" />
@@ -172,34 +171,41 @@ export default function PromotionsSection() {
   if (!isLoading && promotions.length === 0) return null;
 
   return (
-    <div className="container max-w-4xl py-4">
+    <section className="border-b bg-card/50">
+      <div className="container py-10 sm:py-12">
       <AnimatedElement animation="fade-up">
-        <div className="mb-4">
-          <h2 className="font-display font-bold text-2xl text-foreground dark:text-white">
-            🔥 Promociones
-          </h2>
-          <div className="mt-1.5 h-[3px] w-9 rounded-full bg-brand" />
+        <div className="mb-5 flex items-end justify-between gap-4">
+          <div>
+            <p className="section-kicker">Disponibles ahora</p>
+            <h2 className="mt-1 text-4xl text-foreground sm:text-5xl">
+              Promociones
+            </h2>
+          </div>
+          <p className="hidden max-w-xs text-right text-sm text-muted-foreground sm:block">
+            Combos y beneficios vigentes, sin buscar cupones.
+          </p>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => <PromotionCardSkeleton key={i} />)}
           </div>
         ) : (
           <div
             className={cn(
-              'sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4',
-              'flex gap-3 overflow-x-auto scrollbar-hide pb-1 sm:overflow-visible sm:pb-0',
+              'flex gap-3 overflow-x-auto pb-1 scrollbar-hide',
+              'sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:pb-0 lg:grid-cols-3',
             )}
           >
             {promotions.map((promo) => (
-              <div key={promo.id} className="min-w-[75vw] sm:min-w-0">
+              <div key={promo.id} className="min-w-[82vw] sm:min-w-0">
                 <PromotionCard promo={promo} />
               </div>
             ))}
           </div>
         )}
       </AnimatedElement>
-    </div>
+      </div>
+    </section>
   );
 }

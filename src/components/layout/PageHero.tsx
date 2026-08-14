@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 
 type BrandVariant = 'ohana' | 'beverages' | 'neutral';
@@ -11,40 +10,18 @@ interface PageHeroProps {
   brand?: BrandVariant;
 }
 
-const brandStyles: Record<BrandVariant, { section: string; iconWrap: string; title: string }> = {
-  ohana: {
-    section: 'bg-ohana-gradient border-b border-ohana/15',
-    iconWrap: 'rounded-full bg-gradient-to-br from-ohana to-ohana-dark shadow-lg shadow-ohana/30',
-    title: 'text-ohana-dark',
-  },
-  beverages: {
-    section: 'bg-gradient-to-br from-ohana-light/40 via-background to-brand-muted/40 border-b border-border',
-    iconWrap: 'rounded-2xl bg-primary/10',
-    title: 'text-foreground',
-  },
-  neutral: {
-    section: 'bg-gradient-to-br from-ohana-light via-background to-brand-muted border-b border-border',
-    iconWrap: 'rounded-2xl bg-primary/10',
-    title: 'text-foreground',
-  },
-};
-
-export default function PageHero({ icon: Icon, title, subtitle, description, brand = 'neutral' }: PageHeroProps) {
-  const s = brandStyles[brand];
-
+export default function PageHero({ icon: Icon, title, subtitle, description }: PageHeroProps) {
   return (
-    <section className={cn('py-12 sm:py-16', s.section)}>
-      <div className="container">
-        <div className="flex items-center gap-4 mb-4">
-          <div className={cn('w-14 h-14 flex items-center justify-center', s.iconWrap)}>
-            <Icon className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h1 className={cn('text-3xl sm:text-4xl font-bold tracking-tight', s.title)}>{title}</h1>
-            <p className="text-muted-foreground text-sm sm:text-base">{subtitle}</p>
-          </div>
+    <section className="border-b bg-[hsl(var(--mesa))] text-white">
+      <div className="container grid gap-6 py-12 sm:grid-cols-[1fr_auto] sm:items-end sm:py-16">
+        <div>
+          <p className="flex items-center gap-2 font-utility text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">
+            <Icon className="h-4 w-4 text-[hsl(var(--maiz))]" />
+            {subtitle}
+          </p>
+          <h1 className="mt-3 text-white">{title}</h1>
         </div>
-        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl leading-relaxed">
+        <p className="max-w-md text-sm leading-relaxed text-white/68 sm:text-right sm:text-base">
           {description}
         </p>
       </div>

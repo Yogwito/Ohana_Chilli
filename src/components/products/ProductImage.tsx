@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PRODUCT_IMAGE_PLACEHOLDER_SRC, getProductImageFallbackInitial, resolveProductImageUrl } from '@/domain/productImages';
+import { PRODUCT_IMAGE_PLACEHOLDER_SRC, getProductImageFallbackInitial, getProductImageSrcSet, resolveProductImageUrl } from '@/domain/productImages';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/types';
 
@@ -11,13 +11,18 @@ interface ProductImageProps {
   className?: string;
   imageClassName?: string;
   fallbackClassName?: string;
+  /** Ancho de pintado para elegir la variante; por defecto, medida de tarjeta. */
+  sizes?: string;
 }
+
+const CARD_SIZES = '(min-width: 640px) 132px, 108px';
 
 function ProductImageContent({
   product,
   className,
   imageClassName,
   fallbackClassName,
+  sizes = CARD_SIZES,
 }: Omit<ProductImageProps, 'ratio'>) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -37,6 +42,8 @@ function ProductImageContent({
           {!isLoaded ? <Skeleton className="absolute inset-0 rounded-none" /> : null}
           <img
             src={resolvedImageUrl}
+            srcSet={getProductImageSrcSet(resolvedImageUrl)}
+            sizes={sizes}
             alt={product.name}
             loading="lazy"
             decoding="async"
@@ -75,6 +82,7 @@ export default function ProductImage({
   className,
   imageClassName,
   fallbackClassName,
+  sizes,
 }: ProductImageProps) {
   return (
     <AspectRatio ratio={ratio}>
@@ -83,6 +91,7 @@ export default function ProductImage({
         className={className}
         imageClassName={imageClassName}
         fallbackClassName={fallbackClassName}
+        sizes={sizes}
       />
     </AspectRatio>
   );

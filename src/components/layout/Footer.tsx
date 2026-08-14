@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Phone, Clock, Instagram, Facebook } from 'lucide-react';
-import { AnimatedElement } from '@/components/ui/AnimatedElement';
+import { Clock, Facebook, Instagram, MapPin, MessageCircle } from 'lucide-react';
 import {
   buildBusinessWhatsAppUrl,
   formatBusinessPhone,
@@ -9,143 +8,76 @@ import {
 import { useBusinessSettings } from '@/hooks/use-catalog';
 
 export default function Footer() {
-  const { data: businessSettings } = useBusinessSettings();
-  const whatsappLabel = formatBusinessPhone(businessSettings?.whatsappNumber);
-  const whatsappHref = buildBusinessWhatsAppUrl(businessSettings?.whatsappNumber);
-  const address = parseBusinessAddress(businessSettings?.contactAddress);
+  const { data: settings } = useBusinessSettings();
+  const whatsappLabel = formatBusinessPhone(settings?.whatsappNumber);
+  const whatsappHref = buildBusinessWhatsAppUrl(settings?.whatsappNumber);
+  const address = parseBusinessAddress(settings?.contactAddress);
 
   return (
-    <footer className="bg-zinc-900 dark:bg-zinc-950 text-zinc-400">
-      {/* Brand gradient separator */}
-      <div className="h-px bg-brand/40" />
-
-      <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Brand */}
-          <AnimatedElement animation="fade-up" delay={0}>
-            <span className="font-display font-black text-2xl text-brand">
-              Ohana Bowls
-            </span>
-            <p className="text-zinc-500 text-sm leading-relaxed mt-4">
-              Bowls frescos y personalizables{address.addressLocality ? ` en ${address.addressLocality}` : ''}.
+    <footer className="bg-[hsl(var(--mesa))] text-white">
+      <div className="h-2 bg-[hsl(var(--maiz))]" />
+      <div className="container py-12 sm:py-16">
+        <div className="grid gap-10 border-b border-white/15 pb-10 md:grid-cols-[1.2fr_0.8fr_1fr]">
+          <div>
+            <p className="font-display text-5xl font-black leading-none">OHANA</p>
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/65">
+              Bowls frescos, platos con carácter y combinaciones hechas a tu manera
+              {address.addressLocality ? ` en ${address.addressLocality}` : ''}.
             </p>
-          </AnimatedElement>
+          </div>
 
-          {/* Quick Links */}
-          <AnimatedElement animation="fade-up" delay={75}>
-            <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Enlaces</h4>
-            <nav className="flex flex-col gap-2">
-              {[
-                { to: '/', label: 'Menú' },
-                { to: '/bebidas', label: 'Bebidas' },
-                { to: '/nosotros', label: 'Nosotros' },
-              ].map(({ to, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="text-zinc-400 hover:text-white text-sm transition-colors hover:translate-x-0.5 inline-block"
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
-          </AnimatedElement>
+          <nav aria-label="Enlaces del sitio">
+            <p className="font-utility text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">Explora</p>
+            <div className="mt-4 grid gap-2">
+              <Link to="/#arma-tu-bowl" className="w-fit text-sm font-semibold text-white/75 transition-colors hover:text-white">Arma tu bowl</Link>
+              <Link to="/#menu" className="w-fit text-sm font-semibold text-white/75 transition-colors hover:text-white">Menú</Link>
+              <Link to="/nosotros" className="w-fit text-sm font-semibold text-white/75 transition-colors hover:text-white">Nosotros</Link>
+              <Link to="/contacto" className="w-fit text-sm font-semibold text-white/75 transition-colors hover:text-white">Contacto</Link>
+            </div>
+          </nav>
 
-          {/* Contact */}
-          <AnimatedElement animation="fade-up" delay={150}>
-            <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Contacto</h4>
-            <div className="flex flex-col gap-3">
-              {businessSettings?.contactAddress && businessSettings.contactMapsUrl ? (
-                <a
-                  href={businessSettings.contactMapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-start gap-2 text-zinc-400 hover:text-white text-sm transition-colors hover:translate-x-0.5"
-                >
-                  <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{businessSettings.contactAddress}</span>
-                </a>
-              ) : businessSettings?.contactAddress ? (
-                <div className="flex items-start gap-2 text-zinc-400 text-sm">
-                  <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{businessSettings.contactAddress}</span>
+          <div>
+            <p className="font-utility text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">Visítanos</p>
+            <div className="mt-4 grid gap-3 text-sm text-white/70">
+              {settings?.contactAddress ? (
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--maiz))]" />
+                  <span>{settings.contactAddress}</span>
                 </div>
               ) : null}
-              {whatsappLabel && whatsappHref ? (
-                <a
-                  href={whatsappHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm transition-colors hover:translate-x-0.5"
-                >
-                  <Phone className="h-4 w-4 shrink-0" />
-                  <span>{whatsappLabel}</span>
+              {settings?.hoursWeekday ? (
+                <div className="flex items-start gap-2.5">
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--maiz))]" />
+                  <span>{settings.hoursWeekday}</span>
+                </div>
+              ) : null}
+              {whatsappHref && whatsappLabel ? (
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 transition-colors hover:text-white">
+                  <MessageCircle className="h-4 w-4 text-[hsl(var(--maiz))]" />
+                  {whatsappLabel}
                 </a>
               ) : null}
             </div>
-          </AnimatedElement>
 
-          {/* Hours + Social */}
-          <AnimatedElement animation="fade-up" delay={225}>
-            <h4 className="text-zinc-200 text-xs font-semibold uppercase tracking-widest mb-4">Horario</h4>
-            <div className="flex flex-col gap-2 text-sm text-zinc-500">
-              {businessSettings?.hoursWeekday ? (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 shrink-0" />
-                  <span>Lun - Vie: {businessSettings.hoursWeekday}</span>
-                </div>
-              ) : null}
-              {businessSettings?.hoursWeekend ? (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 shrink-0" />
-                  <span>Sáb - Dom: {businessSettings.hoursWeekend}</span>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              {businessSettings?.instagramUrl ? (
-                <a
-                  href={businessSettings.instagramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 p-2 text-zinc-400 hover:text-white transition-colors"
-                  aria-label="Instagram"
-                >
-                  <Instagram className="h-5 w-5" />
+            <div className="mt-5 flex gap-2">
+              {settings?.instagramUrl ? (
+                <a href={settings.instagramUrl} target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 items-center justify-center rounded-md border border-white/20 text-white/70 transition-colors hover:border-white/50 hover:text-white" aria-label="Instagram">
+                  <Instagram className="h-4 w-4" />
                 </a>
               ) : null}
-              {businessSettings?.facebookUrl ? (
-                <a
-                  href={businessSettings.facebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 p-2 text-zinc-400 hover:text-white transition-colors"
-                  aria-label="Facebook"
-                >
-                  <Facebook className="h-5 w-5" />
+              {settings?.facebookUrl ? (
+                <a href={settings.facebookUrl} target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 items-center justify-center rounded-md border border-white/20 text-white/70 transition-colors hover:border-white/50 hover:text-white" aria-label="Facebook">
+                  <Facebook className="h-4 w-4" />
                 </a>
               ) : null}
             </div>
-          </AnimatedElement>
+          </div>
         </div>
 
-        <AnimatedElement animation="fade-in" delay={300} className="border-t border-zinc-800 mt-8 pt-8 text-center">
-          <p className="text-sm text-zinc-600">
-            © {new Date().getFullYear()} Ohana Bowls. Todos los derechos reservados.
-          </p>
-          <p className="text-xs text-zinc-700 mt-1">
-            Hecho con ♥{address.addressLocality ? ` en ${address.addressLocality}` : ''}
-          </p>
-          <div className="mt-6 text-center">
-            <Link
-              to="/admin"
-              className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            >
-              Admin
-            </Link>
-          </div>
-        </AnimatedElement>
+        <div className="flex flex-col gap-3 pt-6 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} Ohana Bowls. Todos los derechos reservados.</p>
+          <Link to="/admin" className="w-fit transition-colors hover:text-white/70">Acceso administrativo</Link>
+        </div>
       </div>
     </footer>
   );

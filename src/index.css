@@ -4,269 +4,220 @@
 
 @layer base {
   :root {
-    /* Base colors — warm paper over green ink (the paper bowl on the table) */
-    --background: 42 33% 97%;
-    --foreground: 160 28% 11%;
+    --background: 96 18% 97%;
+    --foreground: 150 16% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 16% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 16% 12%;
 
-    --card: 40 40% 99%;
-    --card-foreground: 160 28% 11%;
-
-    --popover: 40 40% 99%;
-    --popover-foreground: 160 28% 11%;
-
-    /* Brand tokens */
-    --brand: 142 45% 62%;
-    --brand-light: 138 40% 77%;
-    --brand-dark: 142 45% 40%;
+    --brand: 94 45% 49%;
+    --brand-light: 96 42% 72%;
+    --brand-dark: 151 53% 21%;
     --brand-foreground: 0 0% 100%;
-    --brand-muted: 142 40% 95%;
+    --brand-muted: 93 35% 92%;
 
-    /* La mesa — deep emerald tabletop from the hero commercial */
-    --mesa: 167 58% 20%;
-    --mesa-light: 167 45% 28%;
-    --mesa-foreground: 42 33% 97%;
+    --mesa: 151 53% 15%;
+    --mesa-light: 151 37% 24%;
+    --mesa-foreground: 96 18% 97%;
+    --maiz: 47 88% 59%;
+    --maiz-foreground: 150 16% 12%;
+    --tomate: 7 82% 63%;
 
-    /* Maíz — corn-kernel accent scattered on the table */
-    --maiz: 43 89% 55%;
-    --maiz-foreground: 160 28% 11%;
-
-    /* Ohana aliases (backward compat) */
     --ohana: var(--brand);
     --ohana-light: var(--brand-light);
     --ohana-dark: var(--brand-dark);
     --ohana-foreground: var(--brand-foreground);
     --ohana-muted: var(--brand-muted);
 
-    /* Beverages Brand - Neutral, Refreshing */
-    --beverages: 220 14% 30%;
-    --beverages-light: 220 14% 96%;
+    --beverages: 202 35% 35%;
+    --beverages-light: 199 30% 94%;
     --beverages-foreground: 0 0% 100%;
-    --primary: 160 84% 39%;
+
+    --primary: 151 53% 21%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 20% 10%;
-
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-
-    --accent: 45 93% 47%;
-    --accent-foreground: 220 20% 10%;
-
-    --destructive: 0 84% 60%;
+    --secondary: 92 18% 92%;
+    --secondary-foreground: 150 16% 12%;
+    --muted: 96 12% 92%;
+    --muted-foreground: 150 7% 41%;
+    --accent: 47 88% 59%;
+    --accent-foreground: 150 16% 12%;
+    --destructive: 4 71% 53%;
     --destructive-foreground: 0 0% 100%;
+    --border: 100 10% 84%;
+    --input: 100 10% 84%;
+    --ring: 94 45% 49%;
+    --radius: 0.375rem;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 160 84% 39%;
-
-    --radius: 0.75rem;
-
-    /* Sidebar (for cart drawer) */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 20% 10%;
-    --sidebar-primary: 160 84% 39%;
+    --sidebar-foreground: 150 16% 12%;
+    --sidebar-primary: 151 53% 21%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;
-    --sidebar-accent-foreground: 220 20% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 160 84% 39%;
+    --sidebar-accent: 96 12% 92%;
+    --sidebar-accent-foreground: 150 16% 12%;
+    --sidebar-border: 100 10% 84%;
+    --sidebar-ring: 94 45% 49%;
   }
 
   .dark {
-    --background: 0 0% 6%;
-    --foreground: 0 0% 96%;
-
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 96%;
-
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 96%;
-
-    --primary: 142 45% 62%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 0 0% 96%;
-
-    --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 63%;
-
-    --accent: 0 0% 14%;
-    --accent-foreground: 0 0% 96%;
-
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 96%;
-
-    --border: 0 0% 15%;
-    --input: 0 0% 14%;
-    --ring: 142 45% 62%;
-
-    --brand: 142 45% 62%;
-    --brand-light: 138 40% 77%;
-    --brand-dark: 142 45% 55%;
-    --brand-foreground: 0 0% 100%;
-    --brand-muted: 142 40% 12%;
-
-    --sidebar-background: 0 0% 8%;
-    --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 142 45% 62%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 14%;
-    --sidebar-accent-foreground: 0 0% 96%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 142 45% 62%;
+    --background: 150 14% 8%;
+    --foreground: 96 18% 94%;
+    --card: 150 12% 11%;
+    --card-foreground: 96 18% 94%;
+    --popover: 150 12% 11%;
+    --popover-foreground: 96 18% 94%;
+    --primary: 94 45% 58%;
+    --primary-foreground: 151 53% 10%;
+    --secondary: 150 10% 16%;
+    --secondary-foreground: 96 18% 94%;
+    --muted: 150 10% 15%;
+    --muted-foreground: 100 8% 64%;
+    --accent: 47 76% 55%;
+    --accent-foreground: 150 16% 12%;
+    --destructive: 4 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 8% 22%;
+    --input: 150 8% 22%;
+    --ring: 94 45% 58%;
+    --brand: 94 45% 58%;
+    --brand-light: 94 34% 66%;
+    --brand-dark: 94 45% 58%;
+    --brand-muted: 150 18% 16%;
+    --sidebar-background: 150 14% 9%;
+    --sidebar-foreground: 96 18% 94%;
+    --sidebar-primary: 94 45% 58%;
+    --sidebar-primary-foreground: 151 53% 10%;
+    --sidebar-accent: 150 10% 15%;
+    --sidebar-accent-foreground: 96 18% 94%;
+    --sidebar-border: 150 8% 22%;
+    --sidebar-ring: 94 45% 58%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
 
   html {
     scroll-behavior: smooth;
+    background: hsl(var(--background));
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
+    min-width: 320px;
+    letter-spacing: 0;
   }
 
-  /* Typography Scale */
+  ::selection {
+    color: hsl(var(--foreground));
+    background: hsl(var(--maiz));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: 0;
+    text-wrap: balance;
+  }
+
   h1 {
-    @apply text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight;
+    @apply font-display text-5xl font-extrabold leading-[0.9] sm:text-6xl md:text-7xl;
   }
 
   h2 {
-    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+    @apply font-display text-4xl font-bold leading-[0.95] sm:text-5xl;
   }
 
   h3 {
-    @apply text-xl sm:text-2xl font-semibold;
+    @apply font-display text-2xl font-bold leading-tight sm:text-3xl;
   }
 
   h4 {
-    @apply text-lg font-semibold;
+    @apply text-base font-bold;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
 @layer components {
-  /* Brand-specific button styles */
   .btn-ohana {
-    @apply bg-ohana text-ohana-foreground hover:bg-ohana-dark rounded-full px-6 py-3 font-medium transition-all duration-300 shadow-lg shadow-ohana/20 hover:shadow-xl hover:shadow-ohana/30 hover:-translate-y-0.5;
+    @apply min-h-11 rounded-md bg-primary px-5 py-2.5 font-bold text-primary-foreground shadow-none transition-colors duration-150 hover:bg-[hsl(var(--mesa-light))] active:translate-y-px;
   }
 
-  /* Brand cards */
-  .card-ohana {
-    @apply bg-gradient-to-br from-white to-ohana-light/30 rounded-3xl shadow-lg border border-ohana/20 hover:shadow-xl hover:border-ohana/40 transition-all duration-300;
-  }
-
-  /* Brand backgrounds */
-  .bg-ohana-gradient {
-    background: linear-gradient(180deg, hsl(var(--ohana-light)) 0%, hsl(162 50% 98%) 50%, hsl(0 0% 100%) 100%);
-  }
-
-  /* Product card hover effects */
-  .product-card {
-    @apply bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1;
-  }
-
+  .card-ohana,
+  .product-card,
   .product-card-ohana {
-    @apply bg-gradient-to-b from-white to-ohana-light/20 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-ohana/10;
+    @apply overflow-hidden rounded-md border bg-card shadow-none transition-colors duration-150 hover:border-foreground/30;
   }
 
-  /* Badge styles */
+  .bg-ohana-gradient {
+    background: hsl(var(--brand-muted));
+  }
+
   .badge-ohana {
-    @apply bg-ohana/10 text-ohana-dark border border-ohana/30 rounded-full px-3 py-1 text-xs font-medium tracking-wide;
+    @apply rounded-sm border-0 bg-brand-muted px-2 py-1 font-utility text-[10px] font-semibold uppercase text-brand-dark;
   }
 
-  /* Step indicator */
-  .step-active {
-    @apply bg-ohana text-ohana-foreground;
-  }
-
-  .step-completed {
-    @apply bg-ohana/20 text-ohana;
-  }
-
-  .step-inactive {
-    @apply bg-muted text-muted-foreground;
-  }
-
-  /* Ingredient chip */
   .ingredient-chip {
-    @apply px-3 py-2 rounded-full border-2 transition-all duration-200 cursor-pointer select-none;
+    @apply min-h-11 cursor-pointer select-none rounded-md border px-3 py-2 transition-colors duration-150;
   }
 
   .ingredient-chip-selected {
-    @apply bg-ohana/10 border-ohana text-ohana font-medium;
+    @apply border-primary bg-primary text-primary-foreground;
   }
 
   .ingredient-chip-unselected {
-    @apply bg-card border-border hover:border-ohana/50;
+    @apply border-border bg-card hover:border-primary/50;
   }
 
   .ingredient-chip-disabled {
-    @apply bg-muted border-muted text-muted-foreground cursor-not-allowed opacity-50;
+    @apply cursor-not-allowed border-muted bg-muted text-muted-foreground opacity-50;
   }
 
-  /* Counter badge */
   .counter-badge {
-    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium;
+    @apply inline-flex items-center gap-1 rounded-sm px-2 py-1 font-utility text-xs font-semibold;
   }
 
   .counter-badge-ok {
-    @apply bg-ohana/10 text-ohana;
+    @apply bg-brand-muted text-brand-dark;
   }
 
   .counter-badge-full {
-    @apply bg-ohana text-ohana-foreground;
+    @apply bg-primary text-primary-foreground;
   }
 
   .counter-badge-warning {
     @apply bg-destructive/10 text-destructive;
   }
+
+  .section-kicker {
+    @apply font-utility text-[11px] font-semibold uppercase text-muted-foreground;
+    letter-spacing: 0.12em;
+  }
+
+  .surface-rule {
+    border-top: 1px solid hsl(var(--border));
+  }
 }
 
 @layer utilities {
-  /* Animation utilities */
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out forwards;
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
-  .animate-slide-up {
-    animation: slide-up 0.4s ease-out forwards;
-  }
-
-  .animate-scale-in {
-    animation: scale-in 0.2s ease-out forwards;
-  }
-
-  .animate-slide-in {
-    animation: slide-in 0.2s ease-out forwards;
-  }
-
-  @keyframes fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes slide-up {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.96); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes slide-in {
-    from { opacity: 0; transform: translateX(10px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-
-  /* Hide scrollbar */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -276,49 +227,6 @@
     display: none;
   }
 
-  /* iOS-safe full viewport height (avoids address-bar 100vh bug) */
-  .min-h-screen-safe {
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
-
-  /* ── Scroll-triggered animations (respects prefers-reduced-motion) ── */
-  @media (prefers-reduced-motion: no-preference) {
-    .scroll-fade-up {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .scroll-fade-up.in-view {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .scroll-fade-in {
-      opacity: 0;
-      transition: opacity 0.4s ease-out;
-    }
-    .scroll-fade-in.in-view {
-      opacity: 1;
-    }
-    .scroll-scale-up {
-      opacity: 0;
-      transform: scale(0.96);
-      transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-    }
-    .scroll-scale-up.in-view {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  /* Stagger delays */
-  .delay-75  { transition-delay: 75ms !important; }
-  .delay-150 { transition-delay: 150ms !important; }
-  .delay-225 { transition-delay: 225ms !important; }
-  .delay-300 { transition-delay: 300ms !important; }
-
-  /* Custom scrollbar */
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
@@ -328,88 +236,88 @@
     width: 6px;
   }
 
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: hsl(var(--border));
     border-radius: 3px;
   }
-}
 
-/* ── Hero grain/noise texture overlay ───────────────────────────────────── */
-.hero-grain::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.07;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 256px 256px;
-  background-repeat: repeat;
-}
+  .line-clamp-2 {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
 
-/* Hero copy is always visible. The animation only adds movement, so stalled
-   timers/rAF, video failures, or unsupported animation APIs cannot hide it. */
-.hero-copy-enter {
-  opacity: 1;
-  transform: translateY(0);
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-scale-in,
+  .animate-slide-in {
+    animation: enter-soft 240ms ease-out both;
+  }
+
+  @keyframes enter-soft {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .scroll-fade-up,
+    .scroll-fade-in,
+    .scroll-scale-up {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 320ms ease, transform 320ms ease;
+    }
+
+    .scroll-fade-up.in-view,
+    .scroll-fade-in.in-view,
+    .scroll-scale-up.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .delay-75 { transition-delay: 75ms !important; }
+  .delay-150 { transition-delay: 150ms !important; }
+  .delay-225 { transition-delay: 225ms !important; }
+  .delay-300 { transition-delay: 300ms !important; }
 }
 
 .hero-title {
-  font-family: 'Bricolage Grotesque', 'Nunito', system-ui, sans-serif;
-  font-weight: 700;
+  font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  font-weight: 800;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .hero-copy-enter {
-    animation: hero-copy-enter 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .hero-copy-enter-1 { animation-delay: 80ms; }
-  .hero-copy-enter-2 { animation-delay: 160ms; }
-  .hero-copy-enter-3 { animation-delay: 240ms; }
-  .hero-copy-enter-4 { animation-delay: 320ms; }
-}
-
-@keyframes hero-copy-enter {
-  from { transform: translateY(24px); }
-  to { transform: translateY(0); }
-}
-
-/* ── Brand marquee (BrandMarquee.tsx) ───────────────────────────────────── */
-.marquee-track {
-  animation: marquee-scroll 30s linear infinite;
-}
-
-@keyframes marquee-scroll {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-33.3333%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .marquee-track {
-    animation: none;
-  }
-}
-
-/* Multi-line text truncation */
 .line-clamp-2 {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-/* Prevent iOS Safari from zooming on input focus (triggered when font-size < 16px) */
 @media (max-width: 768px) {
   input,
   select,
   textarea {
     font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

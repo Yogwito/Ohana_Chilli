@@ -144,17 +144,33 @@ export function useCategories(brandId?: Brand) {
   });
 }
 
+/**
+ * Productos activos. Igual que con los ingredientes, marca y categoría se
+ * filtran en cliente sobre una sola consulta compartida: la home pedía el
+ * catálogo con `brand_id` y el carrito el mismo catálogo sin filtrar, así que
+ * se descargaba dos veces. Supabase sigue siendo la fuente de verdad.
+ */
 export function useProducts(opts?: { brandId?: Brand; categoryId?: string }) {
+  const { brandId, categoryId } = opts ?? {};
   return useQuery({
-    queryKey: ['products', opts?.brandId, opts?.categoryId],
+    queryKey: ['products'],
     queryFn: async () => {
-      let query = supabase.from('products').select('*').eq('is_active', true).order('name');
-      if (opts?.brandId) query = query.eq('brand_id', opts.brandId);
-      if (opts?.categoryId) query = query.eq('category_id', opts.categoryId);
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
       if (error) throw error;
       return (data ?? []).map((product) => mapProduct(product as ProductQueryRow));
     },
+    select:
+      brandId || categoryId
+        ? (all: Product[]) =>
+            all.filter(
+              (p) =>
+                (!brandId || p.brand === brandId) && (!categoryId || p.categoryId === categoryId),
+            )
+        : undefined,
     ...liveCatalogQueryOptions,
   });
 }
@@ -202,16 +218,26 @@ export function useBeverages() {
   });
 }
 
+/**
+ * Ingredientes activos. El filtro por tipo se aplica en cliente sobre una
+ * única consulta compartida: Arma tu Bowl pide cinco tipos y el carrito pide
+ * la lista completa, lo que antes eran seis peticiones distintas (y seis
+ * preflight CORS) para el mismo puñado de filas. La clave de caché no lleva
+ * el tipo, así que las seis llamadas comparten la misma respuesta.
+ */
 export function useIngredients(type?: Ingredient['type'], options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['ingredients', type],
+    queryKey: ['ingredients'],
     queryFn: async () => {
-      let query = supabase.from('ingredients').select('*').eq('is_active', true).order('name');
-      if (type) query = query.eq('type', type);
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .from('ingredients')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
       if (error) throw error;
       return (data ?? []).map((ingredient) => mapIngredient(ingredient as IngredientQueryRow));
     },
+    select: type ? (all: Ingredient[]) => all.filter((i) => i.type === type) : undefined,
     ...liveCatalogQueryOptions,
     enabled: options?.enabled,
   });

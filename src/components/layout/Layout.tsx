@@ -1,6 +1,6 @@
 import { ReactNode, useState, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { House, UtensilsCrossed, ShoppingCart, Info } from 'lucide-react';
+import { House, UtensilsCrossed, ShoppingBag, Info } from 'lucide-react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import ClosedBanner from './ClosedBanner';
@@ -33,25 +33,25 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex min-h-screen flex-col overflow-x-clip">
       <RestaurantSchema />
       <ClosedBanner />
       <Navbar />
-      <main className="flex-1 pb-16 md:pb-0">{children}</main>
+      <main className="flex-1 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
       <Footer />
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 min-h-16 bg-background/95 backdrop-blur-xl border-t border-border/40 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed inset-x-0 bottom-0 z-50 flex min-h-[4.25rem] items-stretch border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
         {bottomNavItems.map(({ href, icon: Icon, label, exact }) => (
           <Link
             key={label}
             to={href}
             className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
-              isActive(href, exact) ? 'text-brand' : 'text-muted-foreground',
+              'flex flex-1 flex-col items-center justify-center gap-1 font-utility text-[9px] font-semibold uppercase transition-colors',
+              isActive(href, exact) ? 'text-brand-dark dark:text-brand' : 'text-muted-foreground',
             )}
           >
-            <Icon className="h-5 w-5" />
+            <Icon className="h-[18px] w-[18px]" />
             {label}
           </Link>
         ))}
@@ -59,13 +59,13 @@ export default function Layout({ children }: LayoutProps) {
         {/* Cart button */}
         <button
           onClick={() => setCartOpen(true)}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground transition-colors"
+          className="flex flex-1 flex-col items-center justify-center gap-1 font-utility text-[9px] font-semibold uppercase text-muted-foreground transition-colors"
           aria-label="Abrir carrito"
         >
           <div className="relative">
-            <ShoppingCart className="h-5 w-5" />
+            <ShoppingBag className="h-[18px] w-[18px]" />
             {itemCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-brand-dark text-[9px] font-bold text-white flex items-center justify-center">
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-sm bg-[hsl(var(--maiz))] px-0.5 text-[8px] font-bold text-[hsl(var(--maiz-foreground))]">
                 {itemCount > 9 ? '9+' : itemCount}
               </span>
             )}
@@ -76,11 +76,11 @@ export default function Layout({ children }: LayoutProps) {
         <Link
           to="/nosotros"
           className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
-            isActive('/nosotros') ? 'text-brand' : 'text-muted-foreground',
+              'flex flex-1 flex-col items-center justify-center gap-1 font-utility text-[9px] font-semibold uppercase transition-colors',
+              isActive('/nosotros') ? 'text-brand-dark dark:text-brand' : 'text-muted-foreground',
           )}
         >
-          <Info className="h-5 w-5" />
+          <Info className="h-[18px] w-[18px]" />
           Nosotros
         </Link>
       </nav>

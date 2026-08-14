@@ -88,46 +88,56 @@ export default function AdminLoginPage() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--mesa))]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-[hsl(var(--maiz))]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30">
-      <div className="w-full max-w-sm mx-4">
-        <div className="bg-card rounded-2xl border shadow-lg p-8">
-          <div className="text-center mb-8">
-            <div className="font-display font-black text-3xl text-brand mb-4">Ohana Bowls</div>
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-              <Lock className="w-7 h-7 text-primary" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[hsl(var(--mesa))] p-4 sm:justify-end sm:p-8 lg:p-12">
+      <img src="/images/bowl-hero-poster-v2.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,28,20,0.9),rgba(10,28,20,0.55))]" />
+
+      <a href="/" className="absolute left-6 top-6 z-10 font-display text-3xl font-black text-white sm:left-8 sm:top-8">
+        OHANA
+      </a>
+
+      <div className="relative z-10 w-full max-w-md">
+        <div className="rounded-md border border-white/15 bg-background p-6 shadow-2xl sm:p-8">
+          <div className="mb-8">
+            <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-md bg-brand-muted">
+              <Lock className="h-5 w-5 text-brand-dark" />
             </div>
-            <h1 className="text-xl font-bold">Panel de Administración</h1>
+            <p className="section-kicker">Acceso interno</p>
+            <h1 className="mt-2 text-4xl leading-none text-foreground">Panel administrativo</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Ingresa con la cuenta autorizada para gestionar menú, pedidos y configuración.
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             {errorMessage && (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {errorMessage}
               </p>
             )}
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@ohanachilli.com" className="pl-10" required />
+                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@ohanachilli.com" className="h-12 rounded-md pl-10" autoComplete="email" required />
               </div>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="pl-10" required />
+                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="h-12 rounded-md pl-10" autoComplete="current-password" required />
               </div>
             </div>
-            <Button type="submit" disabled={loading} className="w-full btn-ohana">
-              {loading ? 'Ingresando...' : 'Ingresar'}
+            <Button type="submit" disabled={loading} className="btn-ohana !mt-6 w-full">
+              {loading ? 'Verificando...' : 'Ingresar al panel'}
             </Button>
           </form>
         </div>
