@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
@@ -32,22 +32,23 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
 
   const handleViewMenu = () => {
     onOpenChange(false);
-    navigate('/carta');
+    navigate('/#menu');
   };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
+      <SheetContent className="experience-cart-drawer flex w-full flex-col sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <ShoppingBag className="h-5 w-5" />
-            Tu Carrito
+            Tu pedido
             {cart.items.length > 0 && (
               <span className="text-sm font-normal text-muted-foreground">
-                ({cart.items.reduce((sum, item) => sum + item.quantity, 0)} items)
+                ({cart.items.reduce((sum, item) => sum + item.quantity, 0)} productos)
               </span>
             )}
           </SheetTitle>
+          <SheetDescription className="sr-only">Revisa tus productos y cantidades antes de continuar.</SheetDescription>
         </SheetHeader>
 
         {cart.items.length === 0 ? (
@@ -158,7 +159,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                 <span className="font-bold text-ohana">{formatPrice(cart.total)}</span>
               </div>
               <Button onClick={handleCheckout} className="w-full btn-ohana" size="lg">
-                Ir a Checkout
+                Continuar pedido
               </Button>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button onClick={handleContinueShopping} variant="outline" className="w-full">

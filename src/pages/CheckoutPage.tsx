@@ -524,10 +524,7 @@ export default function CheckoutPage() {
 
   return (
     <>
-      <div className="min-h-screen py-8 sm:py-12">
-        {/* Branded top bar */}
-        <div className="fixed top-14 left-0 right-0 h-0.5 bg-brand z-40 pointer-events-none" />
-
+      <div className="experience-checkout min-h-screen py-8 sm:py-12">
         <div className="container max-w-5xl">
           <button
             type="button"
@@ -536,12 +533,16 @@ export default function CheckoutPage() {
           >
             <ArrowLeft className="w-4 h-4" /> Volver
           </button>
-          <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+          <div className="experience-checkout-heading">
+            <p className="experience-eyebrow">YA CASI ES TUYO</p>
+            <h1>Tu próximo buen momento.</h1>
+            <p>Cuéntanos dónde lo vas a disfrutar.</p>
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
             {/* Form */}
             <div className="lg:col-span-3 order-2 lg:order-1">
-              <form onSubmit={handleSubmit} className="space-y-8 pb-32 lg:pb-0">
+              <form onSubmit={handleSubmit} className="space-y-8">
                 {submitError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -812,7 +813,7 @@ export default function CheckoutPage() {
                   </label>
                 </AnimatedElement>
 
-                <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-auto p-4 lg:p-0 bg-background/95 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none border-t lg:border-0 border-border/40 z-40 lg:z-auto space-y-2">
+                <div className="space-y-3 border-t border-border pt-6">
                   {submitBlockedByClosed && (
                     <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-4 py-3 text-sm">
                       <span className="text-lg leading-none mt-0.5">🔒</span>
@@ -858,7 +859,7 @@ export default function CheckoutPage() {
 
             {/* Order summary sidebar */}
             <div className="lg:col-span-2 order-1 lg:order-2">
-              <AnimatedElement animation="scale-up" delay={75} className="bg-card rounded-xl border p-4 sm:p-6 sticky top-20">
+              <AnimatedElement animation="scale-up" delay={75} className="bg-card rounded-xl border p-4 sm:p-6 sticky top-28">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="font-semibold">Tu orden</h3>
                   <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-medium">

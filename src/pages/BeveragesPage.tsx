@@ -10,7 +10,7 @@ import SEOHead from '@/components/SEOHead';
 
 export default function BeveragesPage() {
   const navigate = useNavigate();
-  useEffect(() => { navigate('/ohana#bebidas', { replace: true }); }, [navigate]);
+  useEffect(() => { navigate('/#bebidas', { replace: true }); }, [navigate]);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { data: beverageCategories = [] } = useBeverageCategories();

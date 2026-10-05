@@ -242,7 +242,13 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   useEffect(() => {
     if (!stepsTabsRef.current) return;
     const activeTab = stepsTabsRef.current.querySelector<HTMLElement>('[aria-selected="true"]');
-    activeTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const tabs = stepsTabsRef.current;
+    if (!activeTab || tabs.scrollWidth <= tabs.clientWidth) return;
+    // Move only the tab strip; scrollIntoView also pulls the page past the hero on mount.
+    tabs.scrollTo({
+      left: activeTab.offsetLeft - tabs.offsetLeft - (tabs.clientWidth - activeTab.clientWidth) / 2,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    });
   }, [currentStep]);
 
   const stepConfigs = useMemo<Record<SelectionStep, StepConfig> | null>(() => {

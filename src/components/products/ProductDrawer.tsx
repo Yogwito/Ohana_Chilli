@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Plus } from 'lucide-react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Minus, Plus } from 'lucide-react';
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { formatPrice } from '@/domain/formatPrice';
@@ -86,16 +86,6 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
         side="bottom"
         className="sm:side-right h-[90dvh] sm:h-full sm:max-w-md sm:left-auto rounded-t-2xl sm:rounded-none p-0 flex flex-col"
       >
-        {/* Close button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-background/80 backdrop-blur flex items-center justify-center shadow border border-border hover:bg-muted transition-colors"
-          aria-label="Cerrar"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           {/* Product image */}
@@ -110,7 +100,8 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
           <div className="p-5 space-y-6">
             {/* Header */}
             <div>
-              <h2 className="text-xl font-bold text-foreground">{product.name}</h2>
+              <SheetTitle className="text-xl font-bold text-foreground">{product.name}</SheetTitle>
+              <SheetDescription>{product.description || "Dale tu toque antes de agregarlo al pedido."}</SheetDescription>
               <p className="text-brand font-bold mt-1">{formatPrice(product.price)}</p>
             </div>
 
