@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCatalogMutationSync } from '@/hooks/use-catalog-sync';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -48,7 +48,7 @@ function ProductThumbnail({ url, name }: { url: string | null; name: string }) {
 }
 
 export default function ProductsAdmin() {
-  const queryClient = useQueryClient();
+  const syncCatalog = useCatalogMutationSync();
   const { data: categories = [] } = useCategories('ohana');
 
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -176,7 +176,7 @@ export default function ProductsAdmin() {
       setSaving(false);
       return;
     }
-    await queryClient.invalidateQueries({ queryKey: ['products'] });
+    await syncCatalog(['products']);
     toast.success(editingProduct ? 'Producto actualizado' : 'Producto creado');
     setSheetOpen(false);
     fetchProducts();
@@ -193,13 +193,13 @@ export default function ProductsAdmin() {
       .order('sort_order', { ascending: false })
       .limit(1)
       .single();
-    const { error } = await supabase.from('categories').insert({
+    const { error } = await supabase.from('categories').insert({ brand_id: 'ohana',
       id: slug,
       name: newCatName.trim(),
       sort_order: (maxOrder?.sort_order ?? 0) + 1,
     });
     if (error) { toast.error('Error al crear categoría'); setSavingCat(false); return; }
-    await queryClient.invalidateQueries({ queryKey: ['categories'] });
+    await syncCatalog(['categories']);
     toast.success('Categoría creada');
     setCatDialogOpen(false);
     setNewCatName('');
@@ -312,19 +312,20 @@ export default function ProductsAdmin() {
         <SheetContent className="overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</SheetTitle>
+            <SheetDescription>Actualiza los detalles que tus clientes verán en la carta.</SheetDescription>
           </SheetHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Nombre</Label>
-              <Input
+              <Label htmlFor="admin-product-name">Nombre</Label>
+              <Input id="admin-product-name"
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Nombre del producto"
               />
             </div>
             <div>
-              <Label>Precio (COP)</Label>
-              <Input
+              <Label htmlFor="admin-product-price">Precio (COP)</Label>
+              <Input id="admin-product-price"
                 type="number"
                 value={form.price_cents || ''}
                 onChange={e => setForm(f => ({ ...f, price_cents: Number(e.target.value) }))}
@@ -332,9 +333,9 @@ export default function ProductsAdmin() {
               />
             </div>
             <div>
-              <Label>Categoría</Label>
+              <Label htmlFor="admin-product-category">Categoría</Label>
               <Select value={form.category_id} onValueChange={v => setForm(f => ({ ...f, category_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecciona categoría" /></SelectTrigger>
+                <SelectTrigger id="admin-product-category"><SelectValue placeholder="Selecciona categoría" /></SelectTrigger>
                 <SelectContent>
                   {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
@@ -351,6 +352,7 @@ export default function ProductsAdmin() {
 
                 <TabsContent value="url" className="mt-2">
                   <Input
+                    aria-label="URL de la imagen"
                     value={form.image_url}
                     onChange={e => { setForm(f => ({ ...f, image_url: e.target.value })); setImgPreviewError(false); }}
                     placeholder="https://..."
@@ -360,6 +362,7 @@ export default function ProductsAdmin() {
                 <TabsContent value="upload" className="mt-2 space-y-2">
                   <input
                     type="file"
+                    aria-label="Subir imagen del producto"
                     accept="image/*"
                     onChange={handleFileUpload}
                     disabled={uploading}
@@ -378,6 +381,7 @@ export default function ProductsAdmin() {
                 <TabsContent value="unsplash" className="mt-2 space-y-2">
                   <div className="flex gap-2">
                     <Input
+                      aria-label="Buscar imagen en Unsplash"
                       value={unsplashQuery}
                       onChange={e => setUnsplashQuery(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && searchUnsplash()}
@@ -443,8 +447,8 @@ export default function ProductsAdmin() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <Label>Nombre</Label>
-              <Input
+              <Label htmlFor="admin-category-name">Nombre</Label>
+              <Input id="admin-category-name"
                 value={newCatName}
                 onChange={e => setNewCatName(e.target.value)}
                 placeholder="ej: Bowls Especiales"

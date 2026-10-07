@@ -26,6 +26,7 @@ function formatEndDate(endsAt: string): string {
 function promoToProduct(promo: Promotion): Product {
   return {
     id: `promo-${promo.id}`,
+    promotionId: promo.id,
     name: promo.title,
     description: promo.description ?? '',
     price: promo.price_cents!,
@@ -45,7 +46,7 @@ function PromotionCard({ promo }: { promo: Promotion }) {
 
   const discountLabel = formatDiscountLabel(promo);
   const displayBadge = promo.badge_text ?? discountLabel;
-  const isAddable = promo.type === 'combo' && promo.price_cents != null;
+  const isAddable = promo.type === 'combo' && promo.price_cents != null && promo.price_cents > 0;
 
   const handleAddToCart = () => {
     if (!isAddable) return;

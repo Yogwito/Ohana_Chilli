@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, Check, ArrowUpRight } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { formatPrice } from '@/domain/formatPrice';
 import { cn } from '@/lib/utils';
 import type { Product, ProductCustomization } from '@/types';
+import ProductImage from '@/components/products/ProductImage';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export type ProductConfig = ProductCustomization;
 
@@ -17,6 +19,7 @@ interface ProductDrawerProps {
 }
 
 export default function ProductDrawer({ product, open, onClose, onConfirm }: ProductDrawerProps) {
+  const isMobile = useIsMobile();
   const { data: ingredients = [], isLoading } = useProductDefaultIngredients(product?.id ?? null);
 
   const [removed, setRemoved] = useState<string[]>([]);
@@ -83,25 +86,20 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
   return (
     <Sheet open={open} onOpenChange={open => { if (!open) onClose(); }}>
       <SheetContent
-        side="bottom"
-        className="sm:side-right h-[90dvh] sm:h-full sm:max-w-md sm:left-auto rounded-t-2xl sm:rounded-none p-0 flex flex-col"
+        side={isMobile ? 'bottom' : 'right'}
+        className="product-customization-drawer w-full h-[92dvh] md:h-full md:max-w-lg rounded-t-[28px] md:rounded-none p-0 flex flex-col"
       >
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {/* Product image */}
-          {product.imageUrl && (
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="w-full h-40 object-cover rounded-t-2xl sm:rounded-none"
-            />
-          )}
+          <ProductImage product={product} ratio={4 / 3} className="rounded-t-2xl sm:rounded-none" />
 
-          <div className="p-5 space-y-6">
+          <div className="product-detail-body p-5 space-y-6">
             {/* Header */}
-            <div>
+            <div className="product-detail-heading">
+              <p className="experience-eyebrow">TU PRÓXIMO ANTOJO</p>
               <SheetTitle className="text-xl font-bold text-foreground">{product.name}</SheetTitle>
-              <SheetDescription>{product.description || "Dale tu toque antes de agregarlo al pedido."}</SheetDescription>
+              <SheetDescription className="product-full-recipe">{product.description || product.ingredients?.join(", ") || "Dale tu toque antes de agregarlo al pedido."}</SheetDescription>
               <p className="text-brand font-bold mt-1">{formatPrice(product.price)}</p>
             </div>
 
@@ -120,8 +118,9 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
               <>
                 {/* Sección 1: Quitar ingredientes */}
                 {removableIngredients.length > 0 && (
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-2">¿Quieres quitar algo?</p>
+                  <section className="product-options-section">
+                    <h3>Hazlo a tu gusto</h3>
+                    <p className="text-sm text-muted-foreground mb-3">Toca los ingredientes que prefieres quitar.</p>
                     <div className="flex flex-wrap gap-1.5">
                       {removableIngredients.map(ing => {
                         const isRemoved = removed.includes(ing.ingredient_name);
@@ -130,46 +129,49 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
                             key={ing.id}
                             type="button"
                             onClick={() => toggleRemoved(ing.ingredient_name)}
+                            aria-pressed={isRemoved}
                             className={cn(
-                              'rounded-full border px-3 py-1 text-xs cursor-pointer transition-all',
+                              'product-removal-option min-h-11 rounded-full border px-3 py-2 text-sm cursor-pointer transition-all',
                               isRemoved
                                 ? 'bg-red-50 border-red-300 text-red-500 line-through'
                                 : 'bg-background border-border text-foreground hover:border-red-200',
                             )}
                           >
-                            {ing.ingredient_name}
+                            {isRemoved && <Check className="inline mr-1 h-3 w-3" aria-hidden="true" />} {ing.ingredient_name}
                           </button>
                         );
                       })}
                     </div>
-                  </div>
+                  </section>
                 )}
 
                 {/* Sección 2: Extras de pago */}
                 {extraIngredients.length > 0 && (
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-2">¿Le agregamos algo?</p>
+                  <section className="product-options-section">
+                    <h3>Un toque extra</h3>
+                    <p className="text-sm text-muted-foreground mb-3">Elige tus adicionales. El precio se suma al total.</p>
                     <div className="space-y-2">
                       {extraIngredients.map(ing => {
                         const qty = extraQty[ing.id] ?? 0;
                         return (
                           <div
                             key={ing.id}
-                            className="flex items-center justify-between border border-dashed border-brand/40 bg-brand/5 rounded-xl px-4 py-3"
+                            data-selected={qty > 0}
+                            className="product-extra-option flex items-center gap-3 justify-between border border-dashed border-brand/40 bg-brand/5 rounded-xl px-4 py-3"
                           >
-                            <div>
+                            <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-foreground">{ing.ingredient_name}</p>
                               <span className="text-xs bg-brand/10 text-brand rounded-full px-2 py-0.5 mt-0.5 inline-block">
                                 +{formatPrice(ing.extra_price_cents)}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => changeExtraQty(ing.id, -1)}
                                 disabled={qty === 0}
-                                className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
-                                aria-label="Quitar"
+                                className="w-11 h-11 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
+                                aria-label={`Quitar ${ing.ingredient_name}`}
                               >
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
@@ -177,8 +179,8 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
                               <button
                                 type="button"
                                 onClick={() => changeExtraQty(ing.id, 1)}
-                                className="w-8 h-8 rounded-full border border-brand bg-brand/10 text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors"
-                                aria-label="Agregar"
+                                className="w-11 h-11 rounded-full border border-brand bg-brand/10 text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors"
+                                aria-label={`Agregar ${ing.ingredient_name}`}
                               >
                                 <Plus className="w-3.5 h-3.5" />
                               </button>
@@ -187,18 +189,20 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
                         );
                       })}
                     </div>
-                  </div>
+                  </section>
                 )}
 
                 {/* Sección 3: Nota para la cocina */}
-                <div>
-                  <p className="text-sm font-semibold text-foreground mb-2">Nota para la cocina</p>
+                <div className="product-options-section">
+                  <label htmlFor={`product-note-${product.id}`} className="block text-sm font-semibold text-foreground mb-2">Nota para la cocina</label>
                   <textarea
+                    id={`product-note-${product.id}`}
                     value={note}
                     onChange={e => setNote(e.target.value)}
                     placeholder="Ej: sin cebolla, bien cocido..."
                     rows={2}
-                    className="w-full border border-border rounded-lg p-3 text-sm resize-none bg-background focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    aria-label="Nota para la cocina"
+                    className="w-full border border-border rounded-lg p-3 text-base sm:text-sm resize-none bg-background focus:outline-none focus:ring-2 focus:ring-brand/30"
                   />
                 </div>
               </>
@@ -207,10 +211,10 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
         </div>
 
         {/* Footer fijo */}
-        <div className="border-t bg-background p-5 space-y-3 shrink-0">
+        <div className="product-customization-footer border-t bg-background p-4 sm:p-5 space-y-2 shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Total</span>
-            <span className="text-lg font-bold text-brand">{formatPrice(totalPrice)}</span>
+            <span className="text-lg font-bold text-brand" aria-live="polite">{formatPrice(totalPrice)}</span>
           </div>
           {isLoading ? (
             <button
@@ -227,7 +231,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
                 onClick={handleConfirm}
                 className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
               >
-                Agregar al carrito · {formatPrice(totalPrice)}
+                Agregar al carrito <ArrowUpRight className="inline ml-2 h-4 w-4" aria-hidden="true" />
               </button>
               <button
                 type="button"

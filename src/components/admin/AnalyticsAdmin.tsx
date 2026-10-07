@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/domain/formatPrice';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, TrendingUp, ShoppingCart, Truck, Store } from 'lucide-react';
 
@@ -29,21 +30,39 @@ export default function AnalyticsAdmin() {
   const [events, setEvents] = useState<AnalyticsEventRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const [ordersRes, itemsRes, eventsRes] = await Promise.all([
-        supabase.from('orders').select('id, total_cents, order_type, created_at').order('created_at', { ascending: false }).limit(500),
-        supabase.from('order_items').select('name, quantity, brand_id').limit(1000),
-        supabase.from('analytics_events').select('event_type, metadata, created_at').order('created_at', { ascending: false }).limit(1000),
+  const [loadError, setLoadError] = useState(false);
+  const [sample, setSample] = useState({ orders: 0, events: 0, itemsTruncated: false });
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const [ordersRes, eventsRes] = await Promise.all([
+        supabase.from('orders').select('id, total_cents, order_type, created_at', { count: 'exact' }).order('created_at', { ascending: false }).order('id').limit(500),
+        supabase.from('analytics_events').select('event_type, metadata, created_at', { count: 'exact' }).order('created_at', { ascending: false }).order('id').limit(1000),
       ]);
-      setOrders((ordersRes.data ?? []) as OrderRow[]);
-      setOrderItems((itemsRes.data ?? []) as OrderItemRow[]);
+      if (ordersRes.error || eventsRes.error) throw new Error('analytics_load_failed');
+      const sampledOrders = (ordersRes.data ?? []) as OrderRow[];
+      const items: OrderItemRow[] = [];
+      let itemsTruncated = false;
+      if (sampledOrders.length) {
+        const ids = sampledOrders.map(order => order.id);
+        // Page within the same order sample; never compare an unrelated item sample.
+        for (let offset = 0; offset < 15000; offset += 500) {
+          const page = await supabase.from('order_items').select('name, quantity, brand_id', { count: 'exact' }).in('order_id', ids).order('id').range(offset, offset + 499);
+          if (page.error) throw page.error;
+          items.push(...(page.data ?? []) as OrderItemRow[]);
+          itemsTruncated = (page.count ?? items.length) > items.length;
+          if (!itemsTruncated || !page.data?.length) break;
+        }
+      }
+      setOrders(sampledOrders);
+      setOrderItems(items);
       setEvents((eventsRes.data ?? []) as AnalyticsEventRow[]);
-      setLoading(false);
-    }
-    load();
+      setSample({ orders: ordersRes.count ?? sampledOrders.length, events: eventsRes.count ?? eventsRes.data?.length ?? 0, itemsTruncated });
+    } catch { setLoadError(true); }
+    finally { setLoading(false); }
   }, []);
+  useEffect(() => { void load(); }, [load]);
 
   // 1. Top products
   const topProducts = useMemo(() => {
@@ -99,30 +118,34 @@ export default function AnalyticsAdmin() {
     );
   }
 
+  if (loadError) return <div role="alert"><p>No se pudieron cargar las estadísticas. Los valores no están disponibles.</p><Button onClick={load}>Reintentar</Button></div>;
+
   const maxQty = topProducts.length > 0 ? topProducts[0].qty : 1;
 
   return (
     <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">Muestra: {orders.length} de {sample.orders} pedidos más recientes (incluye cancelados; importes de pedidos, no ingresos confirmados). Productos calculados sobre esos mismos pedidos. Eventos: {events.length} de {sample.events} más recientes, con ventana independiente; la conversión cuenta eventos, no clientes únicos.</p>
+      {sample.itemsTruncated && <p role="status">Productos parciales: se alcanzó el límite de 15.000 líneas de la muestra.</p>}
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           icon={<ShoppingCart className="w-5 h-5 text-ohana" />}
-          label="Pedidos totales"
+          label="Pedidos en la muestra"
           value={String(orderTypeBreakdown.total)}
         />
         <KpiCard
           icon={<TrendingUp className="w-5 h-5 text-ohana" />}
-          label="Ticket promedio"
+          label="Importe promedio de la muestra"
           value={formatPrice(avgOrderValue)}
         />
         <KpiCard
           icon={<Store className="w-5 h-5 text-primary" />}
-          label="Pickup"
+          label="Para recoger"
           value={`${orderTypeBreakdown.pickup} (${orderTypeBreakdown.total > 0 ? Math.round((orderTypeBreakdown.pickup / orderTypeBreakdown.total) * 100) : 0}%)`}
         />
         <KpiCard
           icon={<Truck className="w-5 h-5 text-brand-dark" />}
-          label="Delivery"
+          label="Domicilio"
           value={`${orderTypeBreakdown.delivery} (${orderTypeBreakdown.total > 0 ? Math.round((orderTypeBreakdown.delivery / orderTypeBreakdown.total) * 100) : 0}%)`}
         />
       </div>
@@ -134,12 +157,12 @@ export default function AnalyticsAdmin() {
         </h3>
         <div className="space-y-3">
           <FunnelBar label="Agregar al carrito" value={funnel.addToCart} max={Math.max(funnel.addToCart, 1)} color="bg-muted-foreground/20" />
-          <FunnelBar label="Inicio checkout" value={funnel.checkoutStart} max={Math.max(funnel.addToCart, 1)} color="bg-ohana/40" />
+          <FunnelBar label="Inicio del pedido" value={funnel.checkoutStart} max={Math.max(funnel.addToCart, 1)} color="bg-ohana/40" />
           <FunnelBar label="Pedido completado" value={funnel.checkoutComplete} max={Math.max(funnel.addToCart, 1)} color="bg-ohana" />
         </div>
         <p className="text-sm text-muted-foreground mt-3">
           Tasa de conversión: <span className="font-bold text-foreground">{funnel.conversionRate}%</span>
-          {' '}(checkout inicio → completado)
+          {' '}(inicio → pedido completado)
         </p>
       </div>
 

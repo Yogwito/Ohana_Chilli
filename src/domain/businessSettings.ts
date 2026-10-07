@@ -202,6 +202,7 @@ function parseBusinessHoursRange(hours: string | null | undefined) {
 
   const match = hours.match(/(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})/);
   if (!match) return null;
+  if (Number(match[1]) > 23 || Number(match[3]) > 23 || Number(match[2]) > 59 || Number(match[4]) > 59) return null;
 
   return {
     startMinutes: Number(match[1]) * 60 + Number(match[2]),
@@ -210,10 +211,17 @@ function parseBusinessHoursRange(hours: string | null | undefined) {
 }
 
 export function isBusinessOpenNow(settings: Pick<BusinessSettings, 'hoursWeekday' | 'hoursWeekend'>, now = new Date()) {
-  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  // Match the backend's business clock, regardless of the customer's device timezone.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota', weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(value => value.type === type)?.value;
+  const isWeekend = ['Sat', 'Sun'].includes(part('weekday'));
   const range = parseBusinessHoursRange(isWeekend ? settings.hoursWeekend : settings.hoursWeekday);
   if (!range) return null;
 
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  return currentMinutes >= range.startMinutes && currentMinutes <= range.endMinutes;
+  const currentMinutes = Number(part('hour')) * 60 + Number(part('minute')) + Number(part('second')) / 60;
+  return range.startMinutes <= range.endMinutes
+    ? currentMinutes >= range.startMinutes && currentMinutes <= range.endMinutes
+    : currentMinutes >= range.startMinutes || currentMinutes <= range.endMinutes;
 }

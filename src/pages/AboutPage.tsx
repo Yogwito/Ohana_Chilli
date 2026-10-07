@@ -1,15 +1,17 @@
-import { Leaf } from 'lucide-react';
+import BrandIllustration from '@/components/ohana/BrandIllustration';
+import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen">
+    <div className="experience-about min-h-screen">
       <SEOHead title="Nosotros" description="Conoce la historia de Ohana Bowls. Bowls frescos y personalizables en Manizales, Colombia." path="/nosotros" />
       {/* Hero */}
       <section className="py-16 sm:py-24 bg-ohana-gradient border-b border-ohana/15">
         <div className="container">
           <div className="max-w-3xl mx-auto text-center">
-            <h1 className="mb-6">Nuestra Historia</h1>
+            <p className="experience-eyebrow">BOWLS & BUENA ENERGÍA</p>
+            <h1 className="mb-6">La buena comida<br /><em>nos reúne.</em></h1>
             <p className="text-xl text-muted-foreground">
               Creemos que la buena comida puede ser saludable y deliciosa al mismo tiempo.
             </p>
@@ -23,7 +25,7 @@ export default function AboutPage() {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <Leaf className="w-8 h-8 text-ohana" />
+                <BrandIllustration kind="leaf" />
               </div>
               <h2 className="mb-4">Bowls con propósito</h2>
               <p className="text-muted-foreground mb-4">
@@ -36,16 +38,12 @@ export default function AboutPage() {
                 todos son bienvenidos.
               </p>
             </div>
-            <div className="bg-ohana-gradient rounded-3xl aspect-square flex items-center justify-center border border-ohana/20">
-              <div className="text-center">
-                <span className="text-8xl">🥗</span>
-                <p className="mt-4 text-lg font-medium">Desde 2024</p>
-              </div>
-            </div>
+            <div className="about-bowl-art"><BrandIllustration kind="bowl" /><span>A tu gusto.<br /><em>A tu manera.</em></span></div>
           </div>
         </div>
       </section>
 
+      <div className="brand-divider" aria-hidden="true"><span>✳</span><span>BUENA COMIDA · MEJOR COMPAÑÍA</span><span>✳</span></div>
       {/* Values */}
       <section className="py-16 bg-muted/50">
         <div className="container">
@@ -54,7 +52,7 @@ export default function AboutPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="bg-card rounded-2xl p-6 shadow-sm">
               <div className="w-12 h-12 rounded-full bg-ohana/10 flex items-center justify-center mb-4">
-                <span className="text-2xl">🌱</span>
+                <BrandIllustration kind="leaf" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Frescura</h3>
               <p className="text-muted-foreground">
@@ -65,7 +63,7 @@ export default function AboutPage() {
 
             <div className="bg-card rounded-2xl p-6 shadow-sm">
               <div className="w-12 h-12 rounded-full bg-brand-muted flex items-center justify-center mb-4">
-                <span className="text-2xl">❤️</span>
+                <BrandIllustration kind="sauce" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Pasión</h3>
               <p className="text-muted-foreground">
@@ -75,7 +73,7 @@ export default function AboutPage() {
 
             <div className="bg-card rounded-2xl p-6 shadow-sm">
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <span className="text-2xl">🤝</span>
+                <BrandIllustration kind="corn" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Comunidad</h3>
               <p className="text-muted-foreground">
@@ -85,6 +83,7 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+      <section className="about-invitation"><h2>Tu mezcla favorita<br /><em>te está esperando.</em></h2><Link to="/#arma-tu-bowl" className="experience-button">Arma tu bowl ↗</Link></section>
     </div>
   );
 }

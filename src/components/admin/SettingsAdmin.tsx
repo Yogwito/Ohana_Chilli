@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCatalogMutationSync } from '@/hooks/use-catalog-sync';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,7 @@ const COLOR_CLASSES: Record<BannerColor, string> = {
 };
 
 export default function SettingsAdmin() {
-  const queryClient = useQueryClient();
+  const syncCatalog = useCatalogMutationSync();
   const { data: businessSettings } = useBusinessSettings();
 
   const [hoursEnforce, setHoursEnforce] = useState(false);
@@ -61,7 +61,7 @@ export default function SettingsAdmin() {
       .upsert({ key: 'business_hours_enforce', value: String(value) }, { onConflict: 'key' });
     setHoursEnforceSaving(false);
     if (error) { toast.error('Error al guardar'); return; }
-    await queryClient.invalidateQueries({ queryKey: ['setting', 'business_hours_enforce'] });
+    await syncCatalog(['settings']);
     toast.success(value ? 'Bloqueo activado' : 'Bloqueo desactivado');
   };
 
@@ -106,7 +106,7 @@ export default function SettingsAdmin() {
         { key: 'banner_color', value: bannerColor },
       ], { onConflict: 'key' });
     if (error) { toast.error('Error al guardar banner'); setBannerSaving(false); return; }
-    await queryClient.invalidateQueries({ queryKey: ['banner-settings'] });
+    await syncCatalog(['settings']);
     toast.success('Banner actualizado');
     setBannerSaving(false);
   };
@@ -123,7 +123,7 @@ export default function SettingsAdmin() {
         { onConflict: 'key' },
       );
     if (error) { toast.error('Error al actualizar configuración'); setBizSaving(false); return; }
-    await queryClient.invalidateQueries({ queryKey: ['business-settings'] });
+    await syncCatalog(['settings']);
     toast.success('Configuración actualizada');
     setBizSaving(false);
   };

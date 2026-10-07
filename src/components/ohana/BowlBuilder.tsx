@@ -1,1791 +1,1383 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Minus, Plus, Heart, Trash2, BookHeart } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ClipboardList,
+  Heart,
+  Sparkles,
+  X,
+  Minus,
+  Plus,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useIngredients, useBowlRules, useProducts } from '@/hooks/use-catalog';
+import { useCart } from '@/context/CartContext';
+import { useSavedBowls } from '@/hooks/use-saved-bowls';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useCart } from '@/context/CartContext';
-import { useSavedBowls } from '@/hooks/use-saved-bowls';
-import type { SavedBowl } from '@/hooks/use-saved-bowls';
 import {
-  calculateBowlExtraCharges,
-  calculateBowlPrice,
-  EXTRA_PROTEIN_PRICE,
-  EXTRA_TOPPING_PRICE,
-  getBowlChargeLines,
-  getIngredientExtraCharge,
-} from '@/domain/bowlPricing';
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { calculateBowlPrice, getBowlChargeLines } from '@/domain/bowlPricing';
+import {
+  extraPrice,
+  isGenericExtra,
+  reconcileBowl,
+  sections,
+  validateBowl,
+} from '@/domain/bowlConfiguration';
 import { formatGroupedIngredients } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
-import { getAdditionalIngredientImageUrl } from '@/domain/productImages';
-import { cn } from '@/lib/utils';
-import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient, Product } from '@/types';
+import type {
+  BowlExtra,
+  BowlSizeRule,
+  CustomBowl,
+  Ingredient,
+  Product,
+} from '@/types';
+import { getBowlUpsells } from '@/domain/bowlUpsells';
+import BrandIllustration from '@/components/ohana/BrandIllustration';
+import './bowl-studio.css';
 
-const steps: { id: BowlBuilderStep; label: string }[] = [
-  { id: 'size', label: 'Tamaño' },
-  { id: 'bases', label: 'Bases' },
-  { id: 'proteins', label: 'Proteínas' },
-  { id: 'acompanantes', label: 'Acompañantes' },
-  { id: 'salsas', label: 'Salsas' },
-  { id: 'complementos', label: 'Complementos' },
-  { id: 'upsell', label: 'Extras' },
-  { id: 'summary', label: 'Resumen' },
+const EXTRAS_STEP = sections.length + 1;
+const DRINKS_STEP = EXTRAS_STEP + 1;
+const SUMMARY_STEP = DRINKS_STEP + 1;
+const steps = [
+  'Tamaño',
+  ...sections.map((s) => s.label),
+  'Extras',
+  'Bebidas',
+  'Resumen',
 ];
-
-type SelectionStep = Exclude<BowlBuilderStep, 'size' | 'summary' | 'upsell'>;
-
-interface BowlBuilderProps {
+const blank = (size: BowlSizeRule): CustomBowl => ({
+  size,
+  bases: [],
+  proteins: [],
+  acompanantes: [],
+  sauces: [],
+  complementos: [],
+  extras: [],
+  notes: '',
+});
+export default function BowlBuilder({
+  onComplete,
+}: {
   onComplete?: () => void;
-}
-
-interface StepConfig {
-  label: string;
-  title: string;
-  subtitle: string;
-  singular: string;
-  plural: string;
-  min: number;
-  max: number;
-  /** Per-item max: max units of the same ingredient. Defaults to max if omitted. */
-  perItemMax?: number;
-  /** When true, the step can be skipped without selecting anything. */
-  optional?: boolean;
-}
-
-function getSizeStructure(size: BowlSizeRule) {
-  return [
-    `${size.maxBases} base${size.maxBases !== 1 ? 's' : ''}`,
-    `${size.maxProteins} proteína${size.maxProteins !== 1 ? 's' : ''}`,
-    `${size.maxAcompanantes} acompañante${size.maxAcompanantes !== 1 ? 's' : ''}`,
-    `Hasta ${size.maxSauces} salsa${size.maxSauces !== 1 ? 's' : ''}`,
-    `Hasta ${size.maxComplementos} complemento${size.maxComplementos !== 1 ? 's' : ''}`,
-  ];
-}
-
-function getIngredientCount(items: Ingredient[], ingredientId: string) {
-  return items.filter((item) => item.id === ingredientId).length;
-}
-
-function updateIngredientSelection(
-  ingredient: Ingredient,
-  setSelectedItems: Dispatch<SetStateAction<Ingredient[]>>,
-  action: 'add' | 'remove',
-  max: number,
-) {
-  setSelectedItems((previousItems) => {
-    if (action === 'add') {
-      if (previousItems.length >= max) return previousItems;
-      return [...previousItems, ingredient];
-    }
-
-    const removableIndex = previousItems.map((item) => item.id).lastIndexOf(ingredient.id);
-    if (removableIndex === -1) return previousItems;
-
-    const nextItems = [...previousItems];
-    nextItems.splice(removableIndex, 1);
-    return nextItems;
-  });
-}
-
-function formatStepQuantity(count: number, singular: string, plural: string) {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function getStepHint(config: StepConfig, currentCount: number) {
-  if (config.max === 0) {
-    return 'No hay opciones activas en esta sección.';
-  }
-
-  if (config.optional && currentCount === 0) {
-    return 'Opcional — puedes saltar este paso.';
-  }
-
-  const remainingRequired = Math.max(config.min - currentCount, 0);
-
-  if (remainingRequired > 0) {
-    return `Te faltan ${formatStepQuantity(remainingRequired, config.singular, config.plural)} para continuar.`;
-  }
-
-  if (currentCount === config.max) {
-    return 'Llegaste al límite de esta sección.';
-  }
-
-  if (config.min === 0) {
-    return `Puedes omitir esta sección o elegir hasta ${formatStepQuantity(config.max, config.singular, config.plural)}.`;
-  }
-
-  return `Puedes repetir ingredientes mientras no superes ${formatStepQuantity(config.max, config.singular, config.plural)}.`;
-}
-
-function getStepNextLabel(currentStep: BowlBuilderStep, canProceed: boolean, isOptionalBlank: boolean) {
-  if (currentStep === 'summary') return 'Agregar al carrito';
-  if (currentStep === 'upsell') return 'Continuar';
-  if (!canProceed) return 'Siguiente';
-  if (isOptionalBlank) return 'Omitir';
-  return 'Siguiente';
-}
-
-export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
-  const { addCustomBowl, addProduct, cart } = useCart();
-  const { saved: savedBowls, saveBowl, removeBowl } = useSavedBowls();
-
-  const builderRef = useRef<HTMLDivElement>(null);
-  const stepsTabsRef = useRef<HTMLDivElement>(null);
-  const stepContentRef = useRef<HTMLDivElement>(null);
-  const scrollToBuilder = () => {
-    stepContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}) {
+  const { cart, addBowlOrder } = useCart();
+  const { saved, saveBowl, removeBowl } = useSavedBowls();
+  const {
+    data: sizes = [],
+    isLoading: sizesLoading,
+    error: sizesError,
+    refetch: refetchSizes,
+  } = useBowlRules();
+  const {
+    data: ingredients = [],
+    isLoading: ingredientsLoading,
+    error: ingredientsError,
+    refetch: refetchIngredients,
+  } = useIngredients();
+  const {
+    data: drinks = [],
+    isLoading: drinksLoading,
+    error: drinksError,
+    refetch: refetchDrinks,
+  } = useProducts({ categoryId: 'ohana-bebidas' });
+  const [bowl, setBowl] = useState<CustomBowl | null>(null);
+  const [step, setStep] = useState(0);
+  const [visited, setVisited] = useState<number[]>([0]);
+  const [recipeOpen, setRecipeOpen] = useState(false);
+  const [selectedDrinks, setSelectedDrinks] = useState<
+    { product: Product; quantity: number }[]
+  >([]);
+  const [selector, setSelector] = useState<Ingredient | null>(null);
+  const [saveName, setSaveName] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string>();
+  const [notice, setNotice] = useState('');
+  const content = useRef<HTMLFieldSetElement>(null);
+  const selectorTrigger = useRef<HTMLButtonElement | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const submitting = useRef(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const total = bowl ? calculateBowlPrice(bowl) : 0;
+  const drinksTotal = selectedDrinks.reduce(
+    (sum, d) => sum + d.quantity * d.product.price,
+    0,
+  );
+  const issues = bowl ? validateBowl(bowl, sizes, ingredients) : [];
+  const section = sections[step - 1];
+  const sectionIssues = section
+    ? issues.filter((i) => i.section === section.key)
+    : [];
+  const scroll = () =>
+    requestAnimationFrame(() => {
+      content.current?.focus({ preventScroll: true });
+      content.current?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+        block: 'start',
+      });
+    });
+  const move = (next: number) => {
+    setSelector(null);
+    setStep(next);
+    setVisited((prev) => (prev.includes(next) ? prev : [...prev, next]));
+    setRecipeOpen(false);
+    scroll();
   };
-
-  const { data: bowlSizes = [], isLoading: sizesLoading, error: sizesError } = useBowlRules();
-  const { data: bebidasOptions = [], isLoading: bebidasLoading } = useProducts({ categoryId: 'ohana-bebidas' });
-  const { data: baseOptions = [], isLoading: basesLoading, error: basesError } = useIngredients('base');
-  const { data: proteinOptions = [], isLoading: proteinsLoading, error: proteinsError } = useIngredients('protein');
-  const { data: acompananteOptions = [], isLoading: acompLoading, error: acompError } = useIngredients('acompanante');
-  const { data: sauceOptions = [], isLoading: saucesLoading, error: saucesError } = useIngredients('sauce');
-  const { data: complementoOptions = [], isLoading: complLoading, error: complError } = useIngredients('topping');
-  const dataLoading = sizesLoading || basesLoading || proteinsLoading || acompLoading || saucesLoading || complLoading;
-  const dataError = sizesError || basesError || proteinsError || acompError || saucesError || complError;
-
-  const [currentStep, setCurrentStep] = useState<BowlBuilderStep>('size');
-  const [selectedSize, setSelectedSize] = useState<BowlSizeRule | null>(null);
-  const [selectedBases, setSelectedBases] = useState<Ingredient[]>([]);
-  const [selectedProteins, setSelectedProteins] = useState<Ingredient[]>([]);
-  const [selectedAcompanantes, setSelectedAcompanantes] = useState<Ingredient[]>([]);
-  const [selectedSauces, setSelectedSauces] = useState<Ingredient[]>([]);
-  const [selectedComplementos, setSelectedComplementos] = useState<Ingredient[]>([]);
-  const [notes, setNotes] = useState('');
-  const [stepVisible, setStepVisible] = useState(false);
-  const [bowlExpanded, setBowlExpanded] = useState(false);
-  const [saveMode, setSaveMode] = useState(false);
-  const [saveName, setSaveName] = useState('');
-
-  // Extra proteins (premium slot → selector de proteína incluida)
-  const [extraProteinSelections, setExtraProteinSelections] = useState<Array<{
-    uid: string;
-    proteinName: string;
-    charge: number;
-    premiumProteinId: string;
-  }>>([]);
-  const [proteinSelectorOpen, setProteinSelectorOpen] = useState<string | null>(null);
-
-  const makeExtraProteinIngredient = (extra: { uid: string; proteinName: string; charge: number }): Ingredient => ({
-    id: extra.uid,
-    name: `Proteína extra: ${extra.proteinName} (+${formatPrice(extra.charge)})`,
-    type: 'protein' as Ingredient['type'],
-    price: extra.charge,
-    isVegan: false,
-    isGlutenFree: false,
-  });
-
-  const [extraAcompananteSelections, setExtraAcompananteSelections] = useState<Array<{
-    uid: string;
-    acompName: string;
-    charge: number;
-    premiumAcompId: string;
-  }>>([]);
-  const [acompSelectorOpen, setAcompSelectorOpen] = useState<string | null>(null);
-
-  const makeExtraAcompananteIngredient = (extra: { uid: string; acompName: string; charge: number }): Ingredient => ({
-    id: extra.uid,
-    name: `Acompañante extra: ${extra.acompName} (+${formatPrice(extra.charge)})`,
-    type: 'acompanante' as Ingredient['type'],
-    price: extra.charge,
-    isVegan: false,
-    isGlutenFree: false,
-  });
-
-  const [extraComplementoSelections, setExtraComplementoSelections] = useState<Array<{
-    uid: string;
-    compName: string;
-    compId: string;
-    charge: number;
-    premiumCompId: string;
-  }>>([]);
-  const [compSelectorOpen, setCompSelectorOpen] = useState<string | null>(null);
-
-  const makeExtraComplementoIngredient = (extra: { uid: string; compName: string; charge: number }): Ingredient => ({
-    id: extra.uid,
-    name: `Complemento extra: ${extra.compName} (+${formatPrice(extra.charge)})`,
-    type: 'topping' as Ingredient['type'],
-    price: extra.charge,
-    isVegan: false,
-    isGlutenFree: false,
-  });
-
-  const [extraSauceSelections, setExtraSauceSelections] = useState<Array<{
-    uid: string;
-    sauceName: string;
-    sauceId: string;
-    charge: number;
-  }>>([]);
-
-  const makeExtraSauceIngredient = (extra: { uid: string; sauceName: string; charge: number }): Ingredient => ({
-    id: extra.uid,
-    name: `Salsa extra: ${extra.sauceName} (+${formatPrice(extra.charge)})`,
-    type: 'sauce' as Ingredient['type'],
-    price: extra.charge,
-    isVegan: false,
-    isGlutenFree: false,
-  });
-
-  const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
-
+  const load = (config: CustomBowl, id?: string) => {
+    const current = reconcileBowl(config, sizes, ingredients);
+    setBowl(current);
+    setSelectedDrinks([]);
+    setSelector(null);
+    setSaveName(null);
+    setEditId(id);
+    submitting.current = false;
+    setNotice(
+      calculateBowlPrice(current) !== calculateBowlPrice(config)
+        ? 'El precio se actualizó con el menú vigente. Revisa el total antes de confirmar.'
+        : 'Revisa tu receta con las opciones del menú vigente.',
+    );
+    move(SUMMARY_STEP);
+  };
   useEffect(() => {
-    setStepVisible(false);
-    const raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setStepVisible(true));
+    const id = new URLSearchParams(location.search).get('editar-bowl');
+    if (!id || ingredientsLoading || sizesLoading || editId === id) return;
+    const item = cart?.items.find((i) => i.id === id);
+    if (item && !item.customBowl) {
+      setEditId(id);
+      setNotice('Selecciona un tamaño para reconstruir la receta guardada.');
+    }
+    if (item?.customBowl) {
+      try {
+        load(item.customBowl, id);
+      } catch {
+        setNotice(
+          'No pudimos recuperar esta receta. Selecciona un tamaño para reconstruirla.',
+        );
+        setEditId(id);
+      }
+    }
+    // Catalog is consumed only when opening the editing request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, ingredientsLoading, sizesLoading, cart?.items]);
+  const includedCount = (i: Ingredient) =>
+    bowl
+      ? (bowl[sections.find((s) => s.type === i.type)!.key] || []).filter(
+          (x) => x.id === i.id,
+        ).length
+      : 0;
+  const extrasCount = (i: Ingredient) =>
+    (bowl?.extras || [])
+      .filter((e) =>
+        isGenericExtra(i) ? e.tariffId === i.id : e.ingredient.id === i.id,
+      )
+      .reduce((sum, e) => sum + e.quantity, 0);
+  const addExtra = (
+    i: Ingredient,
+    source: BowlExtra['source'],
+    tariff?: Ingredient,
+  ) =>
+    setBowl((prev) => {
+      if (!prev) return prev;
+      const unitPrice = extraPrice(i, source, tariff);
+      const extras = [...(prev.extras || [])];
+      const index = extras.findIndex(
+        (e) =>
+          e.ingredient.id === i.id &&
+          e.source === source &&
+          e.tariffId === tariff?.id &&
+          e.unitPrice === unitPrice,
+      );
+      if (index < 0)
+        extras.push({
+          ingredient: i,
+          source,
+          tariffId: tariff?.id,
+          unitPrice,
+          quantity: 1,
+        });
+      else
+        extras[index] = {
+          ...extras[index],
+          quantity: extras[index].quantity + 1,
+        };
+      return { ...prev, extras };
     });
-    return () => cancelAnimationFrame(raf);
-  }, [currentStep]);
-
-  useEffect(() => {
-    if (!stepsTabsRef.current) return;
-    const activeTab = stepsTabsRef.current.querySelector<HTMLElement>('[aria-selected="true"]');
-    const tabs = stepsTabsRef.current;
-    if (!activeTab || tabs.scrollWidth <= tabs.clientWidth) return;
-    // Move only the tab strip; scrollIntoView also pulls the page past the hero on mount.
-    tabs.scrollTo({
-      left: activeTab.offsetLeft - tabs.offsetLeft - (tabs.clientWidth - activeTab.clientWidth) / 2,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+  const add = (i: Ingredient, source: BowlExtra['source'] = 'suggestion') => {
+    if (!bowl) return;
+    if (isGenericExtra(i)) {
+      setSelector(i);
+      return;
+    }
+    const s = sections.find((s) => s.type === i.type)!;
+    const included = bowl[s.key] || [];
+    if (
+      (i.type === 'base' || !i.price) &&
+      included.length < bowl.size[s.max] &&
+      (i.type !== 'acompanante' || includedCount(i) < 3)
+    ) {
+      setBowl((prev) => ({ ...prev!, [s.key]: [...(prev![s.key] || []), i] }));
+    } else addExtra(i, i.price ? 'catalog' : source);
+  };
+  const remove = (i: Ingredient) =>
+    setBowl((prev) => {
+      if (!prev) return prev;
+      const extras = [...(prev.extras || [])];
+      const index = extras
+        .map((e) => (isGenericExtra(i) ? e.tariffId : e.ingredient.id))
+        .lastIndexOf(i.id);
+      if (index >= 0) {
+        if (extras[index].quantity > 1)
+          extras[index] = {
+            ...extras[index],
+            quantity: extras[index].quantity - 1,
+          };
+        else extras.splice(index, 1);
+        return { ...prev, extras };
+      }
+      const s = sections.find((s) => s.type === i.type)!;
+      const list = [...(prev[s.key] || [])];
+      const at = list.map((x) => x.id).lastIndexOf(i.id);
+      if (at >= 0) list.splice(at, 1);
+      return { ...prev, [s.key]: list };
     });
-  }, [currentStep]);
-
-  const stepConfigs = useMemo<Record<SelectionStep, StepConfig> | null>(() => {
-    if (!selectedSize) return null;
-
-    return {
-      bases: {
-        label: 'Bases',
-        title: 'Elige tu base',
-        subtitle: 'Completa la porción incluida por tu bowl. Puedes repetir la misma base si así la quieres.',
-        singular: 'base',
-        plural: 'bases',
-        min: selectedSize.maxBases,
-        max: selectedSize.maxBases,
-      },
-      proteins: {
-        label: 'Proteínas',
-        title: 'Elige tus proteínas',
-        subtitle: `Completa las proteínas incluidas. Si existe una opción de proteína extra, suma ${formatPrice(EXTRA_PROTEIN_PRICE)}.`,
-        singular: 'proteína',
-        plural: 'proteínas',
-        min: selectedSize.maxProteins,
-        max: selectedSize.maxProteins,
-      },
-      acompanantes: {
-        label: 'Acomp.',
-        title: 'Elige tus acompañantes',
-        subtitle: `Selecciona los incluidos (${selectedSize.maxAcompanantes}). Los marcados como extra suman ${formatPrice(EXTRA_TOPPING_PRICE)} c/u.`,
-        singular: 'acompañante',
-        plural: 'acompañantes',
-        min: selectedSize.maxAcompanantes,
-        max: selectedSize.maxAcompanantes,
-        perItemMax: Math.min(3, selectedSize.maxAcompanantes),
-      },
-      salsas: {
-        label: 'Salsas',
-        title: 'Elige tus salsas',
-        subtitle: 'Esta sección es opcional. Puedes omitirla o elegir solo las salsas que sí quieres.',
-        singular: 'salsa',
-        plural: 'salsas',
-        min: 0,
-        max: selectedSize.maxSauces,
-        optional: true,
-      },
-      complementos: {
-        label: 'Compl.',
-        title: 'Elige tus complementos',
-        subtitle: 'Esta sección es opcional. Los complementos premium muestran su recargo en tiempo real.',
-        singular: 'complemento',
-        plural: 'complementos',
-        min: 0,
-        max: selectedSize.maxComplementos,
-        optional: true,
-      },
-    };
-  }, [selectedSize]);
-
-  const previewBowl = useMemo<CustomBowl | null>(() => {
-    if (!selectedSize) return null;
-
-    return {
-      size: selectedSize,
-      bases: selectedBases,
-      proteins: [...selectedProteins, ...extraProteinSelections.map(makeExtraProteinIngredient)],
-      acompanantes: [...selectedAcompanantes, ...extraAcompananteSelections.map(makeExtraAcompananteIngredient)],
-      sauces: [...selectedSauces, ...extraSauceSelections.map(makeExtraSauceIngredient)],
-      complementos: [...selectedComplementos, ...extraComplementoSelections.map(makeExtraComplementoIngredient)],
-      notes: notes || undefined,
-    };
-  }, [
-    notes,
-    selectedAcompanantes,
-    selectedBases,
-    selectedComplementos,
-    selectedProteins,
-    extraProteinSelections,
-    extraAcompananteSelections,
-    extraComplementoSelections,
-    extraSauceSelections,
-    selectedSauces,
-    selectedSize,
-  ]);
-
-  const totalPrice = useMemo(() => {
-    if (!previewBowl) return 0;
-    return calculateBowlPrice(previewBowl);
-  }, [previewBowl]);
-
-  const extraChargeTotal = useMemo(() => {
-    if (!previewBowl) return 0;
-    return calculateBowlExtraCharges(previewBowl);
-  }, [previewBowl]);
-
-  const extraChargeLines = useMemo(() => {
-    if (!previewBowl) return [];
-    return getBowlChargeLines(previewBowl);
-  }, [previewBowl]);
-
-  const summaryRows = useMemo(() => {
-    if (!selectedSize) return [];
-
-    const rows = [
-      { label: 'Base', value: formatGroupedIngredients(selectedBases) },
-      { label: 'Proteínas', value: formatGroupedIngredients(selectedProteins) },
-      { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
-      { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
-      { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
-    ];
-
-    const extraLines = [
-      ...extraProteinSelections.map(e => `Proteína extra: ${e.proteinName} (+${formatPrice(e.charge)})`),
-      ...extraAcompananteSelections.map(e => `Acompañante extra: ${e.acompName} (+${formatPrice(e.charge)})`),
-      ...extraSauceSelections.map(e => `Salsa extra: ${e.sauceName} (+${formatPrice(e.charge)})`),
-      ...extraComplementoSelections.map(e => `Complemento extra: ${e.compName} (+${formatPrice(e.charge)})`),
-    ];
-
-    if (extraLines.length > 0) {
-      rows.push({ label: 'Cargos extra', value: extraLines.join(', ') });
-    }
-
-    return rows;
-  }, [
-    selectedSize,
-    selectedBases,
-    selectedProteins,
-    selectedAcompanantes,
-    selectedSauces,
-    selectedComplementos,
-    extraProteinSelections,
-    extraAcompananteSelections,
-    extraSauceSelections,
-    extraComplementoSelections,
-  ]);
-
-  const liveSummaryRows = useMemo(() => {
-    if (!selectedSize) return [];
-
-    return [
-      { label: 'Base', value: formatGroupedIngredients(selectedBases) },
-      { label: 'Proteínas', value: formatGroupedIngredients(selectedProteins) },
-      { label: 'Acompañantes', value: formatGroupedIngredients(selectedAcompanantes) },
-      { label: 'Salsas', value: formatGroupedIngredients(selectedSauces) },
-      { label: 'Complementos', value: formatGroupedIngredients(selectedComplementos) },
-    ];
-  }, [selectedAcompanantes, selectedBases, selectedComplementos, selectedProteins, selectedSauces, selectedSize]);
-
-  const currentSelectionCount = useMemo(() => {
-    switch (currentStep) {
-      case 'bases':
-        return selectedBases.length;
-      case 'proteins':
-        return selectedProteins.length;
-      case 'acompanantes':
-        return selectedAcompanantes.length;
-      case 'salsas':
-        return selectedSauces.length;
-      case 'complementos':
-        return selectedComplementos.length;
-      default:
-        return 0;
-    }
-  }, [currentStep, selectedAcompanantes.length, selectedBases.length, selectedComplementos.length, selectedProteins.length, selectedSauces.length]);
-
-  const totalAccompaniments = selectedAcompanantes.length;
-
-  const currentStepConfig = currentStep !== 'size' && currentStep !== 'summary' && currentStep !== 'upsell' && stepConfigs ? stepConfigs[currentStep] : null;
-
-  const isStepComplete = (step: BowlBuilderStep) => {
-    if (!selectedSize && step !== 'size') return false;
-
-    switch (step) {
-      case 'size':
-        return selectedSize !== null;
-      case 'bases':
-        return selectedBases.length >= (stepConfigs?.bases.min ?? 0);
-      case 'proteins':
-        return selectedProteins.length >= (stepConfigs?.proteins.min ?? 0);
-      case 'acompanantes':
-        return selectedAcompanantes.length >= (stepConfigs?.acompanantes.min ?? 0);
-      case 'salsas':
-        return selectedSauces.length >= (stepConfigs?.salsas.min ?? 0);
-      case 'complementos':
-        return selectedComplementos.length >= (stepConfigs?.complementos.min ?? 0);
-      case 'upsell':
-        return true;
-      case 'summary':
-        return true;
-      default:
-        return false;
-    }
+  const removeExtraAt = (index: number) =>
+    setBowl((prev) =>
+      prev
+        ? {
+            ...prev,
+            extras: (prev.extras || []).flatMap((extra, at) =>
+              at !== index
+                ? [extra]
+                : extra.quantity > 1
+                  ? [{ ...extra, quantity: extra.quantity - 1 }]
+                  : [],
+            ),
+          }
+        : prev,
+    );
+  const shownPrice = (i: Ingredient, source: BowlExtra['source']) => {
+    const s = sections.find((s) => s.type === i.type)!;
+    if (!bowl) return 0;
+    const hasSlot =
+      (bowl[s.key] || []).length < bowl.size[s.max] &&
+      (i.type !== 'acompanante' || includedCount(i) < 3);
+    return !i.price && !isGenericExtra(i) && hasSlot
+      ? 0
+      : extraPrice(i, source, isGenericExtra(i) ? i : undefined);
   };
-
-  const canProceed = isStepComplete(currentStep);
-  const isOptionalBlank = Boolean(currentStepConfig && currentStepConfig.min === 0 && currentSelectionCount === 0);
-
-  const resetBuilder = () => {
-    setSelectedSize(null);
-    setSelectedBases([]);
-    setSelectedProteins([]);
-    setSelectedAcompanantes([]);
-    setSelectedSauces([]);
-    setSelectedComplementos([]);
-    setExtraProteinSelections([]);
-    setExtraAcompananteSelections([]);
-    setExtraComplementoSelections([]);
-    setExtraSauceSelections([]);
-    setNotes('');
-    setCurrentStep('size');
-  };
-
-  const resetSelectionsForSizeChange = () => {
-    setSelectedBases([]);
-    setSelectedProteins([]);
-    setSelectedAcompanantes([]);
-    setSelectedSauces([]);
-    setSelectedComplementos([]);
-    setExtraProteinSelections([]);
-    setExtraAcompananteSelections([]);
-    setExtraComplementoSelections([]);
-    setExtraSauceSelections([]);
-    setNotes('');
-  };
-
-  const loadSavedBowl = (bowl: SavedBowl) => {
-    const { config } = bowl;
-    setSelectedSize(config.size);
-    setSelectedBases(config.bases);
-    setSelectedProteins(config.proteins);
-    setSelectedAcompanantes(config.acompanantes);
-    setSelectedSauces(config.sauces ?? []);
-    setSelectedComplementos(config.complementos ?? []);
-    setExtraProteinSelections([]);
-    setExtraAcompananteSelections([]);
-    setExtraComplementoSelections([]);
-    setExtraSauceSelections([]);
-    setNotes(config.notes ?? '');
-    setCurrentStep('summary');
-    scrollToBuilder();
-    toast.success(`Bowl "${bowl.name}" cargado`);
-  };
-
-  const handleSaveFavorite = () => {
-    if (!previewBowl) return;
-    const suggested = [
-      ...selectedBases.slice(0, 1).map((i) => i.name),
-      ...selectedProteins.slice(0, 1).map((i) => i.name),
-    ].join(' + ');
-    const name = saveName.trim() || suggested || 'Mi bowl';
-    saveBowl(name, previewBowl);
-    setSaveMode(false);
-    setSaveName('');
-    toast.success('Bowl guardado en tus favoritos ❤️');
-  };
-
-  const goBack = () => {
-    const previousStep = steps[currentStepIndex - 1];
-    if (!previousStep) return;
-    setCurrentStep(previousStep.id);
-  };
-
-  const goNext = () => {
-    if (!canProceed) return;
-    const nextStep = steps[currentStepIndex + 1];
-    if (!nextStep) return;
-    setCurrentStep(nextStep.id);
-    scrollToBuilder();
-  };
-
-  const handleSizeSelect = (size: BowlSizeRule) => {
-    const hasChanged = selectedSize?.size !== size.size;
-    setSelectedSize(size);
-    if (hasChanged) {
-      resetSelectionsForSizeChange();
-    }
-    setCurrentStep('bases');
-    scrollToBuilder();
-  };
-
-  const handleSubmit = () => {
-    if (!previewBowl) return;
-
-    addCustomBowl(previewBowl, notes || undefined);
-    toast.success('Bowl personalizado agregado al carrito', {
-      description: `${previewBowl.size.name} - ${formatPrice(totalPrice)}`,
+  const changeDrink = (product: Product, delta: number) =>
+    setSelectedDrinks((prev) => {
+      const quantity =
+        prev.find((drink) => drink.product.id === product.id)?.quantity || 0;
+      const rest = prev.filter((drink) => drink.product.id !== product.id);
+      return quantity + delta > 0
+        ? [...rest, { product, quantity: quantity + delta }]
+        : rest;
     });
-    resetBuilder();
+  const submit = async () => {
+    if (!bowl || submitting.current) return;
+    submitting.current = true;
+    setVerifying(true);
+    const [latestSizes, latestIngredients, latestDrinks] = await Promise.all([
+      refetchSizes?.(),
+      refetchIngredients?.(),
+      refetchDrinks?.(),
+    ]).catch(() => [null, null, null]);
+    setVerifying(false);
+    submitting.current = false;
+    if (!latestSizes && refetchSizes) {
+      setNotice('No pudimos verificar el menú. Intenta nuevamente.');
+      return;
+    }
+    if (
+      latestSizes?.isError ||
+      latestIngredients?.isError ||
+      (selectedDrinks.length && latestDrinks?.isError)
+    ) {
+      setNotice('No pudimos verificar el menú. Intenta confirmar nuevamente.');
+      return;
+    }
+    const liveSizes = latestSizes?.data || sizes;
+    const liveIngredients = latestIngredients?.data || ingredients;
+    const liveDrinks = latestDrinks?.data || drinks;
+    const canonical = reconcileBowl(bowl, liveSizes, liveIngredients);
+    const invalid = validateBowl(canonical, liveSizes, liveIngredients);
+    if (invalid.length) {
+      setBowl(canonical);
+      setNotice(invalid[0].message);
+      const at = sections.findIndex((s) => s.key === invalid[0].section);
+      move(at >= 0 ? at + 1 : invalid[0].section === 'size' ? 0 : 6);
+      return;
+    }
+    const canonicalDrinks = selectedDrinks.map((d) => ({
+      ...d,
+      product: liveDrinks.find((p) => p.id === d.product.id),
+    }));
+    if (
+      (selectedDrinks.length && drinksError) ||
+      canonicalDrinks.some((d) => !d.product)
+    ) {
+      setNotice('Revisa las bebidas disponibles antes de confirmar.');
+      move(DRINKS_STEP);
+      return;
+    }
+    if (
+      calculateBowlPrice(canonical) !== total ||
+      canonicalDrinks.some(
+        (d, i) => d.product!.price !== selectedDrinks[i].product.price,
+      )
+    ) {
+      setBowl(canonical);
+      setSelectedDrinks(canonicalDrinks as typeof selectedDrinks);
+      setNotice(
+        'El precio cambió. Revisa el nuevo total y confirma nuevamente.',
+      );
+      return;
+    }
+    submitting.current = true;
+    addBowlOrder(canonical, canonicalDrinks as typeof selectedDrinks, editId);
+    toast.success(
+      editId ? 'Bowl actualizado' : 'Bowl personalizado agregado al carrito',
+      { description: formatPrice(total + drinksTotal) },
+    );
+    setBowl(null);
+    setSelectedDrinks([]);
+    setStep(0);
+    setVisited([0]);
+    setRecipeOpen(false);
+    setNotice('');
+    setSaveName(null);
+    setEditId(undefined);
+    setSelector(null);
+    if (editId) navigate('/#arma-tu-bowl', { replace: true });
     onComplete?.();
   };
-
-  const CounterBadge = ({
-    current,
-    config,
-  }: {
-    current: number;
-    config: StepConfig;
-  }) => {
-    const isComplete = current >= config.min && current <= config.max;
-
-    return (
-      <div
-        className={cn(
-          'rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300',
-          isComplete ? 'bg-ohana text-ohana-foreground scale-105' : 'bg-muted text-muted-foreground',
-        )}
-      >
-        {config.label} {current}/{config.max}{config.min === 0 ? ' opcional' : ''}
-      </div>
-    );
-  };
-
-  const IngredientCard = ({
-    ingredient,
-    count,
-    max,
-    perItemMax,
-    onAdd,
-    onRemove,
-  }: {
-    ingredient: Ingredient;
-    count: number;
-    max: number;
-    perItemMax?: number;
-    onAdd: () => void;
-    onRemove: () => void;
-  }) => {
-    const charge = getIngredientExtraCharge(ingredient);
-    const isIncluded = charge === 0;
-    const effectivePerItemMax = perItemMax ?? max;
-    const isAddDisabled = max <= 0 || currentSelectionCount >= max || count >= effectivePerItemMax;
-    const isMaxedForNewSelection = currentSelectionCount >= max;
-
-    return (
-      <div
-        className={cn(
-          'rounded-2xl border bg-card p-3 sm:p-4 shadow-sm transition-all duration-150',
-          count > 0
-            ? 'border-brand bg-brand/5 shadow-sm'
-            : 'border-border/60 hover:border-brand/40 hover:shadow-md',
-          isMaxedForNewSelection && 'opacity-60',
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">{ingredient.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {isIncluded ? 'Incluido' : `+${formatPrice(charge)}`}
-            </p>
-          </div>
-          <span
-            className={cn(
-              'inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold transition-colors shadow-sm',
-              count > 0 ? 'bg-brand text-white' : 'border border-border bg-muted/50 text-muted-foreground',
-            )}
+  const cards = (
+    items: Ingredient[],
+    source: BowlExtra['source'],
+    includedOnly = false,
+  ) => (
+    <div className="bowl-studio-options">
+      {items.map((i) => {
+        const count = includedCount(i) + extrasCount(i);
+        const price =
+          includedOnly && !isGenericExtra(i)
+            ? i.price || 0
+            : shownPrice(i, source);
+        const selectedExtraAmount = (bowl?.extras || [])
+          .filter((extra) =>
+            isGenericExtra(i)
+              ? extra.tariffId === i.id
+              : extra.ingredient.id === i.id,
+          )
+          .reduce((sum, extra) => sum + extra.unitPrice * extra.quantity, 0);
+        const s = sections.find((s) => s.type === i.type)!;
+        const full =
+          includedOnly &&
+          (i.type === 'base' || !i.price) &&
+          !isGenericExtra(i) &&
+          ((bowl?.[s.key]?.length || 0) >= (bowl?.size[s.max] || 0) ||
+            (i.type === 'acompanante' && includedCount(i) >= 3));
+        return (
+          <div
+            key={i.id}
+            className="bowl-studio-ingredient"
+            data-selected={count > 0}
           >
-            {count}
-          </span>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            {count > 0
-              ? `${formatStepQuantity(count, 'selección', 'selecciones')}`
-              : isMaxedForNewSelection
-                ? 'Límite alcanzado'
-                : 'Disponible'}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={onRemove}
-              disabled={count === 0}
-              className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full border border-border hover:border-brand hover:text-brand transition-colors"
-              aria-label={`Quitar ${ingredient.name}`}
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={onAdd}
-              disabled={isAddDisabled}
-              className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full border border-border hover:border-brand hover:text-brand transition-colors"
-              aria-label={`Agregar ${ingredient.name}`}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const StepPicker = ({
-    items,
-    selectedItems,
-    setSelectedItems,
-    config,
-    totalCount,
-    totalMax,
-  }: {
-    items: Ingredient[];
-    selectedItems: Ingredient[];
-    setSelectedItems: Dispatch<SetStateAction<Ingredient[]>>;
-    config: StepConfig;
-    totalCount?: number;
-    totalMax?: number;
-  }) => (
-    <div className="animate-slide-in">
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <div>
-            <h3 className="text-xl font-semibold">{config.title}</h3>
-            <p className="text-sm text-muted-foreground">{config.subtitle}</p>
-            {totalMax !== undefined && totalCount !== undefined ? (
-              <p className={cn('text-sm', totalCount >= totalMax ? 'text-brand' : 'text-muted-foreground')}>
-                {totalCount}/{totalMax} acompañantes
+            <div className="bowl-studio-option-copy">
+              <p className="font-semibold">{i.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {price
+                  ? `${i.type === 'base' ? 'Recargo de base' : 'Porción adicional'}: +${formatPrice(price)}`
+                  : full && !includedCount(i)
+                    ? 'Cupo incluido completo'
+                    : 'Incluido'}
+                {i.type === 'acompanante' && !i.price
+                  ? ' · Hasta 3 porciones incluidas'
+                  : ''}
               </p>
-            ) : null}
-          </div>
-          <div className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            <p>{getStepHint(config, selectedItems.length)}</p>
-            <p className="mt-2 font-medium text-foreground">
-              Selección actual: {formatGroupedIngredients(selectedItems)}
-            </p>
-          </div>
-        </div>
-        <CounterBadge current={selectedItems.length} config={config} />
-      </div>
-
-      {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-          No hay ingredientes disponibles en esta sección por ahora.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {items.map((item) => {
-            const itemCount = getIngredientCount(selectedItems, item.id);
-            const effectivePerItemMax = config.perItemMax ?? config.max;
-            return (
-              <IngredientCard
-                key={item.id}
-                ingredient={item}
-                count={itemCount}
-                max={config.max}
-                perItemMax={config.perItemMax}
-                onAdd={() => {
-                  if (itemCount >= effectivePerItemMax) return;
-                  updateIngredientSelection(item, setSelectedItems, 'add', config.max);
+              {count > 0 && (
+                <p className="bowl-studio-portion-detail">
+                  {includedCount(i) > 0
+                    ? `${includedCount(i)} incluida${includedCount(i) !== 1 ? 's' : ''}`
+                    : ''}
+                  {includedCount(i) > 0 && extrasCount(i) > 0 ? ' · ' : ''}
+                  {extrasCount(i) > 0
+                    ? `${extrasCount(i)} adicional${extrasCount(i) !== 1 ? 'es' : ''} · +${formatPrice(selectedExtraAmount)}`
+                    : ''}
+                </p>
+              )}
+            </div>
+            <div className="bowl-studio-quantity">
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!count}
+                onClick={() => remove(i)}
+                aria-label={`Quitar ${i.name}`}
+              >
+                <Minus size={16} />
+              </Button>
+              <span aria-live="polite">{count}</span>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={full}
+                onClick={(event) => {
+                  if (isGenericExtra(i))
+                    selectorTrigger.current = event.currentTarget;
+                  add(i, source);
                 }}
-                onRemove={() => updateIngredientSelection(item, setSelectedItems, 'remove', config.max)}
-              />
-            );
-          })}
-        </div>
-      )}
+                aria-label={`Agregar ${i.name}`}
+              >
+                <Plus size={16} />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
-
-  const SizeSelector = () => (
-    <section className="border-b bg-muted/20 px-6 py-6">
-      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Paso 1</p>
-          <h3 className="text-xl font-semibold">Elige el tamaño de tu bowl</h3>
-          <p className="text-sm text-muted-foreground">
-            El tamaño define el precio base y cuántas selecciones puedes hacer en cada sección.
-          </p>
-        </div>
-        {selectedSize ? (
-          <div className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
-            Seleccionado: {selectedSize.name}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {bowlSizes.map((size) => {
-          const isSelected = selectedSize?.size === size.size;
-
-          return (
-            <button
-              key={size.size}
-              type="button"
-              onClick={() => handleSizeSelect(size)}
-              aria-pressed={isSelected}
-              className={cn(
-                'rounded-2xl border bg-card p-5 text-left shadow-sm transition-all duration-200',
-                isSelected
-                  ? 'border-primary bg-primary/5 shadow-md shadow-primary/10'
-                  : 'border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-md',
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-lg font-semibold text-foreground">{size.name}</p>
-                  <p className="mt-1 text-2xl font-bold text-ohana-dark">{formatPrice(size.price)}</p>
-                </div>
-                {isSelected ? (
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    ✓
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="my-4 h-px bg-border/70" />
-
-              <div className="space-y-2 text-sm text-muted-foreground">
-                {getSizeStructure(size).map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </section>
+  const options = useMemo(
+    () => (section ? ingredients.filter((i) => i.type === section.type) : []),
+    [ingredients, section],
   );
-
-  const progressPercent = ((currentStepIndex + 1) / steps.length) * 100;
-
-  if (dataLoading) {
-    return (
-      <div className="flex min-h-[300px] items-center justify-center overflow-hidden rounded-[2rem] border bg-card p-12 shadow-lg">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-ohana border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Cargando ingredientes...</p>
+  const recommendedExtras = bowl ? getBowlUpsells(bowl, ingredients) : [];
+  const paidDrinks = drinks.filter((drink) => drink.price > 0);
+  const recommendedDrink =
+    !drinksError && !drinksLoading
+      ? paidDrinks.find((drink) => /bretaña/i.test(drink.name)) || paidDrinks[0]
+      : undefined;
+  const recommendations = bowl &&
+    (recommendedExtras.length > 0 || recommendedDrink) && (
+      <section
+        className="bowl-studio-upsells"
+        aria-label="Extras recomendados para tu bowl"
+      >
+        <div className="bowl-studio-upsells-heading">
+          <Sparkles size={20} aria-hidden="true" />
+          <h4>Dale un extra a tu bowl</h4>
         </div>
-      </div>
-    );
-  }
-
-  if (dataError) {
-    return (
-      <div className="flex min-h-[300px] items-center justify-center overflow-hidden rounded-[2rem] border bg-card p-12 shadow-lg">
-        <div className="space-y-3 text-center">
-          <p className="text-base font-semibold text-foreground">No pudimos cargar el menú</p>
-          <p className="text-sm text-muted-foreground">Revisa tu conexión e intenta de nuevo.</p>
+        <p className="bowl-studio-upsells-description">
+          Porciones adicionales y bebidas, con costo aparte. Tú eliges si las
+          sumas.
+        </p>
+        <div className="bowl-studio-upsell-grid">
+          {recommendedExtras.map((recommendation) => {
+            const { ingredient, source, tariff, price } = recommendation;
+            const matching = (extra: BowlExtra) =>
+              extra.ingredient.id === ingredient.id &&
+              extra.source === source &&
+              extra.tariffId === tariff?.id &&
+              extra.unitPrice === price;
+            const quantity = (bowl.extras || [])
+              .filter(matching)
+              .reduce((sum, extra) => sum + extra.quantity, 0);
+            return (
+              <div
+                className="bowl-studio-upsell-card"
+                key={ingredient.id}
+                data-selected={quantity > 0}
+              >
+                <div>
+                  <p className="bowl-studio-upsell-kind">
+                    {ingredient.type === 'protein'
+                      ? 'MÁS PROTEÍNA'
+                      : 'UN TOQUE EXTRA'}
+                  </p>
+                  <h5>Extra de {ingredient.name}</h5>
+                  <strong>+{formatPrice(price)}</strong>
+                  <span>por porción adicional</span>
+                </div>
+                <div className="bowl-studio-upsell-actions">
+                  {quantity > 0 && (
+                    <div className="bowl-studio-upsell-selected">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label={`Restar extra de ${ingredient.name}`}
+                        onClick={() =>
+                          removeExtraAt((bowl.extras || []).findIndex(matching))
+                        }
+                      >
+                        <Minus size={14} />
+                      </Button>
+                      <span aria-live="polite">
+                        {quantity} agregado{quantity !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    aria-label={`Sumar extra de ${ingredient.name}`}
+                    onClick={() => addExtra(ingredient, source, tariff)}
+                  >
+                    <Plus size={14} />
+                    {quantity ? 'Sumar otra' : 'Sumar'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {recommendedDrink &&
+            (() => {
+              const quantity =
+                selectedDrinks.find(
+                  (drink) => drink.product.id === recommendedDrink.id,
+                )?.quantity || 0;
+              return (
+                <div
+                  className="bowl-studio-upsell-card"
+                  data-selected={quantity > 0}
+                >
+                  <div>
+                    <p className="bowl-studio-upsell-kind">ACOMPAÑA TU BOWL</p>
+                    <h5>{recommendedDrink.name}</h5>
+                    <strong>+{formatPrice(recommendedDrink.price)}</strong>
+                    <span>por bebida</span>
+                  </div>
+                  <div className="bowl-studio-upsell-actions">
+                    {quantity > 0 && (
+                      <div className="bowl-studio-upsell-selected">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          aria-label={`Restar bebida ${recommendedDrink.name}`}
+                          onClick={() => changeDrink(recommendedDrink, -1)}
+                        >
+                          <Minus size={14} />
+                        </Button>
+                        <span aria-live="polite">
+                          {quantity} agregada{quantity !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      aria-label={`Sumar bebida ${recommendedDrink.name}`}
+                      onClick={() => changeDrink(recommendedDrink, 1)}
+                    >
+                      <Plus size={14} />
+                      {quantity ? 'Sumar otra' : 'Sumar'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+        </div>
+        {step !== EXTRAS_STEP && (
           <button
-            onClick={() => window.location.reload()}
-            className="mt-2 rounded-full border border-ohana px-5 py-2 text-sm font-medium text-ohana transition-colors hover:bg-ohana/10"
+            type="button"
+            className="bowl-studio-upsells-more"
+            onClick={() => move(EXTRAS_STEP)}
           >
-            Reintentar
+            Ver todos los extras <ChevronRight size={14} />
           </button>
+        )}
+        {step !== DRINKS_STEP && recommendedDrink && (
+          <button
+            type="button"
+            className="bowl-studio-upsells-more"
+            onClick={() => move(DRINKS_STEP)}
+          >
+            Ver todas las bebidas <ChevronRight size={14} />
+          </button>
+        )}
+      </section>
+    );
+  const chargeLines = bowl ? getBowlChargeLines(bowl) : [];
+  const stepNeedsReview = (index: number) => {
+    const key =
+      index === 0
+        ? 'size'
+        : index === EXTRAS_STEP
+          ? 'extras'
+          : index === DRINKS_STEP
+            ? 'drinks'
+            : sections[index - 1]?.key;
+    return index === SUMMARY_STEP
+      ? issues.length > 0
+      : issues.some((issue) => issue.section === key);
+  };
+  const recipe = bowl && (
+    <div className="bowl-studio-recipe-content">
+      <div className="bowl-studio-recipe-heading">
+        <div>
+          <p className="bowl-studio-eyebrow">HECHO A TU GUSTO</p>
+          <h4>Tu receta</h4>
+        </div>
+        <button
+          type="button"
+          className="bowl-studio-size-chip"
+          disabled={verifying}
+          onClick={() => move(0)}
+          aria-label="Editar tamaño"
+        >
+          {bowl.size.name} <ChevronDown size={12} />
+        </button>
+      </div>
+      <div className="bowl-studio-recipe-rows">
+        {sections.map((s, index) => (
+          <div className="bowl-studio-recipe-row" key={s.key}>
+            <div className="bowl-studio-recipe-row-title">
+              <strong>{s.label}</strong>
+              <button
+                type="button"
+                disabled={verifying}
+                onClick={() => move(index + 1)}
+                aria-label={`Editar ${s.label.toLowerCase()}`}
+              >
+                Editar
+              </button>
+            </div>
+            <p>
+              {(bowl[s.key] || []).length
+                ? formatGroupedIngredients(bowl[s.key] || [])
+                : s.min
+                  ? 'Pendiente de elegir'
+                  : 'Sin seleccionar'}
+            </p>
+            {issues
+              .filter((issue) => issue.section === s.key)
+              .map((issue) => (
+                <p className="bowl-studio-review" key={issue.message}>
+                  {issue.message}
+                </p>
+              ))}
+          </div>
+        ))}
+        <div className="bowl-studio-recipe-row">
+          <div className="bowl-studio-recipe-row-title">
+            <strong>Adicionales</strong>
+            <button
+              type="button"
+              disabled={verifying}
+              onClick={() => move(EXTRAS_STEP)}
+              aria-label="Editar adicionales"
+            >
+              Editar
+            </button>
+          </div>
+          {issues
+            .filter((issue) => issue.section === 'extras')
+            .map((issue) => (
+              <p className="bowl-studio-review" key={issue.message}>
+                {issue.message}
+              </p>
+            ))}
+          {(bowl.extras || []).length ? (
+            bowl.extras!.map((extra, index) => (
+              <div
+                className="bowl-studio-extra-row"
+                key={`${extra.ingredient.id}-${index}`}
+              >
+                <p>
+                  {extra.ingredient.name} x{extra.quantity} ·{' '}
+                  {formatPrice(extra.quantity * extra.unitPrice)}
+                </p>
+                <button
+                  type="button"
+                  disabled={verifying}
+                  aria-label={`Quitar una porción adicional de ${extra.ingredient.name}`}
+                  onClick={() => removeExtraAt(index)}
+                >
+                  <Minus size={14} />
+                </button>
+              </div>
+            ))
+          ) : (
+            <p>Sin adicionales</p>
+          )}
+        </div>
+        <div className="bowl-studio-recipe-row">
+          <div className="bowl-studio-recipe-row-title">
+            <strong>Bebidas</strong>
+            <button
+              type="button"
+              disabled={verifying}
+              onClick={() => move(DRINKS_STEP)}
+              aria-label="Editar bebidas"
+            >
+              Editar
+            </button>
+          </div>
+          {selectedDrinks.length ? (
+            selectedDrinks.map((d) => (
+              <p key={d.product.id}>
+                {d.product.name} x{d.quantity} ·{' '}
+                {formatPrice(d.product.price * d.quantity)}
+              </p>
+            ))
+          ) : (
+            <p>Sin bebidas</p>
+          )}
         </div>
       </div>
+      <dl className="bowl-studio-price-breakdown">
+        <div>
+          <dt>Precio base</dt>
+          <dd>{formatPrice(bowl.size.price)}</dd>
+        </div>
+        {chargeLines.map((line, index) => (
+          <div key={`${line.label}-${line.unitAmount}-${index}`}>
+            <dt>
+              {line.label}
+              {line.quantity > 1 ? ` x${line.quantity}` : ''}
+            </dt>
+            <dd>+{formatPrice(line.amount)}</dd>
+          </div>
+        ))}
+        <div>
+          <dt>Subtotal del bowl</dt>
+          <dd>{formatPrice(total)}</dd>
+        </div>
+        <div>
+          <dt>Bebidas:</dt>
+          <dd>{formatPrice(drinksTotal)}</dd>
+        </div>
+      </dl>
+      <p className="bowl-studio-recipe-total">
+        Total a agregar <strong>{formatPrice(total + drinksTotal)}</strong>
+      </p>
+      <p className="bowl-studio-recipe-note">
+        Tu bowl y las bebidas se agregan juntos al confirmar.
+      </p>
+    </div>
+  );
+  if (sizesLoading || ingredientsLoading)
+    return <p className="p-8">Cargando ingredientes…</p>;
+  if (sizesError || ingredientsError)
+    return (
+      <p role="alert" className="p-8">
+        No pudimos cargar el menú. Recarga la página para intentar nuevamente.
+      </p>
     );
-  }
-
   return (
-    <div ref={builderRef} className="overflow-hidden rounded-[2rem] border bg-card shadow-lg">
-      <div className="h-0.5 bg-muted">
+    <div className="bowl-studio" data-summary={step === SUMMARY_STEP}>
+      <div className="bowl-studio-progress h-1 bg-muted">
         <div
-          className="h-full bg-ohana transition-all duration-500 ease-out"
-          style={{ width: `${progressPercent}%` }}
+          className="h-full bg-brand"
+          style={{ width: `${((step + 1) / steps.length) * 100}%` }}
         />
       </div>
-
-      <div className="border-b px-4 pb-3 pt-3">
-        <div className="flex items-center gap-2">
-          <div ref={stepsTabsRef} className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap pb-1" role="tablist">
-            {steps.map((step, index) => {
-              const isCompleted = index < currentStepIndex;
-              const isCurrent = step.id === currentStep;
-              const isUpcoming = index > currentStepIndex;
-              const available = index <= currentStepIndex || (index === currentStepIndex + 1 && canProceed);
-
-              return (
-                <button
-                  key={step.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isCurrent}
-                  onClick={() => available && setCurrentStep(step.id)}
-                  disabled={!available}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium transition-all duration-200',
-                    isCurrent && 'bg-ohana text-white shadow-sm',
-                    isCompleted && !isCurrent && 'bg-ohana/10 text-ohana/70',
-                    isUpcoming && 'cursor-default opacity-40',
-                  )}
-                >
-                  {step.label}
-                </button>
-              );
-            })}
-          </div>
-          <span className="ml-1 shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-            {currentStepIndex + 1}/{steps.length}
+      <div className="bowl-studio-navigation">
+        <div className="bowl-studio-mobile-navigation">
+          <span>
+            Paso {step + 1} de {steps.length}
           </span>
+          <label className="bowl-studio-step-select">
+            <span className="sr-only">Ir a un paso</span>
+            <select
+              value={step}
+              disabled={verifying}
+              onChange={(event) => move(Number(event.target.value))}
+            >
+              {steps.map((label, index) => (
+                <option key={label} value={index} disabled={!bowl && index > 0}>
+                  {label}
+                  {bowl && stepNeedsReview(index) ? ' · Revisar' : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={16} aria-hidden="true" />
+          </label>
         </div>
+        <nav
+          className="bowl-studio-desktop-navigation"
+          aria-label="Pasos para armar tu bowl"
+        >
+          {steps.map((label, index) => (
+            <button
+              key={label}
+              aria-current={step === index ? 'step' : undefined}
+              data-visited={visited.includes(index)}
+              data-review={Boolean(bowl && stepNeedsReview(index))}
+              aria-label={`${label}${bowl && stepNeedsReview(index) ? ' · Necesita revisión' : ''}`}
+              disabled={verifying || (!bowl && index > 0)}
+              className="bowl-studio-tab rounded-full"
+              onClick={() => move(index)}
+            >
+              <span className="bowl-studio-step-number">{index + 1}</span>
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
-
-      <SizeSelector />
-
-      <div ref={stepContentRef} className="p-6" role="tabpanel" style={{ scrollMarginTop: '80px' }}>
-        <div className={cn('scroll-fade-up', stepVisible && 'in-view')}>
-          {currentStep === 'size' ? (
-            <div className="space-y-4">
-              {savedBowls.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <BookHeart className="w-4 h-4 text-brand" />
-                    <p className="text-sm font-semibold">Tus bowls guardados</p>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {savedBowls.map((bowl) => (
-                      <div
-                        key={bowl.id}
-                        className="flex items-start gap-3 rounded-2xl border bg-card px-4 py-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{bowl.name}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {bowl.config.size.name} · {[
-                              ...bowl.config.bases.slice(0, 2).map((i) => i.name),
-                              ...bowl.config.proteins.slice(0, 1).map((i) => i.name),
-                            ].join(', ')}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs px-3"
-                            onClick={() => loadSavedBowl(bowl)}
-                          >
-                            Cargar
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => {
-                              removeBowl(bowl.id);
-                              toast.success('Bowl eliminado de favoritos');
-                            }}
-                            aria-label="Eliminar favorito"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center">
-                <h3 className="text-xl font-semibold">Selecciona un tamaño arriba</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Las tarjetas superiores definen el precio base y te llevan al siguiente paso automáticamente.
-                </p>
-              </div>
+      <div className="bowl-studio-layout">
+        <fieldset
+          disabled={verifying}
+          ref={content}
+          className="bowl-studio-content"
+          tabIndex={-1}
+        >
+          <legend className="sr-only">{steps[step]}</legend>
+          {notice && (
+            <p
+              role="status"
+              className="mb-4 rounded-xl border bg-muted p-3 text-sm"
+            >
+              {notice}
+            </p>
+          )}
+          {bowl && step > 0 && (
+            <div className="mb-5 flex items-center justify-between">
+              <span className="font-semibold">{bowl.size.name}</span>
+              <Button variant="ghost" onClick={() => move(0)}>
+                Cambiar tamaño
+              </Button>
             </div>
-          ) : null}
-
-          {currentStep === 'bases' && currentStepConfig ? (
-            <StepPicker
-              items={baseOptions}
-              selectedItems={selectedBases}
-              setSelectedItems={setSelectedBases}
-              config={currentStepConfig}
-            />
-          ) : null}
-
-          {currentStep === 'proteins' && currentStepConfig ? (() => {
-            const includedProteins = proteinOptions.filter(p => getIngredientExtraCharge(p) === 0);
-            const premiumProteins = proteinOptions.filter(p => getIngredientExtraCharge(p) > 0);
-            return (
-              <div className="animate-slide-in">
-                {/* Header */}
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-2">
-                    <div>
-                      <h3 className="text-xl font-semibold">{currentStepConfig.title}</h3>
-                      <p className="text-sm text-muted-foreground">{currentStepConfig.subtitle}</p>
-                    </div>
-                    <div className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                      <p>{getStepHint(currentStepConfig, selectedProteins.length)}</p>
-                      <p className="mt-2 font-medium text-foreground">
-                        Selección actual: {formatGroupedIngredients(selectedProteins)}
-                      </p>
-                    </div>
-                  </div>
-                  <CounterBadge current={selectedProteins.length} config={currentStepConfig} />
-                </div>
-
-                {/* Included proteins */}
-                {includedProteins.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-                    No hay proteínas disponibles en esta sección por ahora.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                    {includedProteins.map((protein) => {
-                      const itemCount = getIngredientCount(selectedProteins, protein.id);
-                      const effectivePerItemMax = currentStepConfig.perItemMax ?? currentStepConfig.max;
-                      return (
-                        <IngredientCard
-                          key={protein.id}
-                          ingredient={protein}
-                          count={itemCount}
-                          max={currentStepConfig.max}
-                          perItemMax={currentStepConfig.perItemMax}
-                          onAdd={() => {
-                            if (itemCount >= effectivePerItemMax) return;
-                            updateIngredientSelection(protein, setSelectedProteins, 'add', currentStepConfig.max);
-                          }}
-                          onRemove={() => updateIngredientSelection(protein, setSelectedProteins, 'remove', currentStepConfig.max)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Extra protein chips */}
-                {extraProteinSelections.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold text-foreground mb-2">✅ Proteínas extra añadidas</p>
-                    <div className="flex flex-wrap gap-2">
-                      {extraProteinSelections.map(extra => (
-                        <span
-                          key={extra.uid}
-                          className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5"
-                        >
-                          <span className="font-semibold">{extra.proteinName}</span>
-                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
-                          <button
-                            type="button"
-                            onClick={() => setExtraProteinSelections(prev => prev.filter(e => e.uid !== extra.uid))}
-                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
-                            aria-label="Quitar proteína extra"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Premium proteins sell-up */}
-                {premiumProteins.length > 0 && (
-                  <div className="mt-6 relative">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="h-px flex-1 bg-border/50" />
-                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                        También puedes agregar
-                      </span>
-                      <div className="h-px flex-1 bg-border/50" />
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                      {premiumProteins.map((protein) => {
-                        const extrasForThis = extraProteinSelections.filter(e => e.premiumProteinId === protein.id);
-                        const count = extrasForThis.length;
-                        const charge = getIngredientExtraCharge(protein);
-                        return (
-                          <div
-                            key={protein.id}
-                            className={cn(
-                              'rounded-2xl border border-dashed border-brand/40 bg-card p-4 shadow-sm transition-all duration-200',
-                              count > 0 && 'border-primary bg-primary/5 shadow-md shadow-primary/10',
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="space-y-1">
-                                <p className="text-sm font-semibold text-foreground">{protein.name}</p>
-                                <span className="inline-block text-xs bg-brand/10 text-brand rounded-full px-2 py-0.5">
-                                  + {formatPrice(charge)}
-                                </span>
-                              </div>
-                              <span className={cn(
-                                'inline-flex min-w-[2rem] items-center justify-center rounded-full border px-2 py-1 text-xs font-semibold transition-colors',
-                                count > 0 ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-muted/50 text-muted-foreground',
-                              )}>
-                                x{count}
-                              </span>
-                            </div>
-                            <div className="mt-4 flex items-center justify-between gap-3">
-                              <p className="text-xs text-muted-foreground">
-                                {count > 0 ? formatStepQuantity(count, 'selección', 'selecciones') : 'Extra disponible'}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  type="button" variant="outline" size="icon"
-                                  onClick={() => {
-                                    const lastIdx = [...extraProteinSelections].reverse().findIndex(e => e.premiumProteinId === protein.id);
-                                    if (lastIdx === -1) return;
-                                    const actualIdx = extraProteinSelections.length - 1 - lastIdx;
-                                    setExtraProteinSelections(prev => prev.filter((_, i) => i !== actualIdx));
-                                  }}
-                                  disabled={count === 0}
-                                  aria-label={`Quitar ${protein.name}`}
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button" variant="outline" size="icon"
-                                  onClick={() => setProteinSelectorOpen(protein.id)}
-                                  aria-label={`Agregar ${protein.name}`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Inline protein selector */}
-                    {proteinSelectorOpen !== null && (() => {
-                      const activePremium = premiumProteins.find(p => p.id === proteinSelectorOpen);
-                      if (!activePremium) return null;
-                      const charge = getIngredientExtraCharge(activePremium);
-                      return (
-                        <div className="absolute inset-x-0 top-0 z-10 bg-background border border-border rounded-xl shadow-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-semibold">¿Cuál proteína extra quieres agregar?</p>
-                            <button
-                              type="button"
-                              onClick={() => setProteinSelectorOpen(null)}
-                              className="text-muted-foreground hover:text-foreground text-lg leading-none"
-                              aria-label="Cerrar"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {includedProteins.map(p => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
-                                onClick={() => {
-                                  setExtraProteinSelections(prev => [...prev, {
-                                    uid: `extra-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                                    proteinName: p.name,
-                                    charge,
-                                    premiumProteinId: activePremium.id,
-                                  }]);
-                                  setProteinSelectorOpen(null);
-                                }}
-                              >
-                                {p.name}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            );
-          })() : null}
-
-          {currentStep === 'acompanantes' && currentStepConfig ? (() => {
-            const freeAcomp = acompananteOptions.filter(a => getIngredientExtraCharge(a) === 0);
-            const premiumAcomp = acompananteOptions.filter(a => getIngredientExtraCharge(a) > 0);
-            const SUGGESTED_ACOMP = ['Guacamole', 'Queso rallado', 'Pico de gallo'];
-            const selectedNames = selectedAcompanantes.map(a => a.name.toLowerCase());
-            const freeSuggestions = SUGGESTED_ACOMP
-              .filter(name => !selectedNames.includes(name.toLowerCase()))
-              .map(name => freeAcomp.find(a => a.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((a): a is Ingredient => a !== undefined);
-            const isTotalFull = totalAccompaniments >= (selectedSize?.maxAcompanantes ?? 0);
-            const hasUpsellSection = freeSuggestions.length > 0 || premiumAcomp.length > 0;
-            return (
-              <>
-                <StepPicker
-                  items={freeAcomp}
-                  selectedItems={selectedAcompanantes}
-                  setSelectedItems={setSelectedAcompanantes}
-                  config={currentStepConfig}
-                  totalCount={totalAccompaniments}
-                  totalMax={selectedSize?.maxAcompanantes}
-                />
-
-                {/* Extra acompañante chips */}
-                {extraAcompananteSelections.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold text-foreground mb-2">✅ Acompañantes extra añadidos</p>
-                    <div className="flex flex-wrap gap-2">
-                      {extraAcompananteSelections.map(extra => (
-                        <span key={extra.uid} className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5">
-                          <span className="font-semibold">{extra.acompName}</span>
-                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
-                          <button
-                            type="button"
-                            onClick={() => setExtraAcompananteSelections(prev => prev.filter(e => e.uid !== extra.uid))}
-                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
-                            aria-label="Quitar acompañante extra"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Unified upsell section */}
-                {hasUpsellSection && (
-                  <div className="mt-5 relative">
-                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {/* Free suggestions */}
-                      {freeSuggestions.map(ingredient => (
-                        <button
-                          key={ingredient.id}
-                          type="button"
-                          onClick={() => {
-                            if (isTotalFull) return;
-                            updateIngredientSelection(ingredient, setSelectedAcompanantes, 'add', currentStepConfig.max);
-                          }}
-                          disabled={isTotalFull}
-                          className={cn(
-                            'rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 min-h-[44px] transition-colors',
-                            isTotalFull ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-brand/15',
-                          )}
-                        >
-                          {ingredient.name}
-                        </button>
-                      ))}
-                      {/* Premium acompañantes */}
-                      {premiumAcomp.map(premium => {
-                        const charge = getIngredientExtraCharge(premium);
-                        return (
-                          <button
-                            key={premium.id}
-                            type="button"
-                            onClick={() => setAcompSelectorOpen(premium.id)}
-                            className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 min-h-[44px] cursor-pointer hover:bg-brand/15 transition-colors"
-                          >
-                            {premium.name}
-                            <span className="text-xs bg-brand/10 text-brand rounded-full px-2 ml-1">
-                              +{formatPrice(charge)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Inline acompañante selector */}
-                    {acompSelectorOpen !== null && (() => {
-                      const activePremium = premiumAcomp.find(p => p.id === acompSelectorOpen);
-                      if (!activePremium) return null;
-                      const charge = getIngredientExtraCharge(activePremium);
-                      return (
-                        <div className="absolute inset-x-0 top-0 z-10 bg-background border border-border rounded-xl shadow-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-semibold">¿Qué acompañante extra quieres?</p>
-                            <button
-                              type="button"
-                              onClick={() => setAcompSelectorOpen(null)}
-                              className="text-muted-foreground hover:text-foreground text-lg leading-none"
-                              aria-label="Cerrar"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {freeAcomp.map(a => (
-                              <button
-                                key={a.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
-                                onClick={() => {
-                                  setExtraAcompananteSelections(prev => [...prev, {
-                                    uid: `extra-acomp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                                    acompName: a.name,
-                                    charge,
-                                    premiumAcompId: activePremium.id,
-                                  }]);
-                                  setAcompSelectorOpen(null);
-                                }}
-                              >
-                                {a.name}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-              </>
-            );
-          })() : null}
-
-          {currentStep === 'salsas' && currentStepConfig ? (() => {
-            const EXTRA_SAUCE_PRICE = 2000;
-            const SUGGESTED_SAUCES = ['Ohana Chipotle', 'Mayo Cilantro', 'BBQ Honey'];
-            const maxSauces = selectedSize?.maxSauces ?? currentStepConfig.max;
-            // Exclude already-selected and already-extra sauces from suggestions
-            const selectedSauceIds = new Set(selectedSauces.map(s => s.id));
-            const extraSauceIds = new Set(extraSauceSelections.map(e => e.sauceId));
-            const sauceSuggestions = SUGGESTED_SAUCES
-              .map(name => sauceOptions.find(s => s.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((s): s is Ingredient => s !== undefined && !selectedSauceIds.has(s.id) && !extraSauceIds.has(s.id))
-              .slice(0, 3);
-            return (
-              <>
-                <StepPicker
-                  items={sauceOptions}
-                  selectedItems={selectedSauces}
-                  setSelectedItems={setSelectedSauces}
-                  config={currentStepConfig}
-                />
-
-                {/* Extra sauce chips */}
-                {extraSauceSelections.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold text-foreground mb-2">✅ Salsas extra añadidas</p>
-                    <div className="flex flex-wrap gap-2">
-                      {extraSauceSelections.map(extra => (
-                        <span key={extra.uid} className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5">
-                          <span className="font-semibold">{extra.sauceName}</span>
-                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
-                          <button
-                            type="button"
-                            onClick={() => setExtraSauceSelections(prev => prev.filter(e => e.uid !== extra.uid))}
-                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
-                            aria-label="Quitar salsa extra"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {sauceSuggestions.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {sauceSuggestions.map(sauce => (
-                        <button
-                          key={sauce.id}
-                          type="button"
-                          onClick={() => {
-                            if (selectedSauces.length < maxSauces) {
-                              // Free slot available — add as included sauce
-                              setSelectedSauces(prev => [...prev, sauce]);
-                            } else {
-                              // Beyond free slots — add as paid extra
-                              const charge = (sauce.price ?? 0) > 0 ? sauce.price! : EXTRA_SAUCE_PRICE;
-                              setExtraSauceSelections(prev => [...prev, {
-                                uid: `extra-sauce-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                                sauceName: sauce.name,
-                                sauceId: sauce.id,
-                                charge,
-                              }]);
-                            }
-                          }}
-                          className="rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 min-h-[44px] cursor-pointer hover:bg-brand/15 transition-colors"
-                        >
-                          {sauce.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            );
-          })() : null}
-
-          {currentStep === 'complementos' && currentStepConfig ? (() => {
-            const EXTRA_COMP_PRICE = 500;
-            const SUGGESTED_COMPLEMENTOS = ['Ajonjolí', 'Maní', 'Choclitos triturados'];
-            const maxComplementos = selectedSize?.maxComplementos ?? currentStepConfig.max;
-            const freeComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) === 0);
-            const premiumComplementos = complementoOptions.filter(c => getIngredientExtraCharge(c) > 0);
-            const selectedCompIds = new Set(selectedComplementos.map(c => c.id));
-            const extraCompIds = new Set(extraComplementoSelections.map(e => e.compId));
-            const compSuggestions = SUGGESTED_COMPLEMENTOS
-              .map(name => freeComplementos.find(c => c.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((c): c is Ingredient => c !== undefined && !selectedCompIds.has(c.id) && !extraCompIds.has(c.id))
-              .slice(0, 3);
-            const hasUpsellSection = compSuggestions.length > 0 || premiumComplementos.length > 0;
-            return (
-              <>
-                <StepPicker
-                  items={freeComplementos}
-                  selectedItems={selectedComplementos}
-                  setSelectedItems={setSelectedComplementos}
-                  config={currentStepConfig}
-                />
-
-                {/* Extra complemento chips */}
-                {extraComplementoSelections.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold text-foreground mb-2">✅ Complementos extra añadidos</p>
-                    <div className="flex flex-wrap gap-2">
-                      {extraComplementoSelections.map(extra => (
-                        <span key={extra.uid} className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 text-sm px-3 py-1.5">
-                          <span className="font-semibold">{extra.compName}</span>
-                          <span className="text-brand ml-1">+{formatPrice(extra.charge)}</span>
-                          <button
-                            type="button"
-                            onClick={() => setExtraComplementoSelections(prev => prev.filter(e => e.uid !== extra.uid))}
-                            className="text-base ml-2 text-muted-foreground hover:text-foreground leading-none"
-                            aria-label="Quitar complemento extra"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Unified upsell: free suggestions + premium chips */}
-                {hasUpsellSection && (
-                  <div className="mt-5">
-                    <p className="text-sm font-semibold text-foreground mb-3">¿Le agregamos algo más?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {/* Free suggestions with sauces router pattern */}
-                      {compSuggestions.map(comp => (
-                        <button
-                          key={comp.id}
-                          type="button"
-                          onClick={() => {
-                            if (selectedComplementos.length < maxComplementos) {
-                              setSelectedComplementos(prev => [...prev, comp]);
-                            } else {
-                              const charge = (comp.price ?? 0) > 0 ? comp.price! : EXTRA_COMP_PRICE;
-                              setExtraComplementoSelections(prev => [...prev, {
-                                uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                                compName: comp.name,
-                                compId: comp.id,
-                                charge,
-                                premiumCompId: '',
-                              }]);
-                            }
-                          }}
-                          className="rounded-full border border-brand/30 bg-brand/5 text-sm px-3 py-1.5 min-h-[44px] cursor-pointer hover:bg-brand/15 transition-colors"
-                        >
-                          {comp.name}
-                        </button>
-                      ))}
-                      {/* Premium chips with selector */}
-                      {premiumComplementos.map(premium => {
-                        const charge = getIngredientExtraCharge(premium);
-                        return (
-                          <button
-                            key={premium.id}
-                            type="button"
-                            onClick={() => setCompSelectorOpen(prev => prev === premium.id ? null : premium.id)}
-                            className="inline-flex items-center rounded-full border border-dashed border-brand/50 bg-brand/5 text-sm px-3 py-1.5 min-h-[44px] cursor-pointer hover:bg-brand/15 transition-colors"
-                          >
-                            {premium.name}
-                            <span className="text-xs bg-brand/10 text-brand rounded-full px-2 ml-1">
-                              +{formatPrice(charge)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Inline complemento selector — rendered below as regular block */}
-                {compSelectorOpen !== null && (() => {
-                  const activePremium = premiumComplementos.find(p => p.id === compSelectorOpen);
-                  if (!activePremium) return null;
-                  const charge = getIngredientExtraCharge(activePremium);
-                  return (
-                    <div className="mt-3 bg-background border border-border rounded-xl shadow-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-semibold">¿Qué complemento extra quieres?</p>
-                        <button
-                          type="button"
-                          onClick={() => setCompSelectorOpen(null)}
-                          className="text-muted-foreground hover:text-foreground text-lg leading-none"
-                          aria-label="Cerrar"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className="space-y-1">
-                        {freeComplementos.map(c => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-brand/10 text-sm transition-colors"
-                            onClick={() => {
-                              setExtraComplementoSelections(prev => [...prev, {
-                                uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                                compName: c.name,
-                                compId: c.id,
-                                charge,
-                                premiumCompId: activePremium.id,
-                              }]);
-                              setCompSelectorOpen(null);
-                            }}
-                          >
-                            {c.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </>
-            );
-          })() : null}
-
-          {currentStep === 'upsell' ? (() => {
-            const UPSELL_INGREDIENTS = ['Guacamole', 'Queso rallado', 'Tocineta', 'Queso frito', 'Papa Francesa'];
-            const allIngredients = [...acompananteOptions, ...complementoOptions];
-            const upsellIngredients = UPSELL_INGREDIENTS
-              .map(name => allIngredients.find(i => i.name.toLowerCase().includes(name.toLowerCase())))
-              .filter((i): i is Ingredient => i !== undefined);
-
-            const isInBowl = (ing: Ingredient) =>
-              selectedAcompanantes.some(a => a.id === ing.id) ||
-              selectedComplementos.some(c => c.id === ing.id) ||
-              extraAcompananteSelections.some(e => e.acompName === ing.name) ||
-              extraComplementoSelections.some(e => e.compName === ing.name);
-
-            const addUpsellIngredient = (ing: Ingredient) => {
-              if (isInBowl(ing)) return;
-              const charge = getIngredientExtraCharge(ing);
-              if (ing.type === 'acompanante') {
-                const maxAcomp = selectedSize?.maxAcompanantes ?? 0;
-                if (charge === 0 && selectedAcompanantes.length < maxAcomp) {
-                  setSelectedAcompanantes(prev => [...prev, ing]);
-                } else {
-                  setExtraAcompananteSelections(prev => [...prev, {
-                    uid: `extra-acomp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                    acompName: ing.name,
-                    charge: charge > 0 ? charge : 2000,
-                    premiumAcompId: '',
-                  }]);
-                }
-              } else {
-                const maxComp = selectedSize?.maxComplementos ?? 0;
-                if (charge === 0 && selectedComplementos.length < maxComp) {
-                  setSelectedComplementos(prev => [...prev, ing]);
-                } else {
-                  setExtraComplementoSelections(prev => [...prev, {
-                    uid: `extra-comp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                    compName: ing.name,
-                    compId: ing.id,
-                    charge: charge > 0 ? charge : 500,
-                    premiumCompId: '',
-                  }]);
-                }
-              }
-            };
-
-            return (
-              <div className="animate-slide-in space-y-8">
-                {/* Sección 1: Bebidas */}
-                <div>
-                  <p className="text-lg font-semibold mb-4">🥤 ¿Le sumamos una bebida?</p>
-                  {bebidasLoading ? (
-                    <div className="flex gap-3">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="shrink-0 w-32 space-y-2">
-                          <div className="w-full h-20 bg-muted rounded-lg animate-pulse" />
-                          <div className="h-3 bg-muted rounded w-3/4 animate-pulse" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : bebidasOptions.length > 0 ? (
-                    <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible">
-                      {bebidasOptions.slice(0, 6).map((drink: Product) => {
-                        const inCart = cart.items.some(item => item.type === 'product' && item.product?.id === drink.id);
-                        return (
-                          <div key={drink.id} className="snap-start shrink-0 w-32 md:w-auto">
-                            {drink.imageUrl ? (
-                              <img src={drink.imageUrl} alt={drink.name} className="w-full h-20 object-cover rounded-lg" />
-                            ) : (
-                              <div className="w-full h-20 bg-brand/20 rounded-lg" />
-                            )}
-                            <p className="text-xs font-semibold line-clamp-1 mt-1">{drink.name}</p>
-                            <p className="text-xs text-brand font-bold">{formatPrice(drink.price)}</p>
-                            <button
-                              type="button"
-                              disabled={inCart}
-                              onClick={() => { if (!inCart) addProduct(drink); }}
-                              className={cn(
-                                'text-white text-xs rounded-lg py-1.5 w-full mt-1 transition-colors',
-                                inCart ? 'bg-brand/40 cursor-not-allowed' : 'bg-brand hover:bg-brand/90',
-                              )}
-                            >
-                              {inCart ? '✓ Añadido' : '+ Agregar'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Sección 2: Ingredientes adicionales */}
-                {upsellIngredients.length > 0 && (
-                  <div>
-                    <p className="text-lg font-semibold mb-4">🍟 ¿Algo más para tu bowl?</p>
-                    <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:overflow-visible">
-                      {upsellIngredients.map(ing => {
-                        const inBowl = isInBowl(ing);
-                        const charge = getIngredientExtraCharge(ing);
-                        const imgSrc = getAdditionalIngredientImageUrl(ing.name);
-                        return (
-                          <div key={ing.id} className="snap-start shrink-0 w-32 md:w-auto rounded-2xl border bg-card p-3">
-                            {imgSrc && (
-                              <img
-                                src={imgSrc}
-                                alt={ing.name}
-                                className="w-full h-20 object-cover rounded-lg mb-2"
-                              />
-                            )}
-                            <p className="text-xs font-semibold line-clamp-1">{ing.name}</p>
-                            <p className="text-xs text-brand font-bold mt-0.5">
-                              {charge > 0 ? `+${formatPrice(charge)}` : 'Incluido'}
-                            </p>
-                            <button
-                              type="button"
-                              disabled={inBowl}
-                              onClick={() => addUpsellIngredient(ing)}
-                              className={cn(
-                                'text-white text-xs rounded-lg py-1.5 w-full mt-2 transition-colors',
-                                inBowl ? 'bg-brand/40 cursor-not-allowed' : 'bg-brand hover:bg-brand/90',
-                              )}
-                            >
-                              {inBowl ? '✓ En tu bowl' : '+ Agregar'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })() : null}
-
-          {currentStep === 'summary' && selectedSize ? (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-xl font-semibold">Resumen de tu bowl</h3>
-                <p className="text-sm text-muted-foreground">
-                  Revisa toda la configuración antes de agregarla al carrito.
+          )}
+          {step === 0 && (
+            <>
+              <h3>Elige tu tamaño</h3>
+              <p className="mb-5 text-muted-foreground">
+                Una base y una proteína como mínimo. Puedes elegir menos
+                porciones sin cambiar el precio.
+              </p>
+              {(!sizes.length ||
+                !ingredients.some((i) => i.type === 'base') ||
+                !ingredients.some(
+                  (i) => i.type === 'protein' && !i.price && !isGenericExtra(i),
+                )) && (
+                <p role="alert" className="mb-4">
+                  No hay tamaños, bases o proteínas incluidas disponibles para
+                  armar un bowl en este momento.
                 </p>
+              )}
+              {issues
+                .filter((issue) => issue.section === 'size')
+                .map((issue) => (
+                  <p role="alert" key={issue.message}>
+                    {issue.message}
+                  </p>
+                ))}
+              <div className="bowl-studio-size-grid">
+                {sizes.map((size) => (
+                  <button
+                    key={size.size}
+                    aria-pressed={bowl?.size.size === size.size}
+                    disabled={
+                      size.maxBases < 1 ||
+                      size.maxProteins < 1 ||
+                      !ingredients.some((i) => i.type === 'base') ||
+                      !ingredients.some(
+                        (i) =>
+                          i.type === 'protein' &&
+                          !i.price &&
+                          !isGenericExtra(i),
+                      )
+                    }
+                    className="bowl-studio-size rounded-2xl border bg-muted/30 p-5 text-left"
+                    onClick={() => {
+                      setBowl((prev) =>
+                        prev ? { ...prev, size } : blank(size),
+                      );
+                      submitting.current = false;
+                      setNotice(
+                        bowl
+                          ? 'Conservamos tu receta. Ajusta las porciones que excedan los cupos del nuevo tamaño.'
+                          : '',
+                      );
+                      move(1);
+                    }}
+                  >
+                    <div className="bowl-studio-size-art mb-3">
+                      <BrandIllustration kind="bowl" />
+                    </div>
+                    <p className="text-xl font-semibold">{size.name}</p>
+                    <p className="bowl-studio-size-price">
+                      {formatPrice(size.price)}
+                    </p>
+                    <ul className="bowl-studio-inclusions">
+                      {sections.map((s) => (
+                        <li key={s.key}>
+                          <span>{s.label}</span>
+                          <strong>{size[s.max]}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                    <span className="bowl-studio-size-action">
+                      Elegir tamaño <ChevronRight size={18} />
+                    </span>
+                  </button>
+                ))}
               </div>
-
-              <div className="rounded-2xl border bg-muted/20 p-5">
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Tamaño</p>
-                    <p className="mt-1 text-lg font-semibold">{selectedSize.name}</p>
-                  </div>
-                  <p className="text-xl font-bold text-ohana-dark">{formatPrice(selectedSize.price)}</p>
-                </div>
-
-                <div className="space-y-4 pt-4">
-                  {summaryRows.map((row) => (
-                    <div key={row.label}>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{row.label}</p>
-                      <p className="mt-1 text-sm leading-relaxed text-foreground">{row.value}</p>
+              {saved.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="mb-3 font-semibold">Tus bowls favoritos</h4>
+                  {saved.map((f) => (
+                    <div key={f.id} className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="h-auto min-h-11 max-w-full whitespace-normal break-words text-left [overflow-wrap:anywhere]"
+                        onClick={() => load(f.config)}
+                      >
+                        {f.name}
+                      </Button>
+                      <Button variant="ghost" onClick={() => removeBowl(f.id)}>
+                        Eliminar favorito
+                      </Button>
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold">Notas adicionales</label>
-                <Textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Ej: salsa aparte, sin maní..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="rounded-2xl border bg-primary/5 p-5">
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>Base del bowl</span>
-                  <span>{formatPrice(selectedSize.price)}</span>
-                </div>
-                {extraChargeLines.map((line) => (
-                  <div key={`${line.label}-${line.unitAmount}`} className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                      {line.label}
-                      {line.quantity > 1 ? ` x${line.quantity}` : ''}
-                    </span>
-                    <span>{formatPrice(line.amount)}</span>
-                  </div>
-                ))}
-                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
-                  <span>Extras</span>
-                  <span>{formatPrice(extraChargeTotal)}</span>
-                </div>
-                <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-4">
-                  <span className="text-base font-semibold">Total</span>
-                  <span className="text-2xl font-bold text-ohana-dark">{formatPrice(totalPrice)}</span>
-                </div>
-              </div>
-
-              {/* Save as favorite */}
-              {!saveMode ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 text-muted-foreground"
-                  onClick={() => {
-                    const suggested = [
-                      ...selectedBases.slice(0, 1).map((i) => i.name),
-                      ...selectedProteins.slice(0, 1).map((i) => i.name),
-                    ].join(' + ');
-                    setSaveName(suggested);
-                    setSaveMode(true);
-                  }}
+              )}
+            </>
+          )}
+          {section && bowl && (
+            <>
+              <h3>Elige {section.label.toLowerCase()}</h3>
+              <p className="mb-3 text-sm text-muted-foreground">
+                {section.min
+                  ? 'Elige al menos una opción.'
+                  : 'Opcional: puedes omitir este paso.'}{' '}
+                Hasta {bowl.size[section.max]}{' '}
+                {bowl.size[section.max] === 1
+                  ? 'porción incluida'
+                  : 'porciones incluidas'}
+                .
+              </p>
+              <p className="bowl-studio-slot-count">
+                {(bowl[section.key] || []).length} de {bowl.size[section.max]}{' '}
+                {bowl.size[section.max] === 1
+                  ? 'porción incluida'
+                  : 'porciones incluidas'}
+              </p>
+              <p className="mb-4 text-sm">
+                Selección actual:{' '}
+                {formatGroupedIngredients(bowl[section.key] || [])}
+              </p>
+              {sectionIssues.map((i) => (
+                <p
+                  role="alert"
+                  key={i.message}
+                  className="mb-3 text-sm text-destructive"
                 >
-                  <Heart className="w-3.5 h-3.5" />
+                  {i.message}
+                </p>
+              ))}
+              {(bowl[section.key] || []).map(
+                (i, index) =>
+                  (!ingredients.some(
+                    (current) =>
+                      current.id === i.id && current.type === section.type,
+                  ) ||
+                    isGenericExtra(i)) && (
+                    <div
+                      key={`${i.id}-${index}`}
+                      className="mb-3 rounded-xl border p-3"
+                    >
+                      <p>{i.name} · No disponible</p>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setBowl((prev) => ({
+                            ...prev!,
+                            [section.key]: (prev![section.key] || []).filter(
+                              (_, at) => at !== index,
+                            ),
+                          }))
+                        }
+                      >
+                        Quitar esta porción
+                      </Button>
+                    </div>
+                  ),
+              )}
+              {options.length ? (
+                cards(options, 'suggestion', true)
+              ) : (
+                <p role="alert">No hay opciones disponibles en esta sección.</p>
+              )}
+              <p className="mt-4 text-sm text-muted-foreground">
+                Puedes agregar porciones adicionales en Extras. Su precio
+                aparece antes de seleccionarlas.
+              </p>
+            </>
+          )}
+          {section && bowl && recommendations}
+          {step === EXTRAS_STEP && bowl && (
+            <>
+              <h3>¿Algo más para tu bowl?</h3>
+              <p className="mb-5 text-muted-foreground">
+                Suma ingredientes adicionales. Las bebidas tienen su propio paso
+                a continuación.
+              </p>
+              {issues
+                .filter((issue) => issue.section === 'extras')
+                .map((issue) => (
+                  <p
+                    role="alert"
+                    className="mb-3 text-sm text-destructive"
+                    key={issue.message}
+                  >
+                    {issue.message}
+                  </p>
+                ))}
+              {recommendations}
+              <div className="bowl-studio-extra-groups">
+                {sections
+                  .filter((s) => s.type !== 'base')
+                  .map((s) => {
+                    const options = ingredients.filter(
+                      (i) => i.type === s.type,
+                    );
+                    const chosen =
+                      (bowl[s.key] || []).length +
+                      (bowl.extras || [])
+                        .filter((e) => e.ingredient.type === s.type)
+                        .reduce((sum, e) => sum + e.quantity, 0);
+                    return options.length ? (
+                      <details
+                        className="bowl-studio-extra-group"
+                        key={s.key}
+                        open
+                      >
+                        <summary>
+                          <span>{s.label}</span>
+                          <span className="bowl-studio-group-count">
+                            {chosen
+                              ? `${chosen} ${chosen === 1 ? 'porción' : 'porciones'}`
+                              : 'Ver opciones'}
+                          </span>
+                          <ChevronDown size={16} aria-hidden="true" />
+                        </summary>
+                        {cards(options, 'upsell')}
+                      </details>
+                    ) : null;
+                  })}
+              </div>
+            </>
+          )}
+          {step === DRINKS_STEP && bowl && (
+            <>
+              <h3>¿Una bebida para acompañar?</h3>
+              <p className="mb-4 text-muted-foreground">
+                Este paso es opcional. Puedes continuar sin añadir bebidas.
+              </p>
+              <Button
+                variant="outline"
+                className="mb-5"
+                onClick={() => {
+                  setSelectedDrinks([]);
+                  move(SUMMARY_STEP);
+                }}
+              >
+                Continuar sin bebidas <ChevronRight size={16} />
+              </Button>
+              {drinksLoading ? (
+                <p>Cargando bebidas…</p>
+              ) : drinksError ? (
+                <p role="alert">
+                  No pudimos cargar las bebidas. Puedes continuar sin ellas.
+                </p>
+              ) : !drinks.length ? (
+                <p>
+                  No hay bebidas disponibles por ahora. Puedes continuar con tu
+                  bowl.
+                </p>
+              ) : (
+                <div className="bowl-studio-options bowl-studio-drinks">
+                  {drinks.map((product) => {
+                    const quantity =
+                      selectedDrinks.find((d) => d.product.id === product.id)
+                        ?.quantity || 0;
+                    return (
+                      <div
+                        key={product.id}
+                        className="bowl-studio-ingredient"
+                        data-selected={quantity > 0}
+                      >
+                        <div className="bowl-studio-option-copy">
+                          <p className="font-semibold">{product.name}</p>
+                          <p>{formatPrice(product.price)}</p>
+                        </div>
+                        <div className="bowl-studio-quantity">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            disabled={!quantity}
+                            aria-label={`Quitar ${product.name}`}
+                            onClick={() => changeDrink(product, -1)}
+                          >
+                            <Minus size={16} />
+                          </Button>
+                          <span>{quantity}</span>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            aria-label={`Agregar ${product.name}`}
+                            onClick={() => changeDrink(product, 1)}
+                          >
+                            <Plus size={16} />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+          {bowl && step > 0 && bowl.reviewIssues?.length ? (
+            <div className="mt-5 space-y-2">
+              {(bowl.reviewIssues || []).map((message) => (
+                <div key={message}>
+                  <p role="alert">{message}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setBowl((prev) => ({
+                        ...prev!,
+                        reviewIssues: prev!.reviewIssues!.filter(
+                          (x) => x !== message,
+                        ),
+                        ...Object.fromEntries(
+                          sections.map((s) => [
+                            s.key,
+                            (prev![s.key] || []).filter(
+                              (i) =>
+                                !(
+                                  /^extra-/.test(i.id) &&
+                                  message.includes(i.name)
+                                ),
+                            ),
+                          ]),
+                        ),
+                      }))
+                    }
+                  >
+                    Descartar extra antiguo no identificado
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {step === SUMMARY_STEP && bowl && (
+            <>
+              <h3>Resumen de tu bowl</h3>
+              {issues.map((i) => (
+                <p
+                  key={i.message}
+                  role="alert"
+                  className="my-2 text-destructive"
+                >
+                  {i.message}
+                </p>
+              ))}
+              {recommendations}
+              {recipe}
+              <label className="mt-4 block">
+                Notas para tu bowl
+                <Textarea
+                  value={bowl.notes || ''}
+                  onChange={(e) =>
+                    setBowl((prev) => ({ ...prev!, notes: e.target.value }))
+                  }
+                />
+              </label>
+              {saveName === null ? (
+                <Button
+                  variant="outline"
+                  className="mt-4 gap-2"
+                  onClick={() => setSaveName('Mi bowl')}
+                >
+                  <Heart size={16} />
                   Guardar como favorito
                 </Button>
               ) : (
-                <div className="flex gap-2">
+                <div className="bowl-studio-save-form">
                   <Input
+                    aria-label="Nombre del favorito"
                     value={saveName}
                     onChange={(e) => setSaveName(e.target.value)}
-                    placeholder="Nombre para este bowl"
-                    className="h-9 text-sm"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveFavorite();
-                      if (e.key === 'Escape') { setSaveMode(false); setSaveName(''); }
-                    }}
                   />
-                  <Button size="sm" className="btn-ohana h-9 shrink-0" onClick={handleSaveFavorite}>
+                  <Button
+                    disabled={issues.length > 0}
+                    onClick={() => {
+                      if (issues.length) return;
+                      saveBowl(saveName, bowl);
+                      setSaveName(null);
+                      toast.success('Receta guardada en tus favoritos');
+                    }}
+                  >
                     Guardar
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-9 shrink-0" onClick={() => { setSaveMode(false); setSaveName(''); }}>
+                  <Button variant="ghost" onClick={() => setSaveName(null)}>
                     Cancelar
                   </Button>
                 </div>
               )}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {selectedSize && currentStep !== 'summary' ? (
-        <div className="border-t bg-muted/20 px-4 py-4">
-          {/* Mobile: collapsed header toggle */}
-          <button
-            type="button"
-            className="sm:hidden w-full rounded-2xl border bg-card px-4 py-3 flex items-center justify-between gap-3 mb-2"
-            onClick={() => setBowlExpanded(v => !v)}
+            </>
+          )}
+        </fieldset>
+        {bowl && step !== SUMMARY_STEP && (
+          <aside
+            className="bowl-studio-recipe"
+            aria-label="Resumen de tu receta"
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground shrink-0">Tu bowl</p>
-              <p className="text-sm font-semibold truncate">{selectedSize.name}</p>
+            <button
+              type="button"
+              className="bowl-studio-recipe-toggle"
+              disabled={verifying}
+              aria-expanded={recipeOpen}
+              aria-controls="bowl-recipe-panel"
+              onClick={() => setRecipeOpen((open) => !open)}
+            >
+              <ClipboardList size={18} />
+              <span>{recipeOpen ? 'Ocultar receta' : 'Ver receta'}</span>
+              <ChevronDown size={16} />
+            </button>
+            <div
+              id="bowl-recipe-panel"
+              className="bowl-studio-recipe-panel"
+              data-open={recipeOpen}
+            >
+              {recipe}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <p className="text-base font-bold text-ohana-dark">{formatPrice(totalPrice)}</p>
-              <span className="text-xs text-muted-foreground">{bowlExpanded ? '▴' : '▾'}</span>
-            </div>
-          </button>
-
-          {/* Full panel: always on sm+, toggleable on mobile */}
-          <div className={cn(
-            'rounded-2xl border border-border/60 bg-card p-4 shadow-sm',
-            'hidden sm:block',
-            bowlExpanded && '!block max-h-48 overflow-y-auto',
-          )}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Tu bowl</p>
-                <p className="mt-1 text-lg font-semibold">{selectedSize.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  Base: {formatPrice(selectedSize.price)} · Extras: {formatPrice(extraChargeTotal)}
-                </p>
+          </aside>
+        )}
+        {bowl && (
+          <div className="bowl-studio-footer">
+            {bowl && (
+              <div className="bowl-studio-footer-price" role="status">
+                <span>Total</span>
+                <strong>{formatPrice(total + drinksTotal)}</strong>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Total</p>
-                <p className="mt-1 text-xl font-bold text-ohana-dark">{formatPrice(totalPrice)}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {liveSummaryRows.map((row) => (
-                <div key={row.label}>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{row.label}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-foreground">{row.value}</p>
-                </div>
-              ))}
+            )}
+            <div className="bowl-studio-footer-actions">
+              <Button
+                variant="ghost"
+                disabled={verifying || step === 0}
+                onClick={() => move(step - 1)}
+              >
+                <ChevronLeft size={16} />
+                Anterior
+              </Button>
+              {step === SUMMARY_STEP ? (
+                <Button
+                  disabled={verifying}
+                  className="btn-ohana"
+                  onClick={submit}
+                >
+                  {editId ? 'Actualizar bowl' : 'Agregar al carrito'}
+                </Button>
+              ) : (
+                <Button
+                  className="btn-ohana"
+                  disabled={
+                    verifying || !bowl || (section && sectionIssues.length > 0)
+                  }
+                  onClick={() => move(step + 1)}
+                >
+                  {step === DRINKS_STEP
+                    ? selectedDrinks.length
+                      ? 'Continuar al resumen'
+                      : 'Saltar bebidas'
+                    : step === EXTRAS_STEP
+                      ? 'Continuar a bebidas'
+                      : section?.min === 0 && !bowl?.[section.key]?.length
+                        ? 'Omitir'
+                        : 'Siguiente'}
+                  <ChevronRight size={16} />
+                </Button>
+              )}
             </div>
           </div>
-        </div>
-      ) : null}
-
-      <div className="flex items-center justify-between gap-4 border-t p-4">
-        <Button variant="ghost" onClick={goBack} disabled={currentStepIndex === 0} className="gap-1 min-h-[44px] min-w-[44px]">
-          <ChevronLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Anterior</span>
-        </Button>
-
-        <div className="flex flex-1 flex-col items-center gap-1.5">
-          {currentStep !== 'summary' && currentStepConfig && (!canProceed || (currentStepConfig.optional && currentSelectionCount === 0)) ? (
-            <p className="animate-fade-in text-center text-xs text-muted-foreground">
-              {getStepHint(currentStepConfig, currentSelectionCount)}
-            </p>
-          ) : null}
-
-          {currentStep === 'summary' ? (
-            <Button onClick={handleSubmit} className="btn-ohana gap-2 min-h-[44px]">
-              {getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={goNext}
-                disabled={!canProceed}
-                className={cn('btn-ohana gap-2 min-h-[44px] rounded-2xl px-6 py-3 font-semibold shadow-md hover:shadow-lg hover:bg-brand/90 active:scale-95 transition-all', !canProceed && 'opacity-50')}
-              >
-                {getStepNextLabel(currentStep, canProceed, isOptionalBlank)}
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              {(currentStepConfig?.optional && currentSelectionCount === 0) || currentStep === 'upsell' ? (
-                <Button variant="ghost" size="sm" onClick={goNext} className="text-muted-foreground min-h-[44px] min-w-[44px] hover:text-foreground text-sm underline-offset-2 hover:underline">
-                  Saltar este paso →
-                </Button>
-              ) : null}
-            </div>
-          )}
-        </div>
+        )}
       </div>
+      <Dialog
+        open={Boolean(selector)}
+        onOpenChange={(open) => {
+          if (!open) setSelector(null);
+        }}
+      >
+        <DialogContent
+          className="bowl-extra-dialog"
+          onCloseAutoFocus={(event) => {
+            const trigger = selectorTrigger.current;
+            selectorTrigger.current = null;
+            if (trigger?.isConnected) {
+              event.preventDefault();
+              trigger.focus({ preventScroll: true });
+            }
+          }}
+        >
+          <DialogTitle>
+            Elige tu{' '}
+            {selector?.type === 'protein'
+              ? 'proteína'
+              : selector?.type === 'acompanante'
+                ? 'acompañante'
+                : 'complemento'}{' '}
+            adicional
+          </DialogTitle>
+          <DialogDescription>
+            Selecciona el ingrediente que quieres sumar. Cada porción adicional
+            cuesta{' '}
+            {selector
+              ? formatPrice(extraPrice(selector, 'generic', selector))
+              : ''}
+            .
+          </DialogDescription>
+          <div className="bowl-extra-dialog-options">
+            {selector &&
+              ingredients
+                .filter(
+                  (i) =>
+                    i.type === selector.type && !i.price && !isGenericExtra(i),
+                )
+                .map((i) => (
+                  <Button
+                    key={i.id}
+                    disabled={verifying}
+                    variant="outline"
+                    onClick={() => {
+                      addExtra(i, 'generic', selector);
+                      setSelector(null);
+                    }}
+                  >
+                    {i.name}
+                    <Plus size={16} />
+                  </Button>
+                ))}
+          </div>
+          {selector &&
+            !ingredients.some(
+              (i) => i.type === selector.type && !i.price && !isGenericExtra(i),
+            ) && (
+              <p role="status">
+                No hay ingredientes disponibles para este adicional por ahora.
+              </p>
+            )}
+          <DialogClose asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bowl-extra-dialog-close"
+              aria-label="Cerrar selector de extras"
+            >
+              <X size={18} />
+            </Button>
+          </DialogClose>
+          <DialogClose asChild>
+            <Button variant="ghost" className="min-h-11">
+              Cancelar
+            </Button>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

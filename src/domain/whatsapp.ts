@@ -50,7 +50,7 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
         lines.push(`   ${line}`);
       });
     } else if (item.type === 'custom-bowl' && item.customBowl) {
-      lines.push(`• ${brand} 1x Bowl ${item.customBowl.size.name} — ${formatPrice(item.totalPrice)}`);
+      lines.push(`• ${brand} ${item.quantity}x Bowl ${item.customBowl.size.name} — ${formatPrice(item.totalPrice)}`);
       formatBowlDetailLines(item.customBowl).forEach((line) => {
         lines.push(`   ${line}`);
       });

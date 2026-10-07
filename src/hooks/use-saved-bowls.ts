@@ -1,3 +1,4 @@
+import { bowlSchema } from '@/domain/bowlConfiguration';
 import { useState } from 'react';
 import type { CustomBowl } from '@/types';
 
@@ -14,7 +15,10 @@ export interface SavedBowl {
 function readStorage(): SavedBowl[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as SavedBowl[]) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    const entries = Array.isArray(parsed) ? parsed : parsed?.version === 'saved:v2' ? parsed.items : [];
+    if (!Array.isArray(entries)) return [];
+    return entries.filter(entry => typeof entry?.id === 'string' && typeof entry?.name === 'string' && bowlSchema.safeParse(entry.config).success).slice(0, MAX_SAVED);
   } catch {
     return [];
   }
@@ -22,7 +26,7 @@ function readStorage(): SavedBowl[] {
 
 function writeStorage(bowls: SavedBowl[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bowls));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({version: 'saved:v2', items: bowls}));
   } catch {
     // storage full or unavailable — fail silently
   }

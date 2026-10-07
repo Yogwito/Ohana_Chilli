@@ -1,5 +1,13 @@
 # Fuente de verdad del catalogo y precios
 
+## Fotos de la landing
+
+Las tres fotos del hero (Caribe, Veggie y Paisa) son imágenes ilustrativas regeneradas con IA a partir de las fotos anteriores. Se guardan en `public/images/experience/*-hq.webp` (1254 × 1254); los originales se conservan. Prompts y procedencia: [docs/landing-photo-prompts.md](docs/landing-photo-prompts.md). Esta actualización no modifica las fotos ni los datos del catálogo en Supabase.
+
+## Fotos estandarizadas del menú
+
+Los 35 productos visibles utilizan imágenes ilustrativas regeneradas en formato 4:3, WebP de 1200 × 900, bajo `public/images/menu/`. `src/domain/menuImages.ts` asigna cada archivo al ID del producto y tiene prioridad sobre `image_url`; al reemplazar fotos desde admin, también se debe actualizar o retirar la asignación local. Las tarjetas, el detalle y los extras del bowl comparten el resolvedor. No se modificaron precios, recetas ni registros de Supabase. Prompts y procedencia: [docs/menu-photo-refresh.md](docs/menu-photo-refresh.md).
+
 ## Regla unica
 
 Todos los precios del sitio se manejan como `pesos enteros`.
@@ -39,6 +47,8 @@ El admin edita esos mismos registros directamente en Supabase desde:
 6. WhatsApp formatea ese mismo valor.
 
 ## Formato UI
+
+Auditoría de ingredientes visibles en las imágenes: [docs/menu-ingredient-audit.md](docs/menu-ingredient-audit.md). El queso rallado del constructor tiene fotografía propia, distinta de la salsa de queso. La composición del bowl Veggie está pendiente de confirmación porque su descripción solo enumera cantidades personalizables.
 
 Todas las vistas deben formatear precios con:
 

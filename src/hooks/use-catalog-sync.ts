@@ -26,7 +26,7 @@ const CATALOG_QUERY_KEYS: Record<CatalogTable, QueryKey[]> = {
   ingredients: [['ingredients']],
   bowl_rules: [['bowl_rules']],
   delivery_zones: [['delivery_zones']],
-  settings: [['settings'], ['setting']],
+  settings: [['settings'], ['setting'], ['banner-settings']],
   promotions: [['promotions']],
 };
 

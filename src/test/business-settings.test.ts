@@ -35,15 +35,25 @@ describe('business settings helpers', () => {
     expect(
       isBusinessOpenNow(
         { hoursWeekday: '11:00 - 21:00', hoursWeekend: '12:00 - 20:00' },
-        new Date('2026-04-13T15:00:00'),
+        new Date('2026-04-13T15:00:00-05:00'),
       ),
     ).toBe(true);
 
     expect(
       isBusinessOpenNow(
         { hoursWeekday: '11:00 - 21:00', hoursWeekend: '12:00 - 20:00' },
-        new Date('2026-04-13T22:00:00'),
+        new Date('2026-04-13T22:00:00-05:00'),
       ),
     ).toBe(false);
+  });
+  it('uses Bogota weekdays and supports overnight hours like the backend', () => {
+    const hours = { hoursWeekday: '22:00 - 02:00', hoursWeekend: '12:00 - 20:00' };
+    expect(isBusinessOpenNow(hours, new Date('2026-04-14T04:00:00Z'))).toBe(true);
+    expect(isBusinessOpenNow(hours, new Date('2026-04-14T06:00:00Z'))).toBe(true);
+    expect(isBusinessOpenNow(hours, new Date('2026-04-14T08:00:00Z'))).toBe(false);
+    // UTC Saturday is still Friday at the restaurant.
+    expect(isBusinessOpenNow(hours, new Date('2026-04-18T04:00:00Z'))).toBe(true);
+    expect(isBusinessOpenNow(hours, new Date('2026-04-18T18:00:00Z'))).toBe(true);
+    expect(isBusinessOpenNow({ hoursWeekday: '29:00 - 30:00', hoursWeekend: null }, new Date('2026-04-14T04:00:00Z'))).toBeNull();
   });
 });

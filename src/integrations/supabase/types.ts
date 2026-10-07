@@ -1,509 +1,613 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
-
-export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
-  public: {
-    Tables: {
-      analytics_events: {
-        Row: {
-          created_at: string
-          event_type: string
-          id: string
-          metadata: Json | null
-        }
-        Insert: {
-          created_at?: string
-          event_type: string
-          id?: string
-          metadata?: Json | null
-        }
-        Update: {
-          created_at?: string
-          event_type?: string
-          id?: string
-          metadata?: Json | null
-        }
-        Relationships: []
-      }
-      bowl_rules: {
-        Row: {
-          accompaniments: number
-          bases: number
-          name: string
-          price_cents: number
-          proteins: number
-          size: string
-        }
-        Insert: {
-          accompaniments?: number
-          bases?: number
-          name: string
-          price_cents?: number
-          proteins?: number
-          size: string
-        }
-        Update: {
-          accompaniments?: number
-          bases?: number
-          name?: string
-          price_cents?: number
-          proteins?: number
-          size?: string
-        }
-        Relationships: []
-      }
-      brands: {
-        Row: {
-          id: string
-          name: string
-        }
-        Insert: {
-          id: string
-          name: string
-        }
-        Update: {
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
-      categories: {
-        Row: {
-          brand_id: string
-          icon: string | null
-          id: string
-          name: string
-          slug: string | null
-          sort_order: number | null
-        }
-        Insert: {
-          brand_id: string
-          icon?: string | null
-          id: string
-          name: string
-          slug?: string | null
-          sort_order?: number | null
-        }
-        Update: {
-          brand_id?: string
-          icon?: string | null
-          id?: string
-          name?: string
-          slug?: string | null
-          sort_order?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "categories_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      delivery_zones: {
-        Row: {
-          created_at: string
-          fee_cents: number
-          id: string
-          is_active: boolean
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          fee_cents?: number
-          id?: string
-          is_active?: boolean
-          name: string
-        }
-        Update: {
-          created_at?: string
-          fee_cents?: number
-          id?: string
-          is_active?: boolean
-          name?: string
-        }
-        Relationships: []
-      }
-      ingredients: {
-        Row: {
-          calories: number | null
-          id: string
-          is_active: boolean
-          is_gluten_free: boolean | null
-          is_vegan: boolean | null
-          name: string
-          price_cents: number
-          type: string
-        }
-        Insert: {
-          calories?: number | null
-          id: string
-          is_active?: boolean
-          is_gluten_free?: boolean | null
-          is_vegan?: boolean | null
-          name: string
-          price_cents?: number
-          type: string
-        }
-        Update: {
-          calories?: number | null
-          id?: string
-          is_active?: boolean
-          is_gluten_free?: boolean | null
-          is_vegan?: boolean | null
-          name?: string
-          price_cents?: number
-          type?: string
-        }
-        Relationships: []
-      }
-      order_items: {
-        Row: {
-          brand_id: string | null
-          details: Json | null
-          id: string
-          name: string
-          order_id: string
-          quantity: number
-          unit_price_cents: number
-        }
-        Insert: {
-          brand_id?: string | null
-          details?: Json | null
-          id?: string
-          name: string
-          order_id: string
-          quantity?: number
-          unit_price_cents?: number
-        }
-        Update: {
-          brand_id?: string | null
-          details?: Json | null
-          id?: string
-          name?: string
-          order_id?: string
-          quantity?: number
-          unit_price_cents?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_items_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      orders: {
-        Row: {
-          address: string | null
-          created_at: string
-          customer_name: string
-          delivery_fee_cents: number
-          delivery_zone: string | null
-          id: string
-          notes: string | null
-          order_type: string
-          phone: string
-          status: string
-          total_cents: number
-          updated_at: string
-          whatsapp_sent: boolean
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string
-          customer_name: string
-          delivery_fee_cents?: number
-          delivery_zone?: string | null
-          id?: string
-          notes?: string | null
-          order_type: string
-          phone: string
-          status?: string
-          total_cents?: number
-          updated_at?: string
-          whatsapp_sent?: boolean
-        }
-        Update: {
-          address?: string | null
-          created_at?: string
-          customer_name?: string
-          delivery_fee_cents?: number
-          delivery_zone?: string | null
-          id?: string
-          notes?: string | null
-          order_type?: string
-          phone?: string
-          status?: string
-          total_cents?: number
-          updated_at?: string
-          whatsapp_sent?: boolean
-        }
-        Relationships: []
-      }
-      products: {
-        Row: {
-          brand_id: string
-          calories: number | null
-          category_id: string
-          description: string | null
-          id: string
-          image_url: string | null
-          ingredients_list: string[] | null
-          is_active: boolean
-          is_gluten_free: boolean | null
-          is_new: boolean | null
-          is_popular: boolean | null
-          is_vegan: boolean | null
-          name: string
-          price_cents: number
-        }
-        Insert: {
-          brand_id: string
-          calories?: number | null
-          category_id: string
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          ingredients_list?: string[] | null
-          is_active?: boolean
-          is_gluten_free?: boolean | null
-          is_new?: boolean | null
-          is_popular?: boolean | null
-          is_vegan?: boolean | null
-          name: string
-          price_cents?: number
-        }
-        Update: {
-          brand_id?: string
-          calories?: number | null
-          category_id?: string
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          ingredients_list?: string[] | null
-          is_active?: boolean
-          is_gluten_free?: boolean | null
-          is_new?: boolean | null
-          is_popular?: boolean | null
-          is_vegan?: boolean | null
-          name?: string
-          price_cents?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "products_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      settings: {
-        Row: {
-          key: string
-          value: string
-        }
-        Insert: {
-          key: string
-          value: string
-        }
-        Update: {
-          key?: string
-          value?: string
-        }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-    }
-    Enums: {
-      app_role: "admin" | "user"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
-
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      app_role: ["admin", "user"],
-    },
-  },
-} as const
+// Generated by scripts/generate-db-types.mjs from the verified local baseline + migrations.
+// This is not evidence of the live production schema. Do not edit manually.
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Database = { public: { Tables: {
+"analytics_events": {
+Row: {
+"id": string;
+"event_type": string;
+"metadata": Json | null;
+"created_at": string;
+};
+Insert: {
+"id"?: string;
+"event_type": string;
+"metadata"?: Json | null;
+"created_at"?: string;
+};
+Update: {
+"id"?: string;
+"event_type"?: string;
+"metadata"?: Json | null;
+"created_at"?: string;
+};
+Relationships: [];
+};
+"bowl_rules": {
+Row: {
+"size": string;
+"name": string;
+"price_cents": number;
+"bases": number;
+"proteins": number;
+"accompaniments": number;
+};
+Insert: {
+"size": string;
+"name": string;
+"price_cents"?: number;
+"bases"?: number;
+"proteins"?: number;
+"accompaniments"?: number;
+};
+Update: {
+"size"?: string;
+"name"?: string;
+"price_cents"?: number;
+"bases"?: number;
+"proteins"?: number;
+"accompaniments"?: number;
+};
+Relationships: [];
+};
+"brands": {
+Row: {
+"id": string;
+"name": string;
+};
+Insert: {
+"id": string;
+"name": string;
+};
+Update: {
+"id"?: string;
+"name"?: string;
+};
+Relationships: [];
+};
+"categories": {
+Row: {
+"id": string;
+"brand_id": string;
+"name": string;
+"slug": string | null;
+"icon": string | null;
+"sort_order": number | null;
+};
+Insert: {
+"id": string;
+"brand_id": string;
+"name": string;
+"slug"?: string | null;
+"icon"?: string | null;
+"sort_order"?: number | null;
+};
+Update: {
+"id"?: string;
+"brand_id"?: string;
+"name"?: string;
+"slug"?: string | null;
+"icon"?: string | null;
+"sort_order"?: number | null;
+};
+Relationships: [{foreignKeyName:"categories_brand_id_fkey";columns:["brand_id"];isOneToOne:false;referencedRelation:"brands";referencedColumns:["id"]} ,];
+};
+"delivery_zones": {
+Row: {
+"id": string;
+"name": string;
+"fee_cents": number;
+"is_active": boolean;
+"created_at": string;
+};
+Insert: {
+"id"?: string;
+"name": string;
+"fee_cents": number;
+"is_active"?: boolean;
+"created_at"?: string;
+};
+Update: {
+"id"?: string;
+"name"?: string;
+"fee_cents"?: number;
+"is_active"?: boolean;
+"created_at"?: string;
+};
+Relationships: [];
+};
+"ingredients": {
+Row: {
+"id": string;
+"type": string;
+"name": string;
+"price_cents": number;
+"calories": number | null;
+"is_vegan": boolean | null;
+"is_gluten_free": boolean | null;
+"is_active": boolean;
+};
+Insert: {
+"id": string;
+"type": string;
+"name": string;
+"price_cents"?: number;
+"calories"?: number | null;
+"is_vegan"?: boolean | null;
+"is_gluten_free"?: boolean | null;
+"is_active"?: boolean;
+};
+Update: {
+"id"?: string;
+"type"?: string;
+"name"?: string;
+"price_cents"?: number;
+"calories"?: number | null;
+"is_vegan"?: boolean | null;
+"is_gluten_free"?: boolean | null;
+"is_active"?: boolean;
+};
+Relationships: [];
+};
+"order_events": {
+Row: {
+"id": string;
+"order_id": string;
+"actor_id": string | null;
+"kind": string;
+"data": Json;
+"created_at": string;
+};
+Insert: {
+"id"?: string;
+"order_id": string;
+"actor_id"?: string | null;
+"kind": string;
+"data"?: Json;
+"created_at"?: string;
+};
+Update: {
+"id"?: string;
+"order_id"?: string;
+"actor_id"?: string | null;
+"kind"?: string;
+"data"?: Json;
+"created_at"?: string;
+};
+Relationships: [{foreignKeyName:"order_events_order_id_fkey";columns:["order_id"];isOneToOne:false;referencedRelation:"orders";referencedColumns:["id"]} ,{foreignKeyName:"order_events_actor_id_fkey";columns:["actor_id"];isOneToOne:false;referencedRelation:"users";referencedColumns:["id"]} ,];
+};
+"order_items": {
+Row: {
+"id": string;
+"order_id": string;
+"brand_id": string | null;
+"name": string;
+"quantity": number;
+"unit_price_cents": number;
+"details": Json | null;
+};
+Insert: {
+"id"?: string;
+"order_id": string;
+"brand_id"?: string | null;
+"name": string;
+"quantity"?: number;
+"unit_price_cents"?: number;
+"details"?: Json | null;
+};
+Update: {
+"id"?: string;
+"order_id"?: string;
+"brand_id"?: string | null;
+"name"?: string;
+"quantity"?: number;
+"unit_price_cents"?: number;
+"details"?: Json | null;
+};
+Relationships: [{foreignKeyName:"order_items_order_id_fkey";columns:["order_id"];isOneToOne:false;referencedRelation:"orders";referencedColumns:["id"]} ,{foreignKeyName:"order_items_brand_id_fkey";columns:["brand_id"];isOneToOne:false;referencedRelation:"brands";referencedColumns:["id"]} ,];
+};
+"order_provider_events": {
+Row: {
+"key": string;
+"created_at": string;
+};
+Insert: {
+"key": string;
+"created_at"?: string;
+};
+Update: {
+"key"?: string;
+"created_at"?: string;
+};
+Relationships: [];
+};
+"order_rate_limits": {
+Row: {
+"key": string;
+"window_start": string;
+"attempts": number;
+};
+Insert: {
+"key": string;
+"window_start": string;
+"attempts": number;
+};
+Update: {
+"key"?: string;
+"window_start"?: string;
+"attempts"?: number;
+};
+Relationships: [];
+};
+"order_refunds": {
+Row: {
+"id": string;
+"order_id": string;
+"attempt_id": string;
+"actor_id": string;
+"amount_cop": number;
+"reason": string;
+"state": string;
+"provider_id": string | null;
+"error_code": string | null;
+"created_at": string;
+"updated_at": string;
+};
+Insert: {
+"id"?: string;
+"order_id": string;
+"attempt_id": string;
+"actor_id": string;
+"amount_cop": number;
+"reason": string;
+"state"?: string;
+"provider_id"?: string | null;
+"error_code"?: string | null;
+"created_at"?: string;
+"updated_at"?: string;
+};
+Update: {
+"id"?: string;
+"order_id"?: string;
+"attempt_id"?: string;
+"actor_id"?: string;
+"amount_cop"?: number;
+"reason"?: string;
+"state"?: string;
+"provider_id"?: string | null;
+"error_code"?: string | null;
+"created_at"?: string;
+"updated_at"?: string;
+};
+Relationships: [{foreignKeyName:"order_refunds_order_id_fkey";columns:["order_id"];isOneToOne:false;referencedRelation:"orders";referencedColumns:["id"]} ,{foreignKeyName:"order_refunds_attempt_id_fkey";columns:["attempt_id"];isOneToOne:false;referencedRelation:"payment_attempts";referencedColumns:["id"]} ,{foreignKeyName:"order_refunds_actor_id_fkey";columns:["actor_id"];isOneToOne:false;referencedRelation:"users";referencedColumns:["id"]} ,];
+};
+"orders": {
+Row: {
+"id": string;
+"created_at": string;
+"customer_name": string;
+"phone": string;
+"order_type": string;
+"address": string | null;
+"notes": string | null;
+"status": string;
+"total_cents": number;
+"whatsapp_sent": boolean;
+"updated_at": string;
+"delivery_zone": string | null;
+"delivery_fee_cents": number;
+"version": number;
+"acknowledged_at": string | null;
+"payment_method": string;
+"payment_state": string;
+"actionable_at": string | null;
+"tracking_hash": string | null;
+"tracking_expires_at": string | null;
+"request_key": string | null;
+"request_hash": string | null;
+"financial_attention_at": string | null;
+"financial_acknowledged_at": string | null;
+"financial_resolved_at": string | null;
+};
+Insert: {
+"id"?: string;
+"created_at"?: string;
+"customer_name": string;
+"phone": string;
+"order_type": string;
+"address"?: string | null;
+"notes"?: string | null;
+"status"?: string;
+"total_cents"?: number;
+"whatsapp_sent"?: boolean;
+"updated_at"?: string;
+"delivery_zone"?: string | null;
+"delivery_fee_cents"?: number;
+"version"?: number;
+"acknowledged_at"?: string | null;
+"payment_method"?: string;
+"payment_state"?: string;
+"actionable_at"?: string | null;
+"tracking_hash"?: string | null;
+"tracking_expires_at"?: string | null;
+"request_key"?: string | null;
+"request_hash"?: string | null;
+"financial_attention_at"?: string | null;
+"financial_acknowledged_at"?: string | null;
+"financial_resolved_at"?: string | null;
+};
+Update: {
+"id"?: string;
+"created_at"?: string;
+"customer_name"?: string;
+"phone"?: string;
+"order_type"?: string;
+"address"?: string | null;
+"notes"?: string | null;
+"status"?: string;
+"total_cents"?: number;
+"whatsapp_sent"?: boolean;
+"updated_at"?: string;
+"delivery_zone"?: string | null;
+"delivery_fee_cents"?: number;
+"version"?: number;
+"acknowledged_at"?: string | null;
+"payment_method"?: string;
+"payment_state"?: string;
+"actionable_at"?: string | null;
+"tracking_hash"?: string | null;
+"tracking_expires_at"?: string | null;
+"request_key"?: string | null;
+"request_hash"?: string | null;
+"financial_attention_at"?: string | null;
+"financial_acknowledged_at"?: string | null;
+"financial_resolved_at"?: string | null;
+};
+Relationships: [];
+};
+"payment_attempts": {
+Row: {
+"id": string;
+"order_id": string;
+"reference": string;
+"provider_id": string | null;
+"environment": string;
+"amount_cop": number;
+"currency": string;
+"state": string;
+"provider_status": string | null;
+"expires_at": string;
+"checked_at": string | null;
+"created_at": string;
+};
+Insert: {
+"id"?: string;
+"order_id": string;
+"reference": string;
+"provider_id"?: string | null;
+"environment": string;
+"amount_cop": number;
+"currency"?: string;
+"state"?: string;
+"provider_status"?: string | null;
+"expires_at"?: string;
+"checked_at"?: string | null;
+"created_at"?: string;
+};
+Update: {
+"id"?: string;
+"order_id"?: string;
+"reference"?: string;
+"provider_id"?: string | null;
+"environment"?: string;
+"amount_cop"?: number;
+"currency"?: string;
+"state"?: string;
+"provider_status"?: string | null;
+"expires_at"?: string;
+"checked_at"?: string | null;
+"created_at"?: string;
+};
+Relationships: [{foreignKeyName:"payment_attempts_order_id_fkey";columns:["order_id"];isOneToOne:false;referencedRelation:"orders";referencedColumns:["id"]} ,];
+};
+"product_default_ingredients": {
+Row: {
+"id": string;
+"product_id": string;
+"ingredient_name": string;
+"is_removable": boolean;
+"sort_order": number;
+"is_extra": boolean;
+"extra_price_cents": number;
+"created_at": string | null;
+};
+Insert: {
+"id"?: string;
+"product_id": string;
+"ingredient_name": string;
+"is_removable"?: boolean;
+"sort_order"?: number;
+"is_extra"?: boolean;
+"extra_price_cents"?: number;
+"created_at"?: string | null;
+};
+Update: {
+"id"?: string;
+"product_id"?: string;
+"ingredient_name"?: string;
+"is_removable"?: boolean;
+"sort_order"?: number;
+"is_extra"?: boolean;
+"extra_price_cents"?: number;
+"created_at"?: string | null;
+};
+Relationships: [{foreignKeyName:"product_default_ingredients_product_id_fkey";columns:["product_id"];isOneToOne:false;referencedRelation:"products";referencedColumns:["id"]} ,];
+};
+"products": {
+Row: {
+"id": string;
+"brand_id": string;
+"category_id": string;
+"name": string;
+"description": string | null;
+"price_cents": number;
+"image_url": string | null;
+"is_active": boolean;
+"calories": number | null;
+"is_vegan": boolean | null;
+"is_gluten_free": boolean | null;
+"is_popular": boolean | null;
+"is_new": boolean | null;
+"ingredients_list": string[] | null;
+};
+Insert: {
+"id"?: string;
+"brand_id": string;
+"category_id": string;
+"name": string;
+"description"?: string | null;
+"price_cents"?: number;
+"image_url"?: string | null;
+"is_active"?: boolean;
+"calories"?: number | null;
+"is_vegan"?: boolean | null;
+"is_gluten_free"?: boolean | null;
+"is_popular"?: boolean | null;
+"is_new"?: boolean | null;
+"ingredients_list"?: string[] | null;
+};
+Update: {
+"id"?: string;
+"brand_id"?: string;
+"category_id"?: string;
+"name"?: string;
+"description"?: string | null;
+"price_cents"?: number;
+"image_url"?: string | null;
+"is_active"?: boolean;
+"calories"?: number | null;
+"is_vegan"?: boolean | null;
+"is_gluten_free"?: boolean | null;
+"is_popular"?: boolean | null;
+"is_new"?: boolean | null;
+"ingredients_list"?: string[] | null;
+};
+Relationships: [{foreignKeyName:"products_brand_id_fkey";columns:["brand_id"];isOneToOne:false;referencedRelation:"brands";referencedColumns:["id"]} ,{foreignKeyName:"products_category_id_fkey";columns:["category_id"];isOneToOne:false;referencedRelation:"categories";referencedColumns:["id"]} ,];
+};
+"promotions": {
+Row: {
+"id": string;
+"title": string;
+"description": string | null;
+"type": string;
+"discount_type": string;
+"discount_value": number;
+"badge_text": string | null;
+"image_url": string | null;
+"price_cents": number | null;
+"cta_text": string | null;
+"cta_url": string | null;
+"days_of_week": number[] | null;
+"is_active": boolean;
+"starts_at": string | null;
+"ends_at": string | null;
+"sort_order": number;
+"created_at": string;
+};
+Insert: {
+"id"?: string;
+"title": string;
+"description"?: string | null;
+"type"?: string;
+"discount_type"?: string;
+"discount_value"?: number;
+"badge_text"?: string | null;
+"image_url"?: string | null;
+"price_cents"?: number | null;
+"cta_text"?: string | null;
+"cta_url"?: string | null;
+"days_of_week"?: number[] | null;
+"is_active"?: boolean;
+"starts_at"?: string | null;
+"ends_at"?: string | null;
+"sort_order"?: number;
+"created_at"?: string;
+};
+Update: {
+"id"?: string;
+"title"?: string;
+"description"?: string | null;
+"type"?: string;
+"discount_type"?: string;
+"discount_value"?: number;
+"badge_text"?: string | null;
+"image_url"?: string | null;
+"price_cents"?: number | null;
+"cta_text"?: string | null;
+"cta_url"?: string | null;
+"days_of_week"?: number[] | null;
+"is_active"?: boolean;
+"starts_at"?: string | null;
+"ends_at"?: string | null;
+"sort_order"?: number;
+"created_at"?: string;
+};
+Relationships: [];
+};
+"settings": {
+Row: {
+"key": string;
+"value": string;
+};
+Insert: {
+"key": string;
+"value": string;
+};
+Update: {
+"key"?: string;
+"value"?: string;
+};
+Relationships: [];
+};
+"user_roles": {
+Row: {
+"id": string;
+"user_id": string;
+"role": Database['public']['Enums']["app_role"];
+};
+Insert: {
+"id"?: string;
+"user_id": string;
+"role": Database['public']['Enums']["app_role"];
+};
+Update: {
+"id"?: string;
+"user_id"?: string;
+"role"?: Database['public']['Enums']["app_role"];
+};
+Relationships: [{foreignKeyName:"user_roles_user_id_fkey";columns:["user_id"];isOneToOne:false;referencedRelation:"users";referencedColumns:["id"]} ,];
+};
+}; Views: { [_ in never]: never }; Functions: {
+"create_order_with_items": {Args: {"p_customer_name": string;"p_phone": string;"p_order_type": string;"p_address"?: string;"p_delivery_zone"?: string;"p_delivery_fee_cents"?: number;"p_notes"?: string;"p_total_cents"?: number;"p_items"?: Json;}; Returns: string};
+"has_role": {Args: {"_user_id": string;"_role": Database['public']['Enums']["app_role"];}; Returns: boolean};
+"order_action": {Args: {"p_id": string;"p_version": number;"p_action": string;"p_note"?: string;}; Returns: Json};
+"order_create": {Args: {"p_request": Json;"p_key": string;"p_quote": string;"p_tracking_hash": string;}; Returns: Json};
+"order_generic_ingredient": {Args: {"p_id": string;"p_name": string;}; Returns: boolean};
+"order_payment_apply": {Args: {"p_reference": string;"p_provider_id": string;"p_amount": number;"p_currency": string;"p_environment": string;"p_status": string;"p_event_key": string;}; Returns: undefined};
+"order_payment_start": {Args: {"p_hash": string;"p_environment": string;}; Returns: Json};
+"order_quote": {Args: {"p_request": Json;}; Returns: Json};
+"order_rate_limit": {Args: {"p_key": string;"p_limit"?: number;}; Returns: boolean};
+"order_receipt": {Args: {"p_id": string;}; Returns: Json};
+"order_refund_apply": {Args: {"p_id": string;"p_provider_id": string;"p_transaction_id": string;"p_amount": number;"p_status": string;}; Returns: undefined};
+"order_refund_claim": {Args: {"p_id": string;}; Returns: Json};
+"order_refund_issue": {Args: {"p_id": string;"p_code": string;}; Returns: undefined};
+"order_refund_request": {Args: {"p_id": string;"p_version": number;"p_reason": string;}; Returns: Json};
+"order_track": {Args: {"p_hash": string;}; Returns: Json};
+"track_analytics_event": {Args: {"p_event_type": string;"p_metadata": Json;"p_rate_key": string;}; Returns: boolean};
+}; Enums: {
+"app_role": "admin" | "user";
+}; CompositeTypes: { [_ in never]: never } } };
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
+export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
+export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update'];
+export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T];

@@ -1268,3 +1268,173 @@ body:has(.experience-shell) [role='dialog'] h2 {
 .experience-promotions h2 { font-size: clamp(28px, 3vw, 44px); }
 .experience-promotions img { height: 220px; }
 @media(max-width:767px) { .experience-promotions { padding: 35px 6% 0; } }
+
+/* Mobile browsing: readable recipes, comfortable taps and safe-area spacing. */
+@media (max-width: 767px) {
+  .experience-title { font-size: clamp(48px, 14vw, 72px); }
+  .experience-actions { flex-wrap: wrap; gap: 12px 20px; }
+  .experience-section { padding: 40px 16px; }
+  .experience-section-heading > p { font-size: 14px; margin-top: 14px; }
+  .experience-search input,
+  .experience-checkout input:not([type="checkbox"]),
+  .experience-checkout textarea,
+  .bowl-studio input,
+  .bowl-studio textarea { font-size: 16px; }
+  .experience-search button { min-width: 44px; min-height: 44px; }
+  .experience-category-tabs {
+    margin-inline: -16px;
+    padding: 8px 16px 12px;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 16px;
+  }
+  .experience-category-tabs button { font-size: 13px; }
+  .experience-product-description { font-size: 13px; line-height: 1.6; -webkit-line-clamp: 3; }
+  .experience-product-name button { min-height: 44px; width: 100%; }
+  .experience-product-price { font-size: 15px; padding-top: 10px; }
+  .experience-product-add { width: 46px; height: 46px; }
+  .experience-product:hover { transform: none; }
+  .is-compact .experience-product-image { width: 110px; margin-right: 8px; }
+  .is-compact .experience-product-copy { padding: 12px; }
+  .experience-cart-drawer {
+    height: 100dvh;
+    padding: 24px 16px max(16px, env(safe-area-inset-bottom));
+  }
+  .experience-cart-drawer > div:last-of-type { flex-shrink: 0; }
+  .product-customization-footer { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .product-customization-drawer { max-height: calc(100dvh - env(safe-area-inset-top)); }
+  .experience-shell main { scroll-padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  [data-sonner-toaster][data-y-position="bottom"] {
+    bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+  }
+  body:has([role="dialog"][data-state="open"]) [data-sonner-toaster] {
+    visibility: hidden;
+  }
+}
+@media (max-width: 379px) {
+  .experience-product-grid { grid-template-columns: 1fr; gap: 16px; }
+  .experience-section-heading h2 { font-size: 37px; }
+  .experience-product-name { font-size: 20px; }
+  .experience-product-copy { padding: 12px 16px 16px; }
+}
+
+/* Ohana's menu and ordering surfaces share the same visual language. */
+.brand-illustration { width: 100%; height: 100%; color: var(--exp-ink); }
+.brand-divider { display: flex; align-items: center; justify-content: center; gap: 28px; padding: 22px 16px; background: var(--exp-orchid); color: var(--exp-ink); font-size: 12px; font-weight: 600; letter-spacing: .14em; }
+.brand-divider > span:first-child, .brand-divider > span:last-child { font-size: 28px; }
+.brand-builder-intro { display: flex; gap: 18px; margin: -8px 0 24px; }
+.brand-builder-intro svg { width: 70px; height: 70px; }
+.brand-story-art { width: 190px; flex-shrink: 0; transform: rotate(-8deg); }
+.experience-favorites { background: hsl(var(--brand-muted) / .45); }
+.experience-favorites .experience-section-heading h2 { font-size: clamp(36px, 4vw, 56px); }
+.menu-category-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; color: hsl(var(--muted-foreground)); }
+.experience-product { --menu-tone: var(--exp-orchid); }
+.experience-product[data-category-tone="mint"] { --menu-tone: var(--exp-mint); }
+.experience-product[data-category-tone="melon"] { --menu-tone: var(--exp-melon); }
+.experience-product-copy { border-top: 4px solid var(--menu-tone); }
+.experience-product-price { font-family: 'Space Grotesk', sans-serif; font-size: 21px; letter-spacing: -.035em; }
+.menu-recipe-link { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; min-height: 44px; color: hsl(var(--foreground)); font-size: 12px; text-decoration: underline; text-decoration-color: hsl(var(--border)); text-underline-offset: 4px; }
+.experience-product-add.is-added { animation: ohana-added .28s ease-out; }
+@keyframes ohana-added { 50% { transform: scale(1.12); } }
+.experience-product-compact { flex-direction: row; }
+.experience-product-compact .experience-product-image { width: 130px; align-self: center; flex-shrink: 0; border-radius: 18px; margin-right: 12px; }
+.experience-product-compact .experience-product-copy { min-width: 0; border-top: 0; border-left: 4px solid var(--menu-tone); }
+.experience-product-compact .experience-product-name { font-size: 18px; }
+.experience-product-compact .experience-product-description { -webkit-line-clamp: 2; }
+.product-customization-drawer { color: hsl(var(--foreground)); }
+.product-detail-body { padding: 28px; }
+.product-detail-heading .experience-eyebrow { margin-bottom: 12px; }
+.product-detail-heading h2 { font-size: clamp(28px, 3vw, 38px); line-height: 1.1; }
+.product-full-recipe { font-size: 15px; line-height: 1.75; margin: 16px 0 12px; }
+.product-detail-heading > p:last-child { font-size: 23px; font-family: 'Space Grotesk', sans-serif; }
+.product-options-section { border-top: 1px solid hsl(var(--border)); padding-top: 24px; }
+.product-options-section h3 { font-size: 21px; margin-bottom: 8px; }
+.product-removal-option[aria-pressed="true"] { background: var(--exp-melon); border-color: var(--exp-ink); color: var(--exp-ink); }
+.product-extra-option { border-style: solid; background: hsl(var(--muted) / .4); transition: background .18s, border-color .18s; }
+.product-extra-option[data-selected="true"] { background: hsl(var(--accent) / .45); border-color: hsl(var(--foreground)); }
+.product-customization-footer > div { font-family: 'Space Grotesk', sans-serif; }
+.product-customization-footer > div > span:last-child { color: hsl(var(--foreground)); font-size: 24px; }
+.product-customization-footer > button { min-height: 48px; border-radius: 99px; }
+.product-customization-footer > button:first-of-type { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.product-customization-footer > button:first-of-type:disabled { opacity: .5; }
+.cart-item-visual { width: 64px; flex-shrink: 0; align-self: flex-start; aspect-ratio: 1; overflow: hidden; border-radius: 16px; background: hsl(var(--muted)); }
+.cart-item-visual > svg { height: 64px; }
+.cart-order-item { border-radius: 20px; padding: 14px 12px; border: 1px solid hsl(var(--border) / .6); background: hsl(var(--muted) / .35); }
+.experience-cart-drawer .btn-ohana,
+.experience-checkout .btn-ohana,
+.experience-order-state .btn-ohana { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-radius: 99px; min-height: 48px; box-shadow: none; }
+.experience-cart-drawer > div:last-of-type { border-color: hsl(var(--border)); }
+.experience-checkout-heading h1 em,
+.experience-about em,
+.about-invitation em { font-family: Georgia, serif; font-weight: 400; }
+.experience-checkout form { padding: 28px; }
+.checkout-form-section { padding: 22px !important; border: 1px solid hsl(var(--border)); border-radius: 20px; background: hsl(var(--muted) / .25); }
+.checkout-form-section > .absolute { display: none; }
+.checkout-form-section h3 { font-size: 20px; text-transform: none; letter-spacing: -.04em; color: hsl(var(--foreground)); }
+.checkout-form-section:nth-of-type(2) { background: hsl(var(--brand-muted) / .45); }
+.checkout-payment { background: hsl(var(--muted) / .55); }
+.checkout-order-summary { border-radius: 24px; }
+.checkout-summary-toggle { display: flex; justify-content: space-between; gap: 16px; align-items: center; list-style: none; min-height: 64px; cursor: default; }
+.checkout-summary-toggle::-webkit-details-marker { display: none; }
+.checkout-summary-toggle strong { font-family: 'Space Grotesk', sans-serif; font-size: 25px; letter-spacing: -.05em; }
+.checkout-summary-toggle small { display: block; font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 6px; font-weight: 400; }
+.checkout-summary-price { text-align: right; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.checkout-summary-content { border-top: 1px solid hsl(var(--border)); margin-top: 18px; padding-top: 20px; }
+.experience-order-state h1 { font-size: clamp(32px, 5vw, 52px); letter-spacing: -.05em; }
+.experience-order-state > .container > div { border-radius: 28px; }
+.experience-about > section:first-of-type { background: hsl(var(--muted)); }
+.experience-about h1 { font-size: clamp(46px, 6.5vw, 84px); line-height: 1.05; margin-top: 22px; }
+.experience-about h2 { font-size: clamp(32px, 4vw, 46px); line-height: 1.15; }
+.experience-about p { line-height: 1.8; }
+.experience-about .grid > div > .flex .brand-illustration { width: 56px; height: 56px; }
+.about-bowl-art { padding: 40px; border-radius: 38% 38% 24px 24px; background: var(--exp-mint); color: var(--exp-ink); text-align: center; }
+.about-bowl-art > svg { max-width: 270px; margin: auto; display: block; }
+.about-bowl-art > span { display: block; font-family: 'Space Grotesk', sans-serif; font-size: 36px; line-height: 1.15; letter-spacing: -.05em; }
+.experience-about .grid > .bg-card { border: 1px solid hsl(var(--border)); border-radius: 24px; box-shadow: none; }
+.about-invitation { text-align: center; padding: 70px 16px; background: hsl(var(--brand-muted)); }
+.about-invitation h2 { margin-bottom: 28px; }
+@media (hover: hover) and (pointer: fine) {
+  .menu-recipe-link:hover { text-decoration-color: currentColor; }
+  .product-removal-option:hover { border-color: hsl(var(--foreground)); }
+}
+@media (hover: none) {
+  .experience-product img { transform: none !important; }
+  .experience-product-add:hover { transform: none; }
+}
+@media (max-width: 767px) {
+  .favorites-track { display: flex; overflow-x: auto; gap: 16px; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin-inline: -16px; padding: 0 16px 12px; }
+  .favorites-track > article { flex: 0 0 82%; scroll-snap-align: start; }
+  .favorites-track .experience-product-name { font-size: 24px; }
+  .favorites-track .experience-product-description { -webkit-line-clamp: 2; }
+  .brand-story-art { width: 110px; }
+  .experience-story > .brand-story-art { min-width: 0; flex: 0 0 110px; }
+  .brand-builder-intro svg { width: 52px; height: 52px; }
+  .experience-product-price { font-size: 18px; }
+  .experience-product-copy { padding: 12px; }
+  .menu-category-label { font-size: 9px; letter-spacing: .04em; }
+  .experience-product-description { margin-top: 4px; }
+  .experience-product-name button { min-height: 44px; }
+  .experience-product-compact .experience-product-image { width: 104px; margin-right: 8px; }
+  .product-detail-body { padding: 24px 20px; }
+  .product-options-section { padding-top: 20px; }
+  .cart-item-visual { width: 52px; border-radius: 12px; }
+  .cart-item-visual > svg { height: 52px; }
+  .experience-checkout form { padding: 16px; }
+  .checkout-form-section { padding: 16px !important; }
+  .checkout-summary-toggle { cursor: pointer; }
+  .checkout-summary-toggle strong { font-size: 23px; }
+  .checkout-summary-price { font-size: 17px; white-space: normal; }
+  .checkout-summary-content .cart-item-visual { width: 46px; }
+  .checkout-summary-content .cart-item-visual > svg { height: 46px; }
+  .brand-divider { gap: 14px; font-size: 9px; letter-spacing: .08em; }
+  .experience-about > section { padding-top: 44px; padding-bottom: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .experience-product-add.is-added { animation: none; }
+  .product-customization-drawer *, .product-customization-drawer *::before,
+  .product-customization-drawer *::after { animation: none !important; transition: none !important; }
+  .experience-cart-drawer *, .experience-order-state * { animation: none !important; transition: none !important; }
+  .experience-cart-drawer .scroll-fade-up,
+  .experience-checkout .scroll-fade-up, .experience-checkout .scroll-scale-up {
+    opacity: 1; transform: none;
+  }
+}

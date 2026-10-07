@@ -1,3 +1,4 @@
+import { bowlSchema } from '@/domain/bowlConfiguration';
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { CartItem, CartState, Product, CustomBowl, Brand, ProductCustomization } from '@/types';
@@ -8,12 +9,12 @@ import {
   getProductCustomizationKey,
   normalizeProductCustomization,
 } from '@/domain/productCustomizations';
-import { useBowlRules, useIngredients, useProducts } from '@/hooks/use-catalog';
+import { useBowlRules, useIngredients, useProducts, usePromotions } from '@/hooks/use-catalog';
 import { z } from 'zod';
 import { toast } from 'sonner';
 
 // ─── Cart validation schema (versioned) ─────────────────
-const CART_VERSION = 'cart:v3';
+const CART_VERSION = 'cart:v4';
 const CART_STORAGE_KEY = 'ohana-bowls-cart';
 
 const productCustomizationSchema = z.object({
@@ -33,6 +34,7 @@ const cartItemSchema = z.object({
   type: z.enum(['product', 'custom-bowl']),
   product: z.any().optional().nullable(),
   customBowl: z.any().optional().nullable(),
+  reviewIssues: z.array(z.string()).optional(),
   customizations: productCustomizationSchema.optional().nullable(),
   quantity: z.number().int().positive(),
   notes: z.string().optional().nullable(),
@@ -41,7 +43,7 @@ const cartItemSchema = z.object({
 });
 
 const cartStateSchema = z.object({
-  version: z.literal(CART_VERSION).optional(),
+  version: z.enum(['cart:v3', 'cart:v4']).optional(),
   items: z.array(cartItemSchema),
   subtotal: z.number(),
   total: z.number(),
@@ -51,9 +53,10 @@ const cartStateSchema = z.object({
 type CartAction =
   | { type: 'ADD_PRODUCT'; payload: { product: Product; quantity: number; notes?: string; customizations?: ProductCustomization } }
   | { type: 'ADD_CUSTOM_BOWL'; payload: { customBowl: CustomBowl; notes?: string } }
+  | { type: 'ADD_BOWL_ORDER'; payload: { bowl: CustomBowl; drinks: {product: Product; quantity: number}[]; replaceId?: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
   | { type: 'REMOVE_ITEM'; payload: { itemId: string } }
-  | { type: 'RECONCILE_CATALOG'; payload: { products: Product[]; bowlRules: Parameters<typeof reconcileCartWithCatalog>[1]['bowlRules']; ingredients: Parameters<typeof reconcileCartWithCatalog>[1]['ingredients'] } }
+  | { type: 'RECONCILE_CATALOG'; payload: Parameters<typeof reconcileCartWithCatalog>[1] }
   | { type: 'CLEAR_CART' }
   | { type: 'LOAD_CART'; payload: CartState };
 
@@ -114,6 +117,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       }];
       return { items: newItems, ...calculateTotals(newItems) };
     }
+    case 'ADD_BOWL_ORDER': {
+      const original = state.items.find(i => i.id === action.payload.replaceId);
+      let next = {...state, items:state.items.filter(i => i.id !== action.payload.replaceId)};
+      next = cartReducer(next, {type:'ADD_CUSTOM_BOWL', payload:{customBowl:action.payload.bowl, notes:action.payload.bowl.notes}});
+      if (original && original.quantity > 1) next = cartReducer(next, {type:'UPDATE_QUANTITY', payload:{itemId:next.items[next.items.length - 1].id, quantity:original.quantity}});
+      for (const drink of action.payload.drinks) next = cartReducer(next, {type:'ADD_PRODUCT', payload:drink});
+      return next;
+    }
     case 'UPDATE_QUANTITY': {
       const { itemId, quantity } = action.payload;
       if (quantity <= 0) {
@@ -146,6 +157,7 @@ interface CartStateContextType {
 }
 
 interface CartActionsContextType {
+  addBowlOrder: (bowl: CustomBowl, drinks: {product: Product; quantity: number}[], replaceId?: string) => void;
   addProduct: (product: Product, quantity?: number, notes?: string, customizations?: ProductCustomization) => void;
   addCustomBowl: (customBowl: CustomBowl, notes?: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -164,7 +176,14 @@ function loadCartFromStorage(): CartState {
     if (!raw) return initialState;
     const parsed = JSON.parse(raw);
     const result = cartStateSchema.safeParse(parsed);
-    if (result.success) return { items: result.data.items as CartItem[], subtotal: result.data.subtotal, total: result.data.total };
+    if (result.success) {
+      const items = result.data.items.map(item => {
+        if (item.type !== 'custom-bowl') return item as CartItem;
+        const bowl = bowlSchema.safeParse(item.customBowl);
+        return bowl.success ? {...item, customBowl:bowl.data} as CartItem : {...item, customBowl:undefined, reviewIssues:['La receta guardada está incompleta. Edita el bowl para reconstruirla.']} as CartItem;
+      });
+      return {items, ...calculateTotals(items)};
+    }
     localStorage.removeItem(CART_STORAGE_KEY);
     return initialState;
   } catch {
@@ -186,8 +205,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { data: products = [], isSuccess: productsReady } = useProducts();
   const { data: bowlRules = [], isSuccess: bowlRulesReady } = useBowlRules();
   const { data: ingredients = [], isSuccess: ingredientsReady } = useIngredients();
+  const { data: promotions = [], isSuccess: promotionsReady } = usePromotions();
 
-  const catalogReady = productsReady && bowlRulesReady && ingredientsReady;
+  const catalogReady = productsReady && bowlRulesReady && ingredientsReady && promotionsReady;
 
   useEffect(() => { saveCartToStorage(cart); }, [cart]);
 
@@ -196,13 +216,15 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     dispatch({
       type: 'RECONCILE_CATALOG',
-      payload: { products, bowlRules, ingredients },
+      payload: { products, bowlRules, ingredients, promotions },
     });
-  }, [bowlRules, catalogReady, ingredients, products]);
+  }, [bowlRules, catalogReady, ingredients, products, promotions]);
 
   const addProduct = useCallback((product: Product, quantity = 1, notes?: string, customizations?: ProductCustomization) => {
     dispatch({ type: 'ADD_PRODUCT', payload: { product, quantity, notes, customizations } });
   }, []);
+
+  const addBowlOrder = useCallback((bowl: CustomBowl, drinks: {product: Product; quantity: number}[], replaceId?: string) => { dispatch({type:'ADD_BOWL_ORDER', payload:{bowl, drinks, replaceId}}); }, []);
 
   const addCustomBowl = useCallback((customBowl: CustomBowl, notes?: string) => {
     dispatch({ type: 'ADD_CUSTOM_BOWL', payload: { customBowl, notes } });
@@ -224,8 +246,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const stateValue = useMemo(() => ({ cart }), [cart]);
   const actionsValue = useMemo(() => ({
-    addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand,
-  }), [addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand]);
+    addBowlOrder, addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand,
+  }), [addBowlOrder, addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand]);
 
   return (
     <CartStateContext.Provider value={stateValue}>

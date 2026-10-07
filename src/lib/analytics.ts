@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { orderApi } from '@/lib/orderApi';
 
 type AnalyticsEvent =
   | { type: 'page_view'; page: string }
@@ -13,10 +13,7 @@ type AnalyticsEvent =
  */
 export function trackEvent(event: AnalyticsEvent) {
   const { type, ...metadata } = event;
-  supabase
-    .from('analytics_events')
-    .insert({ event_type: type, metadata })
-    .then(({ error }) => {
-      if (error) { /* fire-and-forget: analytics failure is non-critical */ }
-    });
+  void orderApi('analytics', { event_type: type, metadata }).catch(() => {
+    // Analytics failure is non-critical and must not block shopping.
+  });
 }

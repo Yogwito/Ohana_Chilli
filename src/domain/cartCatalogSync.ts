@@ -1,55 +1,24 @@
+import { reconcileBowl, validateBowl } from '@/domain/bowlConfiguration';
 import { calculateBowlPrice } from '@/domain/bowlPricing';
-import { calculateProductUnitPrice, normalizeProductCustomization } from '@/domain/productCustomizations';
-import type { BowlSizeRule, CartItem, CartState, CustomBowl, Ingredient, Product } from '@/types';
+import {
+  calculateProductUnitPrice,
+  normalizeProductCustomization,
+} from '@/domain/productCustomizations';
+import type {
+  BowlSizeRule,
+  CartItem,
+  CartState,
+  CustomBowl,
+  Ingredient,
+  Product,
+  Promotion,
+} from '@/types';
 
 export interface CatalogSnapshot {
   bowlRules: BowlSizeRule[];
   ingredients: Ingredient[];
   products: Product[];
-}
-
-function reconcileIngredientSelections(
-  selections: Ingredient[],
-  ingredientsById: Map<string, Ingredient>,
-) {
-  const nextSelections: Ingredient[] = [];
-
-  for (const selection of selections) {
-    const currentIngredient = ingredientsById.get(selection.id);
-    if (!currentIngredient) return null;
-    nextSelections.push(currentIngredient);
-  }
-
-  return nextSelections;
-}
-
-function reconcileCustomBowl(
-  bowl: CustomBowl,
-  bowlRulesBySize: Map<string, BowlSizeRule>,
-  ingredientsById: Map<string, Ingredient>,
-) {
-  const currentSize = bowlRulesBySize.get(bowl.size.size);
-  if (!currentSize) return null;
-
-  const bases = reconcileIngredientSelections(bowl.bases, ingredientsById);
-  const proteins = reconcileIngredientSelections(bowl.proteins, ingredientsById);
-  const acompanantes = reconcileIngredientSelections(bowl.acompanantes, ingredientsById);
-  const sauces = reconcileIngredientSelections(bowl.sauces ?? [], ingredientsById);
-  const complementos = reconcileIngredientSelections(bowl.complementos ?? [], ingredientsById);
-
-  if (!bases || !proteins || !acompanantes || !sauces || !complementos) {
-    return null;
-  }
-
-  return {
-    ...bowl,
-    size: currentSize,
-    bases,
-    proteins,
-    acompanantes,
-    sauces,
-    complementos,
-  };
+  promotions?: Promotion[];
 }
 
 function reconcileCartItem(
@@ -57,13 +26,18 @@ function reconcileCartItem(
   productsById: Map<string, Product>,
   bowlRulesBySize: Map<string, BowlSizeRule>,
   ingredientsById: Map<string, Ingredient>,
-) {
+): CartItem | null {
   if (item.type === 'product') {
-    const currentProduct = item.product?.id ? productsById.get(item.product.id) : null;
+    const currentProduct = item.product?.id
+      ? productsById.get(item.product.id)
+      : null;
     if (!currentProduct) return null;
 
     const customizations = normalizeProductCustomization(item.customizations);
-    const unitPrice = calculateProductUnitPrice(currentProduct.price, customizations);
+    const unitPrice = calculateProductUnitPrice(
+      currentProduct.price,
+      customizations,
+    );
 
     return {
       ...item,
@@ -75,28 +49,73 @@ function reconcileCartItem(
     };
   }
 
-  if (!item.customBowl) return null;
+  if (!item.customBowl)
+    return {
+      ...item,
+      reviewIssues: [
+        'La receta guardada está incompleta. Edita el bowl para reconstruirla.',
+      ],
+    };
 
-  const currentBowl = reconcileCustomBowl(item.customBowl, bowlRulesBySize, ingredientsById);
-  if (!currentBowl) return null;
+  let currentBowl: CustomBowl;
+  try {
+    currentBowl = reconcileBowl(
+      item.customBowl,
+      [...bowlRulesBySize.values()],
+      [...ingredientsById.values()],
+    );
+  } catch {
+    return {
+      ...item,
+      reviewIssues: ['La configuración del bowl necesita revisión.'],
+    };
+  }
+  const reviewIssues = validateBowl(
+    currentBowl,
+    [...bowlRulesBySize.values()],
+    [...ingredientsById.values()],
+  ).map((i) => i.message);
 
   const unitPrice = calculateBowlPrice(currentBowl);
 
   return {
     ...item,
     customBowl: currentBowl,
+    reviewIssues,
     unitPrice,
     totalPrice: unitPrice * item.quantity,
   };
 }
 
-export function reconcileCartWithCatalog(state: CartState, snapshot: CatalogSnapshot): CartState {
-  const productsById = new Map(snapshot.products.map((product) => [product.id, product]));
-  const bowlRulesBySize = new Map(snapshot.bowlRules.map((rule) => [rule.size, rule]));
-  const ingredientsById = new Map(snapshot.ingredients.map((ingredient) => [ingredient.id, ingredient]));
+export function reconcileCartWithCatalog(
+  state: CartState,
+  snapshot: CatalogSnapshot,
+): CartState {
+  const productsById = new Map(
+    snapshot.products.map((product) => [product.id, product]),
+  );
+  // Promotions are catalog entities in their own right, never fabricated product rows.
+  for (const promo of snapshot.promotions || []) {
+    const now = Date.now();
+    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Bogota', weekday: 'short' }).format(new Date());
+    const day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(weekday);
+    if (!promo.is_active || promo.type !== 'combo' || promo.price_cents == null || promo.price_cents <= 0
+      || (promo.starts_at && new Date(promo.starts_at).getTime() > now)
+      || (promo.ends_at && new Date(promo.ends_at).getTime() <= now)
+      || (promo.days_of_week?.length && !promo.days_of_week.includes(day))) continue;
+    productsById.set(`promo-${promo.id}`, { id:`promo-${promo.id}`,promotionId:promo.id,name:promo.title,description:promo.description || '',price:promo.price_cents,brand:'ohana',categoryId:'promociones',imageUrl:promo.image_url });
+  }
+  const bowlRulesBySize = new Map(
+    snapshot.bowlRules.map((rule) => [rule.size, rule]),
+  );
+  const ingredientsById = new Map(
+    snapshot.ingredients.map((ingredient) => [ingredient.id, ingredient]),
+  );
 
   const nextItems = state.items
-    .map((item) => reconcileCartItem(item, productsById, bowlRulesBySize, ingredientsById))
+    .map((item) =>
+      reconcileCartItem(item, productsById, bowlRulesBySize, ingredientsById),
+    )
     .filter((item): item is CartItem => Boolean(item));
 
   const nextState: CartState = {
@@ -105,5 +124,7 @@ export function reconcileCartWithCatalog(state: CartState, snapshot: CatalogSnap
     total: nextItems.reduce((sum, item) => sum + item.totalPrice, 0),
   };
 
-  return JSON.stringify(nextState) === JSON.stringify(state) ? state : nextState;
+  return JSON.stringify(nextState) === JSON.stringify(state)
+    ? state
+    : nextState;
 }

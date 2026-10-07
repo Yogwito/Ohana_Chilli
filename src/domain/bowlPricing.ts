@@ -67,6 +67,12 @@ export function getBowlChargeLines(bowl: CustomBowl): BowlChargeLine[] {
     });
   });
 
+  for (const extra of bowl.extras || []) {
+    const key = `${extra.ingredient.id}:${extra.unitPrice}`;
+    const existing = groupedCharges.get(key);
+    if (existing) { existing.quantity += extra.quantity; existing.amount += extra.quantity * extra.unitPrice; }
+    else groupedCharges.set(key, {label: extra.ingredient.name, quantity:extra.quantity, unitAmount:extra.unitPrice, amount:extra.quantity * extra.unitPrice});
+  }
   return Array.from(groupedCharges.values());
 }
 

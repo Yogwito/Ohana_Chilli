@@ -11,6 +11,7 @@ interface ProductImageProps {
   className?: string;
   imageClassName?: string;
   fallbackClassName?: string;
+  sizes?: string;
 }
 
 function ProductImageContent({
@@ -18,6 +19,7 @@ function ProductImageContent({
   className,
   imageClassName,
   fallbackClassName,
+  sizes,
 }: Omit<ProductImageProps, 'ratio'>) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -37,6 +39,10 @@ function ProductImageContent({
           {!isLoaded ? <Skeleton className="absolute inset-0 rounded-none" /> : null}
           <img
             src={resolvedImageUrl}
+            srcSet={resolvedImageUrl?.startsWith('/images/menu/') && resolvedImageUrl.endsWith('.webp')
+              ? `${resolvedImageUrl.replace(/\.webp$/, '-480.webp')} 480w, ${resolvedImageUrl} 1200w`
+              : undefined}
+            sizes={sizes ?? '(max-width: 767px) 90vw, 440px'}
             alt={product.name}
             loading="lazy"
             decoding="async"
@@ -49,6 +55,7 @@ function ProductImageContent({
               'h-full w-full object-cover transition-all duration-300',
               isLoaded ? 'opacity-100 group-hover:scale-105' : 'opacity-0',
               imageClassName,
+              resolvedImageUrl?.startsWith('/images/brands/') && 'object-contain bg-[#fffaf4] p-3',
             )}
           />
         </>
@@ -75,6 +82,7 @@ export default function ProductImage({
   className,
   imageClassName,
   fallbackClassName,
+  sizes,
 }: ProductImageProps) {
   return (
     <AspectRatio ratio={ratio}>
@@ -83,6 +91,7 @@ export default function ProductImage({
         className={className}
         imageClassName={imageClassName}
         fallbackClassName={fallbackClassName}
+        sizes={sizes}
       />
     </AspectRatio>
   );

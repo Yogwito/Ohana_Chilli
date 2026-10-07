@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { useCatalogMutationSync } from '@/hooks/use-catalog-sync';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AdminShell, { type AdminSection } from '@/components/admin/AdminShell';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,9 +17,9 @@ import { toast } from 'sonner';
 import { formatDeliveryZoneName, normalizeDeliveryZoneName } from '@/domain/deliveryZones';
 import { formatPrice } from '@/domain/formatPrice';
 import {
-  LogOut, Package, Salad, Ruler, Settings, Pencil, Save, ClipboardList,
-  Search, Truck, Upload, BarChart3, Plus, Tag, Trash2,
+  Pencil, Save, Search, Upload, Plus, Trash2,
 } from 'lucide-react';
+import OrdersDashboard from '@/components/admin/OrdersDashboard';
 import AnalyticsAdmin from '@/components/admin/AnalyticsAdmin';
 import PromotionsAdmin from '@/components/admin/PromotionsAdmin';
 import ProductsAdmin from '@/components/admin/ProductsAdmin';
@@ -33,12 +33,6 @@ interface IngredientRow {
 
 interface BowlRuleRow {
   size: string; name: string; price_cents: number; bases: number; proteins: number; accompaniments: number;
-}
-
-interface OrderRow {
-  id: string; customer_name: string; phone: string; order_type: string;
-  total_cents: number; status: string; created_at: string; notes: string | null; address: string | null;
-  delivery_zone: string | null; delivery_fee_cents: number;
 }
 
 interface DeliveryZoneRow {
@@ -69,6 +63,10 @@ function toSlug(name: string) {
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const selectedSection = params.get('section');
+  const section: AdminSection = ['orders', 'products', 'categories', 'ingredients', 'bowl_rules', 'delivery_zones', 'settings', 'promotions', 'analytics'].includes(selectedSection) ? selectedSection as AdminSection : 'orders';
+  const setSection = (value: AdminSection) => setParams(value === 'orders' ? {} : { section: value });
   const { user, isAdmin, loading: authLoading, signOut } = useAdminAuth();
 
   useEffect(() => {
@@ -76,12 +74,12 @@ export default function AdminPage() {
   }, [authLoading, user, navigate]);
 
   if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><Skeleton className="h-12 w-48" /></div>;
+    return <div className="admin-auth-state min-h-screen flex items-center justify-center"><Skeleton className="h-12 w-48" /></div>;
   }
 
   if (user && !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+      <div className="admin-auth-state min-h-screen flex items-center justify-center bg-muted/30 px-4">
         <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
           <h1 className="text-xl font-bold">Acceso no autorizado</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -106,154 +104,18 @@ export default function AdminPage() {
   }
 
   if (!user) {
-    return <div className="min-h-screen flex items-center justify-center"><Skeleton className="h-12 w-48" /></div>;
+    return <div className="admin-auth-state min-h-screen flex items-center justify-center"><Skeleton className="h-12 w-48" /></div>;
   }
 
-  return (
-    <div className="min-h-screen bg-muted/30">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="container flex h-14 items-center justify-between">
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-brand font-display font-black">Ohana Bowls</span>
-            <span className="text-muted-foreground font-normal hidden sm:inline">—</span>
-            <span className="text-sm text-muted-foreground font-normal hidden sm:inline">Panel de Administración</span>
-          </h1>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground hidden sm:block">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate('/'); }}>
-              <LogOut className="w-4 h-4 mr-1" /> Salir
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="container py-4 sm:py-6">
-        <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="mb-4 sm:mb-6 flex w-full overflow-x-auto h-auto flex-nowrap justify-start rounded-lg bg-muted p-1 gap-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <TabsTrigger value="orders" title="Pedidos" className="flex shrink-0 items-center gap-1.5"><ClipboardList className="w-4 h-4" /><span className="hidden sm:inline">Pedidos</span></TabsTrigger>
-            <TabsTrigger value="products" title="Productos" className="flex shrink-0 items-center gap-1.5"><Package className="w-4 h-4" /><span className="hidden sm:inline">Productos</span></TabsTrigger>
-            <TabsTrigger value="categories" title="Categorías" className="flex shrink-0 items-center gap-1.5"><Tag className="w-4 h-4" /><span className="hidden sm:inline">Categorías</span></TabsTrigger>
-            <TabsTrigger value="ingredients" title="Ingredientes" className="flex shrink-0 items-center gap-1.5"><Salad className="w-4 h-4" /><span className="hidden sm:inline">Ingredientes</span></TabsTrigger>
-            <TabsTrigger value="bowl_rules" title="Bowl Rules" className="flex shrink-0 items-center gap-1.5"><Ruler className="w-4 h-4" /><span className="hidden sm:inline">Bowls</span></TabsTrigger>
-            <TabsTrigger value="delivery_zones" title="Domicilios" className="flex shrink-0 items-center gap-1.5"><Truck className="w-4 h-4" /><span className="hidden sm:inline">Domicilios</span></TabsTrigger>
-            <TabsTrigger value="settings" title="Configuración" className="flex shrink-0 items-center gap-1.5"><Settings className="w-4 h-4" /><span className="hidden sm:inline">Config</span></TabsTrigger>
-            <TabsTrigger value="promotions" title="Promociones" className="flex shrink-0 items-center gap-1.5">🏷️<span className="hidden sm:inline">Promos</span></TabsTrigger>
-            <TabsTrigger value="analytics" title="Analytics" className="flex shrink-0 items-center gap-1.5"><BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">Analytics</span></TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="orders"><OrdersAdmin /></TabsContent>
-          <TabsContent value="products"><ProductsAdmin /></TabsContent>
-          <TabsContent value="categories"><CategoriesAdmin /></TabsContent>
-          <TabsContent value="ingredients"><IngredientsAdmin /></TabsContent>
-          <TabsContent value="bowl_rules"><BowlRulesAdmin /></TabsContent>
-          <TabsContent value="delivery_zones"><DeliveryZonesAdmin /></TabsContent>
-          <TabsContent value="settings"><SettingsAdminComponent /></TabsContent>
-          <TabsContent value="promotions"><PromotionsAdmin /></TabsContent>
-          <TabsContent value="analytics"><AnalyticsAdmin /></TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-}
-
-// ─── Orders Admin ────────────────────────────────────────
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pendiente' },
-  { value: 'confirmed', label: 'Confirmado' },
-  { value: 'preparing', label: 'Preparando' },
-  { value: 'ready', label: 'Listo' },
-  { value: 'delivered', label: 'Entregado' },
-  { value: 'cancelled', label: 'Cancelado' },
-];
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  confirmed: 'bg-blue-100 text-blue-700',
-  preparing: 'bg-orange-100 text-orange-700',
-  ready: 'bg-green-100 text-green-700',
-  delivered: 'bg-muted text-muted-foreground',
-  cancelled: 'bg-red-100 text-red-700',
-};
-
-function OrdersAdmin() {
-  const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(50);
-    setOrders((data ?? []) as OrderRow[]);
-    setLoading(false);
+  const sections = {
+    orders: <OrdersDashboard />, products: <ProductsAdmin />, categories: <CategoriesAdmin />,
+    ingredients: <IngredientsAdmin />, bowl_rules: <BowlRulesAdmin />, delivery_zones: <DeliveryZonesAdmin />,
+    settings: <SettingsAdminComponent />, promotions: <PromotionsAdmin />, analytics: <AnalyticsAdmin />,
   };
-
-  useEffect(() => { fetchOrders(); }, []);
-
-  // Real-time: refetch when orders are inserted or updated
-  useEffect(() => {
-    const channel = supabase
-      .channel('orders-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
-        toast.success('Nuevo pedido recibido');
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  const updateStatus = async (id: string, status: string) => {
-    await supabase.from('orders').update({ status }).eq('id', id);
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-    toast.success(`Pedido actualizado a ${status}`);
-  };
-
-  if (loading) return <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div>;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Pedidos recientes</h2>
-        <Button variant="outline" size="sm" onClick={fetchOrders}>Refrescar</Button>
-      </div>
-      {orders.length === 0 ? (
-        <p className="text-center py-12 text-muted-foreground">No hay pedidos</p>
-      ) : orders.map(order => (
-        <div key={order.id} className="bg-card border rounded-xl p-4 space-y-3">
-          <div className="flex flex-wrap justify-between gap-2">
-            <div>
-              <p className="font-semibold">{order.customer_name}</p>
-              <p className="text-xs text-muted-foreground">{order.phone} • {new Date(order.created_at).toLocaleString('es-CO')}</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-primary">{formatPrice(order.total_cents)}</span>
-              <Select value={order.status} onValueChange={v => updateStatus(order.id, v)}>
-                <SelectTrigger className={`h-7 w-auto text-xs px-2 gap-1 border-0 font-medium rounded-full ${STATUS_COLORS[order.status] ?? 'bg-muted text-muted-foreground'}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map(s => (
-                    <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {order.order_type === 'delivery' && (
-            <div className="text-xs text-muted-foreground space-x-2">
-              {order.address && <span>📍 {order.address}</span>}
-              {order.delivery_zone && <span>• 🏘️ {order.delivery_zone}</span>}
-              {order.delivery_fee_cents > 0 && <span>• 🚚 {formatPrice(order.delivery_fee_cents)}</span>}
-            </div>
-          )}
-          {order.order_type === 'pickup' && <p className="text-xs text-muted-foreground">🏪 Recoger en sucursal</p>}
-          {order.notes && <p className="text-xs text-muted-foreground">📝 {order.notes}</p>}
-          <p className="text-xs font-mono text-muted-foreground">ID: {order.id.slice(0, 8)}</p>
-        </div>
-      ))}
-    </div>
-  );
+  return <AdminShell section={section} onSectionChange={setSection} email={user.email}
+    onSignOut={async () => { await signOut(); navigate('/admin/login', { replace: true }); }}>
+    {sections[section]}
+  </AdminShell>;
 }
 
 // ─── Categories Admin ─────────────────────────────────────
@@ -306,6 +168,7 @@ function CategoriesAdmin() {
   const createCategory = async () => {
     if (!newForm.name) { toast.error('Nombre requerido'); return; }
     const { error } = await supabase.from('categories').insert({
+      id: crypto.randomUUID(),
       name: newForm.name,
       slug: toSlug(newForm.name),
       brand_id: 'ohana',
@@ -442,16 +305,24 @@ function CategoriesAdmin() {
 }
 
 // ─── Ingredients Admin ───────────────────────────────────
-function IngredientsAdmin() {
+export function IngredientsAdmin() {
   const syncCatalog = useCatalogMutationSync();
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchIngredients = async () => {
     setLoading(true);
-    const { data } = await supabase.from('ingredients').select('*').order('type').order('name');
-    setIngredients((data ?? []) as IngredientRow[]);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const { data, error } = await supabase.from('ingredients').select('*').order('type').order('name');
+      if (error) throw error;
+      setIngredients((data ?? []) as IngredientRow[]);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchIngredients(); }, []);
@@ -465,6 +336,8 @@ function IngredientsAdmin() {
   };
 
   if (loading) return <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}</div>;
+
+  if (loadError) return <div role="alert"><p>No se pudieron cargar los ingredientes.</p><Button onClick={fetchIngredients}>Reintentar</Button></div>;
 
   const grouped = ingredients.reduce<Record<string, IngredientRow[]>>((acc, i) => {
     (acc[i.type] = acc[i.type] || []).push(i);
@@ -495,19 +368,28 @@ function IngredientsAdmin() {
 }
 
 // ─── Bowl Rules Admin ────────────────────────────────────
-function BowlRulesAdmin() {
+export function BowlRulesAdmin() {
   const syncCatalog = useCatalogMutationSync();
   const [rules, setRules] = useState<BowlRuleRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<BowlRuleRow>>({});
 
-  useEffect(() => {
-    supabase.from('bowl_rules').select('*').then(({ data }) => {
+  const fetchRules = async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const { data, error } = await supabase.from('bowl_rules').select('*');
+      if (error) throw error;
       setRules((data ?? []) as BowlRuleRow[]);
+    } catch {
+      setLoadError(true);
+    } finally {
       setLoading(false);
-    });
-  }, []);
+    }
+  };
+  useEffect(() => { fetchRules(); }, []);
 
   const startEdit = (r: BowlRuleRow) => {
     setEditing(r.size);
@@ -520,25 +402,25 @@ function BowlRulesAdmin() {
     await syncCatalog(['bowl_rules']);
     toast.success('Regla actualizada');
     setEditing(null);
-    const { data } = await supabase.from('bowl_rules').select('*');
-    setRules((data ?? []) as BowlRuleRow[]);
+    await fetchRules();
   };
 
   if (loading) return <Skeleton className="h-48" />;
+  if (loadError) return <div role="alert"><p>No se pudieron cargar las reglas.</p><Button onClick={fetchRules}>Reintentar</Button></div>;
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">Reglas de Bowl</h2>
+      <h2 className="text-xl font-bold">Tamaños y porciones</h2>
       {rules.map(r => (
         <div key={r.size} className="bg-card border rounded-xl p-4">
           {editing === r.size ? (
             <div className="space-y-3">
               <p className="font-bold">{r.name} ({r.size})</p>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Precio</Label><Input type="number" value={editForm.price_cents} onChange={e => setEditForm(p => ({ ...p, price_cents: Number(e.target.value) }))} /></div>
-                <div><Label>Bases</Label><Input type="number" value={editForm.bases} onChange={e => setEditForm(p => ({ ...p, bases: Number(e.target.value) }))} /></div>
-                <div><Label>Proteínas</Label><Input type="number" value={editForm.proteins} onChange={e => setEditForm(p => ({ ...p, proteins: Number(e.target.value) }))} /></div>
-                <div><Label>Acomp.</Label><Input type="number" value={editForm.accompaniments} onChange={e => setEditForm(p => ({ ...p, accompaniments: Number(e.target.value) }))} /></div>
+                <div><Label htmlFor={`rule-${r.size}-price_cents`}>Precio</Label><Input id={`rule-${r.size}-price_cents`} type="number" value={editForm.price_cents} onChange={e => setEditForm(p => ({ ...p, price_cents: Number(e.target.value) }))} /></div>
+                <div><Label htmlFor={`rule-${r.size}-bases`}>Bases</Label><Input id={`rule-${r.size}-bases`} type="number" value={editForm.bases} onChange={e => setEditForm(p => ({ ...p, bases: Number(e.target.value) }))} /></div>
+                <div><Label htmlFor={`rule-${r.size}-proteins`}>Proteínas</Label><Input id={`rule-${r.size}-proteins`} type="number" value={editForm.proteins} onChange={e => setEditForm(p => ({ ...p, proteins: Number(e.target.value) }))} /></div>
+                <div><Label htmlFor={`rule-${r.size}-accompaniments`}>Acomp.</Label><Input id={`rule-${r.size}-accompaniments`} type="number" value={editForm.accompaniments} onChange={e => setEditForm(p => ({ ...p, accompaniments: Number(e.target.value) }))} /></div>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => saveEdit(r.size)}><Save className="w-3 h-3 mr-1" />Guardar</Button>

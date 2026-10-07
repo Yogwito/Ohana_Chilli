@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import '@/components/admin/admin.css';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,45 +89,46 @@ export default function AdminLoginPage() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+      <div className="admin-login min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30">
-      <div className="w-full max-w-sm mx-4">
-        <div className="bg-card rounded-2xl border shadow-lg p-8">
+    <div className="admin-login min-h-screen flex items-center justify-center">
+      <div className="admin-login-layout">
+        <aside className="admin-login-story"><Link to="/" className="admin-wordmark">ohana<span>bowls · administración</span></Link><div><span className="admin-brand-flower" aria-hidden="true">✳</span><h2>Lo bueno empieza<br />en tu equipo.</h2><p>Tu carta, tus pedidos y todo lo que hace que Ohana siga en movimiento.</p></div><Link to="/">Volver al sitio ↗</Link></aside>
+        <div className="admin-login-card bg-card rounded-2xl border p-8">
           <div className="text-center mb-8">
-            <div className="font-display font-black text-3xl text-brand mb-4">Ohana Bowls</div>
+            <p className="admin-eyebrow">Bienvenido a Ohana</p>
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
               <Lock className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-xl font-bold">Panel de Administración</h1>
+            <h1 className="text-xl font-bold">Entra a tu panel</h1>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             {errorMessage && (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {errorMessage}
               </p>
             )}
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@ohanachilli.com" className="pl-10" required />
+                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@correo.com" autoComplete="username" className="pl-10" required />
               </div>
             </div>
             <div>
               <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="pl-10" required />
+                <Input id="password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="pl-10" required />
               </div>
             </div>
-            <Button type="submit" disabled={loading} className="w-full btn-ohana">
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Ingresando...' : 'Ingresar'}
             </Button>
           </form>

@@ -176,10 +176,10 @@ export default function ExperienceHero({
           <img
             key={selected.image}
             className="flavor-photo"
-            src={`/images/experience/${selected.image}.webp`}
+            src={`/images/experience/${selected.image}-hq.webp`}
             alt={`Bowl ${selected.name} de Ohana`}
-            width="500"
-            height="500"
+            width="1254"
+            height="1254"
             loading="eager"
           />
           <div className="flavor-sticker" aria-hidden="true">

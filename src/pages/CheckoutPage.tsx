@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
+import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
-import { useActiveDeliveryZones, useBusinessSettings, useBusinessOpenStatus } from '@/hooks/use-catalog';
+import { useActiveDeliveryZones, useBusinessSettings, useBusinessOpenStatus, useBowlRules, useIngredients, useProducts, usePromotions } from '@/hooks/use-catalog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +19,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
@@ -25,7 +27,6 @@ import {
   Banknote,
   CheckCircle,
   CreditCard,
-  Leaf,
   MapPin,
   ShoppingCart,
   Store,
@@ -40,6 +41,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { formatBusinessPhone, parseBusinessAddress } from '@/domain/businessSettings';
+import { formatOrderReceiptMessage, type OrderReceipt } from '@/domain/orderReceipt';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatProductCustomizationLines } from '@/domain/productCustomizations';
@@ -48,7 +50,12 @@ import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff 
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
+import CartItemVisual from '@/components/cart/CartItemVisual';
+import BrandIllustration from '@/components/ohana/BrandIllustration';
+import { useIsMobile } from '@/hooks/use-mobile';
 import RecentOrders from '@/components/checkout/RecentOrders';
+import BotProtection from '@/components/checkout/BotProtection';
+import { checkoutAttempt, getPendingCheckout, pendingCheckoutStorageKey, orderApi, orderItemRequest, OrderApiError, type CanonicalQuote, type PendingCheckoutAttempt } from '@/lib/orderApi';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -65,8 +72,18 @@ type CheckoutLocationState = { from?: string } | null;
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const location = useLocation();
   const { cart, updateQuantity, removeItem, clearCart } = useCart();
+  const catalogProducts = useProducts();
+  const catalogPromotions = usePromotions();
+  const [pendingAttempt, setPendingAttempt] = useState(getPendingCheckout);
+  const [recovering, setRecovering] = useState(false);
+  const recoveryInFlight = useRef(false);
+  const [pendingReviewQuote, setPendingReviewQuote] = useState<CanonicalQuote | null>(null);
+  const catalogIngredients = useIngredients();
+  const catalogRules = useBowlRules();
   const { data: businessSettings } = useBusinessSettings();
   const { isClosed: isBusinessClosed, isOpen: isBusinessOpen, isEnforced: isHoursEnforced } = useBusinessOpenStatus();
   const {
@@ -76,26 +93,36 @@ export default function CheckoutPage() {
   } = useActiveDeliveryZones();
 
   const [orderStatus, setOrderStatus] = useState<OrderStatus>('idle');
+  useEffect(() => {
+    if (orderStatus === 'created') window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [orderStatus]);
+  const [botToken, setBotToken] = useState('');
+  const [botReset, setBotReset] = useState(0);
+  const [trackingUrl, setTrackingUrl] = useState('');
+  const [reviewQuote, setReviewQuote] = useState<CanonicalQuote | null>(null);
+  const [acceptedQuote, setAcceptedQuote] = useState('');
+  const [reviewKey, setReviewKey] = useState('');
+  const [acceptedPreview, setAcceptedPreview] = useState<{key:string;quote:CanonicalQuote} | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [whatsappMessage, setWhatsappMessage] = useState<string>('');
   const [whatsappUrl, setWhatsappUrl] = useState<string>('');
   const [submitError, setSubmitError] = useState<string>('');
-  const [selectedZoneId, setSelectedZoneId] = useState('');
+  const [selectedZoneId, setSelectedZoneId] = useState(pendingAttempt?.request?.delivery_zone_id || '');
   const [platform, setPlatform] = useState<'mobile' | 'desktop'>('mobile');
 
   // CHANGE 1 — delivery as default
   const [form, setForm] = useState<CheckoutForm>({
-    name: '',
-    phone: '',
-    orderType: 'delivery',
-    address: '',
+    name: pendingAttempt?.request?.customer_name || '',
+    phone: pendingAttempt?.request?.phone || '',
+    orderType: pendingAttempt?.request?.order_type || 'delivery',
+    address: pendingAttempt?.request?.address || '',
     deliveryZone: '',
-    notes: '',
+    notes: pendingAttempt?.request?.notes || '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
   // CHANGE 2 — payment method state
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'online'>(pendingAttempt?.request?.payment_method || 'cash');
 
   // CHANGE 5 — terms states
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -113,8 +140,10 @@ export default function CheckoutPage() {
     [deliveryZones, selectedZoneId],
   );
   const hasSelectedDeliveryZone = Boolean(selectedDeliveryZone);
-  const deliveryFeeCents = form.orderType === 'delivery' ? selectedDeliveryZone?.feeCents ?? 0 : 0;
-  const orderSubtotal = cart.subtotal;
+  const requestReviewKey = JSON.stringify({items:cart.items,zone:selectedZoneId,type:form.orderType});
+  const quotedPrices = acceptedPreview?.key === requestReviewKey ? acceptedPreview.quote : null;
+  const deliveryFeeCents = quotedPrices ? quotedPrices.delivery_fee : form.orderType === 'delivery' ? selectedDeliveryZone?.feeCents ?? 0 : 0;
+  const orderSubtotal = quotedPrices ? quotedPrices.subtotal : cart.subtotal;
   const orderTotal = orderSubtotal + deliveryFeeCents;
   const submitBlockedByZone = form.orderType === 'delivery'
     && (loadingDeliveryZones || isDeliveryZoneQueryError || !hasSelectedDeliveryZone);
@@ -130,6 +159,7 @@ export default function CheckoutPage() {
 
   const messagePreview = useMemo(() => {
     if (cart.items.length === 0) return '';
+    if (quotedPrices) return formatOrderReceiptMessage(quotedPrices,{id:'PREVIEW000',name:form.name||'Cliente',phone:form.phone,orderType:form.orderType,address:form.address,notes:form.notes,paymentMethod});
     return generateWhatsAppMessage(cart.items, orderTotal, {
       name: form.name || 'Cliente',
       phone: form.phone || '',
@@ -139,9 +169,9 @@ export default function CheckoutPage() {
       deliveryFeeCents,
       notes: form.notes,
       orderId: 'PREVIEW000',
-      paymentMethod,
+      paymentMethod: paymentMethod === 'online' ? undefined : paymentMethod,
     });
-  }, [cart.items, orderTotal, form, selectedDeliveryZone, deliveryFeeCents, paymentMethod]);
+  }, [cart.items, orderTotal, form, selectedDeliveryZone, deliveryFeeCents, paymentMethod, quotedPrices]);
 
   const updateField = <K extends keyof CheckoutForm>(field: K, value: CheckoutForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -204,7 +234,9 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (getPendingCheckout()) { setSubmitError('Verifica o reenvía la solicitud original antes de crear otro pedido.'); return; }
     setSubmitError('');
+    if (cart.items.some(item => item.reviewIssues?.length)) { setSubmitError('Revisa los bowls marcados en tu pedido antes de confirmar.'); return; }
 
     const result = checkoutSchema.safeParse(form);
     if (!result.success) {
@@ -254,6 +286,10 @@ export default function CheckoutPage() {
     trackEvent({ type: 'checkout_start', itemCount: cart.items.length, subtotalCents: orderSubtotal });
 
     try {
+      const [productsResult, ingredientsResult, rulesResult, promotionsResult] = await Promise.all([catalogProducts.refetch(), catalogIngredients.refetch(), catalogRules.refetch(), catalogPromotions.refetch()]);
+      if (productsResult.isError || ingredientsResult.isError || rulesResult.isError || promotionsResult.isError) {setSubmitError('No pudimos verificar el menú. Intenta nuevamente.'); setOrderStatus('idle'); return;}
+      const canonicalCart = reconcileCartWithCatalog(cart, {products:productsResult.data || [], ingredients:ingredientsResult.data || [], bowlRules:rulesResult.data || [], promotions:promotionsResult.data || []});
+      if (canonicalCart.items.some(item => item.reviewIssues?.length) || canonicalCart.items.length !== cart.items.length || canonicalCart.items.some((item,index) => item.unitPrice !== cart.items[index]?.unitPrice)) {setSubmitError('El menú cambió. Revisa las opciones y el total actualizado antes de confirmar.'); setOrderStatus('idle'); return;}
       let resolvedDeliveryZone = form.orderType === 'delivery' ? form.deliveryZone ?? '' : '';
       let resolvedDeliveryFeeCents = deliveryFeeCents;
 
@@ -286,72 +322,37 @@ export default function CheckoutPage() {
         resolvedDeliveryFeeCents = canonicalZone.fee_cents;
       }
 
-      const finalOrderTotal = orderSubtotal + resolvedDeliveryFeeCents;
-      const orderItems = cart.items.map((item) => ({
-        brand_id: item.brand,
-        name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
-        quantity: item.quantity,
-        unit_price_cents: item.unitPrice,
-        details:
-          item.type === 'custom-bowl' && item.customBowl
-            ? {
-                size: item.customBowl.size.name,
-                bases: item.customBowl.bases.map((b) => b.name),
-                proteins: item.customBowl.proteins.map((p) => p.name),
-                acompanantes: item.customBowl.acompanantes.map((a) => a.name),
-                sauces: item.customBowl.sauces?.map((s) => s.name),
-                complementos: item.customBowl.complementos?.map((c) => c.name),
-                notes: item.notes,
-              }
-            : {
-                product_id: item.product?.id,
-                notes: item.notes,
-                customizations: item.customizations ?? null,
-              },
-      }));
-
-      // Use SECURITY DEFINER RPC — bypasses RLS so anon users can insert orders.
-      // Direct inserts into orders/order_items are blocked by RLS (no anon policies).
-      const { data: createdOrderId, error: createOrderError } = await supabase.rpc(
-        'create_order_with_items',
-        {
-          p_customer_name: form.name,
-          p_phone: form.phone,
-          p_order_type: form.orderType,
-          p_address: form.address || null,
-          p_delivery_zone: form.orderType === 'delivery' ? resolvedDeliveryZone || null : null,
-          p_delivery_fee_cents: resolvedDeliveryFeeCents,
-          p_notes: form.notes || null,
-          p_total_cents: finalOrderTotal,
-          p_items: orderItems,
-        }
-      );
-
-      if (createOrderError || !createdOrderId) {
-        console.error('Error creating order:', createOrderError);
-        setSubmitError(
-          createOrderError?.message
-            ? `Error: ${createOrderError.message}`
-            : 'No pudimos crear el pedido. Intenta nuevamente.'
-        );
-        toast.error('Error al crear el pedido. Intenta de nuevo.');
+      const request = {
+        customer_name: form.name, phone: form.phone, order_type: form.orderType,
+        address: form.address || undefined, notes: form.notes || undefined,
+        delivery_zone_id: form.orderType === 'delivery' ? selectedZoneId : undefined,
+        payment_method: paymentMethod, items: canonicalCart.items.map(orderItemRequest),
+      };
+      const quote = await orderApi<CanonicalQuote>('quote', {request});
+      if ((quote.total !== orderTotal || quote.items.some((item,index) => item.unit_price_cents !== canonicalCart.items[index]?.unitPrice || item.name !== (canonicalCart.items[index]?.type === 'product' ? canonicalCart.items[index]?.product?.name : 'Bowl Personalizado'))) && acceptedQuote !== quote.fingerprint) {
+        setReviewQuote(quote);
+        setReviewKey(requestReviewKey);
         setOrderStatus('idle');
         return;
       }
+      if (!botToken) { setSubmitError('Completa la verificación antes de enviar el pedido.'); setOrderStatus('idle'); return; }
+      const attempt = await checkoutAttempt(request, quote.fingerprint);
+      setPendingAttempt(attempt);
+      const created = await orderApi<{id:string;total:number;receipt:OrderReceipt}>('create', {
+        request, quote:quote.fingerprint, idempotency_key:attempt.key,tracking_token:attempt.token,bot_token:botToken,
+      });
+      const createdOrderId = created.id;
+      const finalOrderTotal = created.total;
+      const privateLink = `${window.location.origin}/pedido/${attempt.token}`;
+      setTrackingUrl(privateLink);
+      try { localStorage.setItem('ohana-tracking-links:v1',JSON.stringify([privateLink,...JSON.parse(localStorage.getItem('ohana-tracking-links:v1') || '[]')].slice(0,10))); } catch { /* Order is already persisted. */ }
+      sessionStorage.removeItem(pendingCheckoutStorageKey);
+      setPendingAttempt(null);
 
       const phone = whatsappNumber;
-      // CHANGE 3 — pass paymentMethod to WhatsApp message generator
-      const message = generateWhatsAppMessage(cart.items, finalOrderTotal, {
-        name: form.name,
-        phone: form.phone,
-        orderType: form.orderType,
-        address: form.address,
-        deliveryZone: resolvedDeliveryZone,
-        deliveryFeeCents: resolvedDeliveryFeeCents,
-        notes: form.notes,
-        orderId: createdOrderId,
-        paymentMethod,
-      });
+      const message = formatOrderReceiptMessage(created.receipt, {
+        id:createdOrderId,name:form.name,phone:form.phone,orderType:form.orderType,address:form.address,notes:form.notes,paymentMethod,
+      }) + `\n\nSigue tu pedido: ${privateLink}`;
       const { url, platform: detectedPlatform } = buildPlatformWhatsAppUrl(phone, message);
       setPlatform(detectedPlatform);
 
@@ -370,19 +371,88 @@ export default function CheckoutPage() {
 
       setOrderStatus('created');
 
-      if (detectedPlatform === 'desktop') {
+      if (paymentMethod === 'online') {
+        try { const payment = await orderApi<{url:string}>('payment',{token:attempt.token}); window.location.assign(payment.url); }
+        catch { toast.error('Pedido guardado. Abre el seguimiento para continuar el pago.'); }
+      } else if (detectedPlatform === 'desktop') {
         openWhatsAppHandoff(phone, message);
         toast.success('WhatsApp Web se abrió en una nueva pestaña.');
       } else {
         toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
-      setSubmitError('Ocurrió un error inesperado al crear tu pedido.');
+      // Keep the original identity after any uncertain submission, including a refresh.
+      setPendingAttempt(getPendingCheckout());
+      setBotReset(value => value+1);
+      setSubmitError(err instanceof OrderApiError ? err.message : 'No pudimos verificar si el pedido se guardó. Reintenta sin cambiar los datos para evitar duplicados.');
       toast.error('Error inesperado. Intenta de nuevo.');
       setOrderStatus('idle');
     }
   };
+
+  const finishRecovery = (pending: PendingCheckoutAttempt) => {
+    const link = `${window.location.origin}/pedido/${pending.token}`;
+    try { localStorage.setItem('ohana-tracking-links:v1',JSON.stringify([link,...JSON.parse(localStorage.getItem('ohana-tracking-links:v1') || '[]').filter((saved: string) => saved !== link)].slice(0,10))); } catch { /* Order is persisted. */ }
+    // Recovery belongs to the original request, which can differ from later cart edits.
+    try {
+      if (pending.request && JSON.stringify(cart.items.map(orderItemRequest)) === JSON.stringify(pending.request.items)) clearCart();
+    } catch { /* Preserve an incomplete or subsequently edited cart. */ }
+    sessionStorage.removeItem(pendingCheckoutStorageKey);
+    setPendingAttempt(null);
+    navigate(`/pedido/${pending.token}`);
+  };
+
+  const recoverPendingOrder = async () => {
+    const pending = getPendingCheckout();
+    if (!pending || recoveryInFlight.current) return;
+    recoveryInFlight.current = true;
+    setRecovering(true);
+    try {
+      await orderApi('track',{token:pending.token});
+      finishRecovery(pending);
+    } catch(error) {
+      setSubmitError(error instanceof OrderApiError && error.code === 'tracking_not_found'
+        ? 'El pedido aún no aparece. Puedes reenviar exactamente la solicitud original con el mismo identificador.'
+        : 'No pudimos verificar el pedido anterior. Conservamos la solicitud para evitar duplicados.');
+    } finally { recoveryInFlight.current = false; setRecovering(false); }
+  };
+
+  const retryPendingOrder = async () => {
+    const pending = getPendingCheckout();
+    if (!pending?.request || !pending.quote || !botToken || recoveryInFlight.current) return;
+    recoveryInFlight.current = true;
+    setRecovering(true);
+    setSubmitError('');
+    try {
+      const attempt = await checkoutAttempt(pending.request, pending.quote);
+      await orderApi('create', {request:pending.request, quote:pending.quote,
+        idempotency_key:attempt.key, tracking_token:attempt.token, bot_token:botToken});
+      finishRecovery(attempt);
+    } catch(error) {
+      if (error instanceof OrderApiError && error.code === 'quote_changed') {
+        // A quote rejection is pre-commit, but retain the key while requesting explicit review.
+        try {
+          const quote = await orderApi<CanonicalQuote>('quote',{request:pending.request});
+          setPendingReviewQuote(quote);
+        } catch { setSubmitError('La solicitud original no está disponible. Conservamos su identificador; verifica el pedido o contacta al negocio.'); }
+      } else setSubmitError(error instanceof OrderApiError ? error.message : 'No pudimos confirmar el resultado. Vuelve a verificar; el identificador original sigue guardado.');
+      setBotReset(value => value + 1);
+    } finally { recoveryInFlight.current = false; setRecovering(false); }
+  };
+
+  const pendingRecovery = pendingAttempt && <section role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 space-y-3">
+    <p className="font-semibold">Hay un pedido pendiente de confirmar</p>
+    <p className="text-sm">Conservamos los datos originales solo en esta pestaña. Verifica el resultado antes de cambiar el pedido. Reenviar conserva el mismo identificador y los mismos datos.</p>
+    <Button type="button" variant="outline" disabled={recovering} onClick={recoverPendingOrder}>Verificar pedido anterior</Button>
+    {pendingAttempt.request && pendingAttempt.quote && <Button type="button" variant="outline" disabled={recovering || !botToken} onClick={retryPendingOrder}>Reenviar solicitud original</Button>}
+    {pendingReviewQuote && <div className="space-y-2">
+      <p>El presupuesto original cambió. Revisa los importes antes de reenviar:</p>
+      {pendingReviewQuote.items.map((item,index) => <p key={index}>{item.quantity} × {item.name}: {formatPrice(item.unit_price_cents * item.quantity)}</p>)}
+      <p>Domicilio: {formatPrice(pendingReviewQuote.delivery_fee)}</p><strong>Total: {formatPrice(pendingReviewQuote.total)}</strong>
+      <Button type="button" onClick={async () => { try { setPendingAttempt(await checkoutAttempt(pendingAttempt.request, pendingReviewQuote.fingerprint)); setPendingReviewQuote(null); } catch { setSubmitError('No se pudo recuperar la solicitud original. Verifica el pedido anterior.'); } }}>Aceptar presupuesto para la solicitud original</Button>
+    </div>}
+    {submitError && <p role="alert">{submitError}</p>}
+  </section>;
 
   const handleCopyMessage = async () => {
     try {
@@ -396,13 +466,16 @@ export default function CheckoutPage() {
   // CHANGE 4 — Empty cart state
   if (cart.items.length === 0 && orderStatus === 'idle') {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12">
+      <div className="experience-order-state min-h-screen flex items-center justify-center py-12">
         <div className="text-center max-w-sm px-4 animate-scale-in">
           <div className="flex items-center justify-center mb-8">
-            <div className="w-16 h-16 rounded-full border-4 border-ohana/30 flex items-center justify-center bg-ohana/5">
-              <div className="w-8 h-8 rounded-full bg-ohana/25" />
+            <div className="w-28 h-28 flex items-center justify-center">
+              <BrandIllustration kind="bowl" />
             </div>
           </div>
+          <RecentOrders />
+          {pendingRecovery}
+          {pendingAttempt && <BotProtection onToken={setBotToken} resetKey={botReset} />}
           <h2 className="text-2xl font-bold mb-2">Tu carrito está vacío</h2>
           <p className="text-muted-foreground mb-8">Elige tus platos favoritos y empieza a armar tu orden.</p>
           <div className="flex flex-col gap-3 justify-center sm:flex-row">
@@ -422,7 +495,7 @@ export default function CheckoutPage() {
   // Success state
   if (orderStatus === 'created') {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4">
+      <div className="experience-order-state min-h-screen flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full space-y-6 text-center">
 
           {/* Animated checkmark */}
@@ -453,10 +526,11 @@ export default function CheckoutPage() {
           <div className="rounded-2xl border bg-card/60 px-4 py-3 text-left text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Siguiente paso</p>
             <p>
-              Tu pedido ya fue creado. Solo falta enviar el mensaje en WhatsApp para confirmarlo con el equipo de Ohana.
+              Tu pedido está guardado. El equipo debe aceptarlo antes de prepararlo. Puedes consultar su estado en el enlace privado y comunicarte por WhatsApp.
             </p>
           </div>
 
+          {trackingUrl && <Button asChild className="w-full"><a href={trackingUrl}>Seguir mi pedido</a></Button>}
           {/* Primary CTA */}
           {platform === 'mobile' ? (
             <a
@@ -542,7 +616,9 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
             {/* Form */}
             <div className="lg:col-span-3 order-2 lg:order-1">
+              {cart.items.filter(item => item.reviewIssues?.length).map(item => <Alert key={item.id} variant="destructive" className="mb-4"><AlertTitle>Revisa tu bowl</AlertTitle><AlertDescription>{item.reviewIssues.join(' ')}<Button variant="outline" className="mt-2" onClick={() => navigate(`/?editar-bowl=${encodeURIComponent(item.id)}#arma-tu-bowl`)}>Editar bowl</Button></AlertDescription></Alert>)}
               <form onSubmit={handleSubmit} className="space-y-8">
+                {pendingRecovery}
                 {submitError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -552,9 +628,9 @@ export default function CheckoutPage() {
                 )}
 
                 {/* Contact info */}
-                <AnimatedElement as="div" animation="fade-up" delay={0} className="relative pl-4">
+                <AnimatedElement as="div" animation="fade-up" delay={0} className="checkout-form-section relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-ohana" />
-                  <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Información de contacto</h3>
+                  <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Tus datos</h3>
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="name">Nombre completo</Label>
@@ -584,15 +660,15 @@ export default function CheckoutPage() {
 
                 {/* Recent orders */}
                 {form.phone.replace(/\D/g, '').length >= 10 && (
-                  <AnimatedElement as="div" animation="fade-up" delay={50}>
-                    <RecentOrders phone={form.phone} />
+                  <AnimatedElement as="div" animation="fade-up" delay={75}>
+                    <RecentOrders />
                   </AnimatedElement>
                 )}
 
                 {/* Order type */}
-                <AnimatedElement as="div" animation="fade-up" delay={75} className="relative pl-4">
+                <AnimatedElement as="div" animation="fade-up" delay={75} className="checkout-form-section relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-ohana" />
-                  <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Tipo de orden</h3>
+                  <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">¿Dónde lo disfrutas?</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       {
@@ -688,7 +764,7 @@ export default function CheckoutPage() {
                 </AnimatedElement>
 
                 {/* CHANGE 2 — Payment method */}
-                <AnimatedElement as="div" animation="fade-up" delay={150} className="bg-card rounded-xl p-6 border">
+                <AnimatedElement as="div" animation="fade-up" delay={150} className="checkout-form-section checkout-payment bg-card rounded-xl p-6 border">
                   <h3 className="font-semibold mb-4">Método de pago</h3>
                   <div className="grid grid-cols-2 gap-3">
                     <button
@@ -722,6 +798,7 @@ export default function CheckoutPage() {
                     </button>
                   </div>
 
+                  {import.meta.env.VITE_ONLINE_PAYMENTS_ENABLED === 'true' && <Button type="button" variant={paymentMethod==='online'?'default':'outline'} onClick={()=>setPaymentMethod('online')}>Pagar en línea · Wompi sandbox</Button>}
                   {paymentMethod === 'transfer' && (
                     <div className="mt-4 rounded-xl bg-brand/5 dark:bg-brand/10 border border-brand/20 dark:border-brand/30 p-4 space-y-3 animate-fade-in">
                       <p className="text-sm font-medium text-brand-dark">
@@ -772,7 +849,7 @@ export default function CheckoutPage() {
                 </AnimatedElement>
 
                 {/* Notes */}
-                <AnimatedElement as="div" animation="fade-up" delay={225} className="relative pl-4">
+                <AnimatedElement as="div" animation="fade-up" delay={225} className="checkout-form-section relative pl-4">
                   <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-muted" />
                   <h3 className="text-xs uppercase tracking-[.15em] text-muted-foreground mb-4">Notas adicionales (opcional)</h3>
                   <Textarea
@@ -828,14 +905,16 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
+
+                  <BotProtection onToken={setBotToken} resetKey={botReset} />
                   <Button
                     type="submit"
-                    disabled={orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || !termsAccepted}
+                    disabled={!!pendingAttempt || cart.items.some(item => item.reviewIssues?.length) || orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || !termsAccepted || !botToken}
                     className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2 disabled:bg-muted disabled:text-muted-foreground"
                     size="lg"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    {orderStatus === 'submitting' ? 'Creando pedido...' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : 'Enviar por WhatsApp'}
+                    {orderStatus === 'submitting' ? 'Creando pedido...' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : paymentMethod === 'online' ? 'Crear pedido y pagar' : 'Crear pedido y abrir WhatsApp'}
                   </Button>
 
                   {!termsAccepted && !submitBlockedByClosed && (
@@ -859,34 +938,34 @@ export default function CheckoutPage() {
 
             {/* Order summary sidebar */}
             <div className="lg:col-span-2 order-1 lg:order-2">
-              <AnimatedElement animation="scale-up" delay={75} className="bg-card rounded-xl border p-4 sm:p-6 sticky top-28">
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="font-semibold">Tu orden</h3>
-                  <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-medium">
-                    {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
-                  </span>
-                </div>
-
+              <AnimatedElement animation="scale-up" delay={75} className="checkout-order-summary bg-card rounded-xl border p-4 sm:p-6 lg:sticky lg:top-28">
+                <details open={!isMobile || summaryExpanded}>
+                  <summary className="checkout-summary-toggle" onClick={event => {
+                    event.preventDefault();
+                    if (isMobile) setSummaryExpanded(value => !value);
+                  }} aria-expanded={!isMobile || summaryExpanded}>
+                    <span><strong>Tu pedido</strong><small>{cart.items.reduce((sum, item) => sum + item.quantity, 0)} productos · <span className="lg:hidden">{summaryExpanded ? 'Ocultar detalles' : 'Ver detalles'}</span></small></span>
+                    <span className="checkout-summary-price">{formatPrice(orderTotal)}{form.orderType === 'delivery' && !hasSelectedDeliveryZone && <small>+ domicilio por calcular</small>}</span>
+                  </summary>
+                  <div className="checkout-summary-content">
                 <div className="space-y-4 mb-6">
-                  {cart.items.map((item) => {
+                  {cart.items.map((item, index) => {
                     const customizationLines = item.type === 'product'
                       ? formatProductCustomizationLines(item.customizations)
                       : [];
 
                     return (
                       <div key={item.id} className="group flex gap-3">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-ohana/10">
-                          <Leaf className="h-4 w-4 text-ohana" />
-                        </div>
+                        <CartItemVisual item={item} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-1">
                             <p className="font-medium text-sm leading-tight">
-                              {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
+                              {quotedPrices?.items[index]?.name || (item.type === 'product' ? item.product?.name : 'Bowl Personalizado')}
                             </p>
                             <button
                               type="button"
                               onClick={() => removeItem(item.id)}
-                              className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                              className="flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-destructive transition-colors shrink-0"
                               aria-label="Eliminar producto"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -907,12 +986,12 @@ export default function CheckoutPage() {
                           {item.notes && customizationLines.length === 0 && (
                             <p className="mt-1 text-xs text-muted-foreground">Nota: {item.notes}</p>
                           )}
-                          <div className="flex items-center justify-between mt-2">
+                          <div className="flex flex-wrap gap-2 items-center justify-between mt-2">
                             <div className="flex items-center gap-1 border rounded-full px-1 py-0.5">
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
+                                className="w-11 h-11 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
                                 aria-label="Reducir cantidad"
                               >
                                 <Minus className="h-3 w-3" />
@@ -921,13 +1000,13 @@ export default function CheckoutPage() {
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
+                                className="w-11 h-11 flex items-center justify-center hover:bg-muted rounded-full transition-colors"
                                 aria-label="Aumentar cantidad"
                               >
                                 <Plus className="h-3 w-3" />
                               </button>
                             </div>
-                            <span className="font-semibold text-sm">{formatPrice(item.totalPrice)}</span>
+                            <span className="font-semibold text-sm">{formatPrice(quotedPrices ? quotedPrices.items[index].unit_price_cents * item.quantity : item.totalPrice)}</span>
                           </div>
                         </div>
                       </div>
@@ -992,12 +1071,23 @@ export default function CheckoutPage() {
                     </Button>
                   </div>
                 </div>
+                  </div>
+                </details>
               </AnimatedElement>
             </div>
           </div>
         </div>
       </div>
 
+      <Dialog open={!!reviewQuote} onOpenChange={open => {if (!open) setReviewQuote(null);}}>
+        <DialogContent><DialogHeader><DialogTitle>Revisa el precio actualizado</DialogTitle><DialogDescription>El presupuesto vigente requiere tu revisión antes de crear el pedido.</DialogDescription></DialogHeader>
+          <p>El menú cambió. Este es el presupuesto vigente del negocio:</p>
+          {reviewQuote?.items.map((item,index) => <p key={index}>{item.quantity} × {item.name}: {formatPrice(item.unit_price_cents * item.quantity)}</p>)}
+          <p>Domicilio: {formatPrice(reviewQuote?.delivery_fee || 0)}</p>
+          <strong>Total: {formatPrice(reviewQuote?.total || 0)}</strong>
+          <Button onClick={() => {setAcceptedQuote(reviewQuote!.fingerprint);setAcceptedPreview({key:reviewKey,quote:reviewQuote!});setReviewQuote(null);}}>Acepto el presupuesto; volver a confirmar</Button>
+        </DialogContent>
+      </Dialog>
       {/* CHANGE 5 — Terms modal */}
       <Dialog open={termsModalOpen} onOpenChange={setTermsModalOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">

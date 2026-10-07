@@ -12,12 +12,13 @@ import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import HomePage from "./pages/HomePage";
 import NotFound from "./pages/NotFound";
 import OhanaPage from "./pages/OhanaPage";
-import CheckoutPage from "./pages/CheckoutPage";
 
 // Lazy-loaded routes
+const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const BeveragesPage = lazy(() => import("./pages/BeveragesPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
+const OrderTrackingPage = lazy(() => import("./pages/OrderTrackingPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
@@ -57,6 +58,8 @@ const App = () => (
               <Route path="/admin/login" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><AdminLoginPage /></Suspense></ErrorBoundary>} />
               <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><AdminPage /></Suspense></ErrorBoundary>} />
 
+              <Route path="/pedido/:token" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><OrderTrackingPage /></Suspense></ErrorBoundary>} />
+
               {/* Public routes with Layout */}
               <Route path="/" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OhanaPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/ohana" element={<Navigate to="/" replace />} />
@@ -65,7 +68,7 @@ const App = () => (
               <Route path="/checkout" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><CheckoutPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/nosotros" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><AboutPage /></Layout></Suspense></ErrorBoundary>} />
               <Route path="/contacto" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><ContactPage /></Layout></Suspense></ErrorBoundary>} />
-              <Route path="/pedidos" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><Layout><OrdersPage /></Layout></Suspense></ErrorBoundary>} />
+              <Route path="/pedidos" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><OrdersPage /></Suspense></ErrorBoundary>} />
               <Route path="/carta" element={<Navigate to="/" replace />} />
               <Route path="*" element={<Layout><NotFound /></Layout>} />
             </Routes>

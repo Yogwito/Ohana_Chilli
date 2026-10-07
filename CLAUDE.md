@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Single-page web app serving two Colombian food brands — **Ohana** (healthy bowls) and **Chilli** (hot food) — from one React codebase. Customers browse the menu, build custom bowls, and place orders that are sent via **WhatsApp**. There is no payment processing.
+Single-page web app serving two Colombian food brands — **Ohana** (healthy bowls) and **Chilli** (hot food) — from one React codebase. Customers browse the menu, build custom bowls, and place orders. Orders are priced and persisted server-side (Supabase Edge function), then handed off via **WhatsApp**. Online payments (Wompi) exist but are **sandbox-only and disabled by default** (`VITE_ONLINE_PAYMENTS_ENABLED=false`).
 
 ## Tech Stack
 
@@ -31,6 +31,8 @@ npm run build:dev    # build in development mode (unminified)
 npm run test         # run tests once
 npm run test:watch   # watch mode
 npm run lint         # eslint
+npx tsc --noEmit -p tsconfig.app.json   # typecheck (run in CI)
+node scripts/test-database.mjs          # SQL regression tests against isolated local PostgreSQL (supabase/tests/*.sql)
 ```
 
 Run a single test file: `npx vitest run src/test/bowl-pricing.test.ts`
@@ -46,6 +48,7 @@ Run a single test file: `npx vitest run src/test/bowl-pricing.test.ts`
 | `/carta` | — | Redirects to `/` (CartaPage exists but is not mounted) |
 | `/checkout` | CheckoutPage | Order form → WhatsApp |
 | `/pedidos` | OrdersPage | Admin-only order list |
+| `/pedido/:token` | OrderTrackingPage | Private order tracking via token (no Layout) |
 | `/nosotros` | AboutPage | About page |
 | `/contacto` | ContactPage | Contact |
 | `/admin` | AdminPage | Admin panel (auth-guarded) |
@@ -89,12 +92,11 @@ The `Brand` type in `src/types/index.ts` is currently `'ohana'` only. The DB tab
 - Bowl pricing in `src/domain/bowlPricing.ts` — base price from size + extra charges for premium ingredients
 
 ### Order Flow
-1. Customer fills checkout form (name, phone, pickup/delivery, zone)
-2. Delivery zone validated against Supabase at submit time (re-fetches canonical fee)
-3. Order inserted into `orders` + `order_items` tables
-4. WhatsApp message generated via `src/domain/whatsapp.ts`
-5. `openWhatsAppHandoff()` attempts to open WhatsApp (handles embedded/iframe contexts)
-6. Fallback: copy message or direct link
+1. Customer fills checkout form (name, phone, pickup/delivery, zone; Turnstile key via `VITE_TURNSTILE_SITE_KEY`)
+2. `src/lib/orderApi.ts` calls the **`order-api` Edge function** (`supabase/functions/order-api/handler.ts`). The server re-prices everything from the catalog (client prices are ignored), validates zone/hours/promotions, and returns a canonical quote; if the quote changed, checkout pauses for user review
+3. Order is created atomically via SQL RPCs, with idempotency key + tracking token. The pending request is kept in `sessionStorage` (`ohana-pending-order:v1`) so a reload can recover with the same identity
+4. WhatsApp message generated via `src/domain/whatsapp.ts` from the persisted receipt; `openWhatsAppHandoff()` handles embedded/iframe contexts (fallback: copy message or direct link)
+5. Optional Wompi sandbox payment / full-refund requests; late payments on cancelled orders raise a persistent "financial attention" incident in the admin orders dashboard
 
 ### Admin Auth
 - Login at `/admin/login` via `supabase.auth.signInWithPassword()`
@@ -108,6 +110,12 @@ All Supabase reads use React Query via hooks in `src/hooks/use-catalog.ts`:
 - `useActiveDeliveryZones()` — refetches every 30s, staleTime: 0 (important for live fee accuracy)
 - `useWhatsAppNumber()` — stale 1 hour
 - `useBusinessSettings()` — typed wrapper around the `settings` table; covers phone, hours, social links, etc.
+
+### Backend (Supabase)
+- `supabase/migrations/2026100612*` are **additive** order/payment migrations; apply only via the isolated staging/drift-review process in `docs/ORDER_BACKEND_ROLLOUT.md` before releasing matching frontend/Edge code. Never point local/staging config at production.
+- `src/integrations/supabase/types.ts` is generated (`scripts/generate-db-types.mjs`); regenerate after migrations.
+- Backup/restore scripts live in `scripts/` (see `docs/BACKUP_RESTORE.md`). Edge tests run with Deno (`handler.test.ts`); CI (`.github/workflows/order-ci.yml`) runs lint, tests, tsc, build and Deno.
+- Dated change/audit notes in `docs/` (e.g. `CORRECTIONS_2026-10-07.md`) record what is verified locally vs. not deployed.
 
 ### Cross-Tab Cache Sync
 `src/hooks/use-catalog-sync.ts` keeps React Query caches in sync across browser tabs when the admin makes changes. After any admin mutation, call `useCatalogMutationSync()` with the affected table names — it invalidates/refetches locally and broadcasts via `BroadcastChannel` (falling back to `localStorage` storage events for same-origin tabs). `CatalogSyncBridge` in `App.tsx` wires up the listener side automatically.
@@ -150,7 +158,9 @@ src/
 
 2. **WhatsApp handoff in embedded contexts**: The `openWhatsAppHandoff()` function detects if running in an iframe/preview and falls back gracefully. Test checkout on real devices, not previews.
 
-3. **Delivery zone re-validation**: At checkout submit, the zone is re-fetched from Supabase to get the canonical fee. If the zone was deactivated between selection and submit, the order is blocked.
+3. **Delivery zone re-validation**: Zone and fee are validated server-side at order creation. If the zone was deactivated between selection and submit, the order is blocked.
+
+4. **Hours/banner settings**: Business hours use Bogotá time (incl. overnight ranges); the backend rejects orders when closed. Only specific `settings` keys are anonymously readable (RLS).
 
 ## TypeScript
 

@@ -12,21 +12,14 @@ import {
   ArrowUpRight,
   Clock,
   MapPin,
-  Plus,
-  Check,
   Search,
   X,
   SlidersHorizontal,
   Leaf,
-  MoveUpRight,
 } from "lucide-react";
 import { useExperienceMotion } from "@/hooks/use-experience-motion";
 import SEOHead from "@/components/SEOHead";
 import { Skeleton } from "@/components/ui/skeleton";
-import ProductImage from "@/components/products/ProductImage";
-import ProductDrawer, {
-  type ProductConfig,
-} from "@/components/products/ProductDrawer";
 import ExperienceHero from "@/components/ohana/ExperienceHero";
 import {
   buildBusinessWhatsAppUrl,
@@ -34,21 +27,15 @@ import {
   isBusinessOpenNow,
 } from "@/domain/businessSettings";
 import {
-  calculateProductUnitPrice,
-  isProductCustomizable,
-  normalizeProductCustomization,
-} from "@/domain/productCustomizations";
-import { formatPrice } from "@/domain/formatPrice";
-import {
   useBusinessSettings,
   useProducts,
   useCategories,
 } from "@/hooks/use-catalog";
-import { useCart } from "@/context/CartContext";
-import { trackEvent } from "@/lib/analytics";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Product, Category } from "@/types";
+import type { Product, Category } from "@/types";
+import MenuProductCard from "@/components/products/MenuProductCard";
+import BrandIllustration from "@/components/ohana/BrandIllustration";
+import { selectFeaturedProducts } from "@/domain/featuredProducts";
 const BowlBuilder = lazy(() => import("@/components/ohana/BowlBuilder"));
 const PromotionsSection = lazy(
   () => import("@/components/ohana/PromotionsSection"),
@@ -61,124 +48,6 @@ const normalizeSearch = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
-function ProductRow({
-  product,
-  category,
-}: {
-  product: Product;
-  category?: Category;
-}) {
-  const resetTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => clearTimeout(resetTimer.current), []);
-  const { addProduct } = useCart();
-  const [added, setAdded] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const productWithCategory = useMemo(
-    () => ({
-      ...product,
-      categorySlug: category?.slug,
-      categoryName: category?.name,
-      category,
-    }),
-    [category, product],
-  );
-
-  const handleAddDirect = () => {
-    addProduct(product);
-    trackEvent({
-      type: "add_to_cart",
-      productId: product.id,
-      productName: product.name,
-      brand: product.brand,
-      priceCents: product.price,
-    });
-    toast.success(`${product.name} agregado`);
-    setAdded(true);
-    clearTimeout(resetTimer.current);
-    resetTimer.current = setTimeout(() => setAdded(false), 1200);
-  };
-
-  const handleAddClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isProductCustomizable(productWithCategory)) {
-      setDrawerOpen(true);
-      return;
-    }
-
-    handleAddDirect();
-  };
-
-  const handleDrawerConfirm = (config: ProductConfig) => {
-    const customizations = normalizeProductCustomization(config);
-    const unitPrice = calculateProductUnitPrice(product.price, customizations);
-    const notes = customizations?.note || undefined;
-
-    addProduct(product, 1, notes, customizations);
-    trackEvent({
-      type: "add_to_cart",
-      productId: product.id,
-      productName: product.name,
-      brand: product.brand,
-      priceCents: unitPrice,
-    });
-    toast.success(`${product.name} agregado`, {
-      description: formatPrice(unitPrice),
-    });
-    setAdded(true);
-    clearTimeout(resetTimer.current);
-    resetTimer.current = setTimeout(() => setAdded(false), 1200);
-  };
-
-  return (
-    <>
-      <article className="experience-product group">
-        {/* Left: text */}
-        <div className="experience-product-copy">
-          <p className="experience-product-name">{product.name}</p>
-          {product.description?.trim() && (
-            <p className="experience-product-description">
-              {product.description.trim()}
-            </p>
-          )}
-          <p className="experience-product-price">
-            {formatPrice(product.price)}
-          </p>
-        </div>
-
-        {/* Right: image with add button */}
-        <div className="experience-product-image">
-          <ProductImage
-            product={product}
-            ratio={4 / 3}
-            imageClassName="group-hover:scale-105"
-            className="rounded-none"
-            fallbackClassName="rounded-2xl bg-gradient-to-br from-brand/30 to-brand-dark/50"
-          />
-
-          {/* Floating add button */}
-          <button
-            onClick={handleAddClick}
-            className={cn("experience-product-add", added && "is-added")}
-            aria-label={`Agregar ${product.name} al carrito`}
-          >
-            {added ? <Check size={19} /> : <Plus size={19} />}
-          </button>
-        </div>
-      </article>
-
-      {drawerOpen && (
-        <ProductDrawer
-          product={product}
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          onConfirm={handleDrawerConfirm}
-        />
-      )}
-    </>
-  );
-}
 export default function OhanaPage() {
   const location = useLocation();
   const handledNavigation = useRef<string>();
@@ -208,6 +77,7 @@ export default function OhanaPage() {
       ),
     [categories, products],
   );
+  const featured = useMemo(() => selectFeaturedProducts(products), [products]);
   const filtered = useMemo(
     () =>
       products
@@ -303,6 +173,18 @@ export default function OhanaPage() {
       <Suspense fallback={null}>
         <PromotionsSection />
       </Suspense>
+
+      {featured.length > 0 && (
+        <section className="experience-section experience-favorites" aria-labelledby="favorites-title">
+          <div className="experience-section-heading">
+            <div><p className="experience-eyebrow">¿POR DÓNDE EMPEZAMOS?</p><h2 id="favorites-title">Favoritos <em>de Ohana.</em></h2></div>
+            <p>Ideas para tu próximo antojo.<br />El resto lo eliges tú.</p>
+          </div>
+          <div className="experience-product-grid favorites-track">
+            {featured.map(product => <MenuProductCard key={product.id} product={product} featured category={categories.find(c => c.id === product.categoryId)} />)}
+          </div>
+        </section>
+      )}
 
       <section
         id="menu"
@@ -409,7 +291,7 @@ export default function OhanaPage() {
               className={cn("experience-product-grid", compact && "is-compact")}
             >
               {filtered.map((product) => (
-                <ProductRow
+                <MenuProductCard
                   key={product.id}
                   product={product}
                   category={categories.find(
@@ -469,13 +351,6 @@ export default function OhanaPage() {
             <br />y termina con tu salsa favorita.
           </p>
         </div>
-        <div className="experience-builder-steps" aria-hidden="true">
-          <span>01 / Elige tu tamaño</span>
-          <span>02 / Haz tu mezcla</span>
-          <span>
-            03 / Dale tu toque <MoveUpRight size={18} />
-          </span>
-        </div>
         <div className="experience-builder-surface">
           <Suspense fallback={<Skeleton className="h-[520px] rounded-3xl" />}>
             <BowlBuilder />
@@ -484,9 +359,7 @@ export default function OhanaPage() {
       </section>
 
       <section className="experience-story experience-section">
-        <span className="story-flower" aria-hidden="true">
-          ✳
-        </span>
+        <div className="brand-story-art"><BrandIllustration kind="bowl" /></div>
         <div>
           <p className="experience-eyebrow">
             COMER RICO SE DISFRUTA MÁS EN FAMILIA

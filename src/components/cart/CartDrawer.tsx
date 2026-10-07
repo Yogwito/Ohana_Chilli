@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
 import { useCart } from '@/context/CartContext';
-import { Minus, Plus, Trash2, ShoppingBag, Leaf } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatBowlSummary } from '@/domain/bowlSummary';
+import CartItemVisual from '@/components/cart/CartItemVisual';
+import BrandIllustration from '@/components/ohana/BrandIllustration';
 import { formatPrice } from '@/domain/formatPrice';
 import { formatProductCustomizationLines } from '@/domain/productCustomizations';
 
@@ -54,9 +56,9 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
         {cart.items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-              <ShoppingBag className="h-10 w-10 text-muted-foreground" />
+              <BrandIllustration kind="bowl" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">Tu carrito esta vacio</h3>
+            <h3 className="mb-2 text-lg font-semibold">Tu pedido empieza aquí</h3>
             <p className="mb-6 text-sm text-muted-foreground">Agrega productos de Ohana Bowls para comenzar.</p>
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
               <Button onClick={handleContinueShopping} variant="outline" className="w-full sm:w-auto">
@@ -69,7 +71,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
           </div>
         ) : (
           <>
-            <ScrollArea className="-mx-6 flex-1 px-6">
+            <ScrollArea className="-mx-4 min-h-0 flex-1 px-4 sm:-mx-6 sm:px-6">
               <div className="space-y-4 py-4">
                 {cart.items.map((item, index) => {
                   const customizationLines = item.type === 'product'
@@ -81,11 +83,9 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                       key={item.id}
                       animation="fade-up"
                       delay={Math.min(index * 75, 300) as 0 | 75 | 150 | 225 | 300}
-                      className="flex gap-3 rounded-lg bg-muted/50 p-3"
+                      className="cart-order-item flex gap-3 rounded-lg bg-muted/50 p-3"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ohana/10">
-                        <Leaf className="h-5 w-5 text-ohana" />
-                      </div>
+                      <CartItemVisual item={item} />
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
@@ -101,6 +101,8 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                                 {formatBowlSummary(item.customBowl)}
                               </p>
                             )}
+                            {item.reviewIssues?.map(message => <p key={message} role="alert" className="mt-2 text-sm text-destructive">{message}</p>)}
+                            {item.type === 'custom-bowl' && <Button variant="outline" size="sm" className="mt-2" onClick={() => {onOpenChange(false); navigate(`/?editar-bowl=${encodeURIComponent(item.id)}#arma-tu-bowl`);}}>Editar bowl</Button>}
                             {customizationLines.length > 0 && (
                               <div className="mt-1 space-y-0.5">
                                 {customizationLines.map((line) => (
@@ -114,18 +116,18 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                           </div>
                           <button
                             onClick={() => removeItem(item.id)}
-                            className="p-1 text-muted-foreground transition-colors hover:text-destructive"
+                            className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
                             aria-label="Eliminar"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
 
-                        <div className="mt-2 flex items-center justify-between">
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                              className="flex h-11 w-11 items-center justify-center rounded-full border transition-colors hover:bg-muted"
                               aria-label="Reducir cantidad"
                             >
                               <Minus className="h-3 w-3" />
@@ -133,7 +135,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                             <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                              className="flex h-11 w-11 items-center justify-center rounded-full border transition-colors hover:bg-muted"
                               aria-label="Aumentar cantidad"
                             >
                               <Plus className="h-3 w-3" />
@@ -158,7 +160,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                 <span className="font-semibold">Total</span>
                 <span className="font-bold text-ohana">{formatPrice(cart.total)}</span>
               </div>
-              <Button onClick={handleCheckout} className="w-full btn-ohana" size="lg">
+              <Button disabled={cart.items.some(item => item.reviewIssues?.length)} onClick={handleCheckout} className="w-full btn-ohana" size="lg">
                 Continuar pedido
               </Button>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

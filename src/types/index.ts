@@ -42,6 +42,7 @@ export interface BowlSizeRule {
 
 // Product Types
 export interface Product {
+  promotionId?: string;
   id: string;
   name: string;
   description: string;
@@ -79,9 +80,19 @@ export interface ProductCustomization {
   extraTotal: number;
 }
 
+export interface BowlExtra {
+  ingredient: Ingredient;
+  quantity: number;
+  source: 'catalog' | 'generic' | 'upsell' | 'suggestion' | 'legacy';
+  tariffId?: string;
+  unitPrice: number;
+}
+
 // Custom Bowl Type
 export interface CustomBowl {
   size: BowlSizeRule;
+  extras?: BowlExtra[];
+  reviewIssues?: string[];
   bases: Ingredient[];
   proteins: Ingredient[];
   acompanantes: Ingredient[];
@@ -99,6 +110,7 @@ export interface CartItem {
   customBowl?: CustomBowl;
   customizations?: ProductCustomization;
   modifiers?: Modifier[];
+  reviewIssues?: string[];
   quantity: number;
   notes?: string;
   unitPrice: number;
