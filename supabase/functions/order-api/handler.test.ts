@@ -190,3 +190,80 @@ Deno.test('Body limit rejects oversized headers and cancels streamed UTF-8 bodie
  const declared=req('quote',{});declared.headers.set('content-length','50001');
  assert((await handleRequest(declared)).status===413,'declared oversized body accepted');
 });
+Deno.test('Redaction masks secrets, tokens, phones, addresses and bodies in logs',async()=>{
+ const {redact,maskPhone,requestId}=await import('../_shared/log.ts');
+ const out=JSON.stringify(redact({password:'hunter2',tracking_token:'a'.repeat(64),phone:'+57 300 123 4567',address:'Calle 1 #2',authorization:'Bearer abc.def.ghi',WOMPI_PRIVATE_KEY:'prv_test_zzzzzz',request:{items:[1]},note:'x',msg:'failed with Bearer sekret123 and prv_test_abcdefgh',route:'quote'}));
+ for(const leak of ['hunter2','a'.repeat(64),'4567','Calle 1','abc.def.ghi','prv_test_','sekret123'])assert(!out.includes(leak),`leaked ${leak}`);
+ assert(out.includes('***567')&&out.includes('quote'),'phone mask or safe field lost');
+ assert(maskPhone('3001234567')==='***567','mask');
+ assert(requestId('good-id-1234')==='good-id-1234'&&requestId('bad id\n<x>')!=='bad id\n<x>','request id sanitising');
+});
+Deno.test('Handler logs structured JSON without PII and echoes request id',async()=>{
+ const lines:string[]=[];const orig=[console.log,console.warn,console.error];
+ console.log=console.warn=console.error=(m:string)=>{lines.push(String(m));};
+ try{
+  await withFetch(async input=>{const u=String(input);if(u.includes('order_rate_limit'))return json(true);if(u.includes('order_quote'))return json({total:1});throw new Error('net');},async()=>{
+   const r=req('quote',{request:{...request,phone:'3009998877',address:'Secret Street 5'}});r.headers.set('x-request-id','trace-abcdef12');
+   const res=await handleRequest(r);
+   assert(res.headers.get('x-request-id')==='trace-abcdef12','request id not echoed');
+   const gen=await handleRequest(req('quote',{request}));assert(/^[0-9a-f-]{36}$/.test(gen.headers.get('x-request-id')||''),'id not generated');
+  });
+ }finally{[console.log,console.warn,console.error]=orig;}
+ const all=lines.join('\n');
+ const rec=JSON.parse(lines[0]);
+ assert(rec.route==='quote'&&rec.status===200&&typeof rec.duration_ms==='number'&&rec.request_id==='trace-abcdef12','log shape');
+ assert(!all.includes('3009998877')&&!all.includes('Secret Street')&&!all.includes('192.0.2.1'),'PII in logs');
+});
+Deno.test('Health: liveness always ok, readiness reports only coarse status',async()=>{
+ const get=(p:string)=>new Request(`https://edge.example/order-api/${p}`,{method:'GET'});
+ let res=await handleRequest(get('health'));assert(res.status===200&&(await res.json()).ok===true,'liveness');
+ await withFetch(async()=>json([{key:'k'}]),async()=>{
+  res=await handleRequest(get('health/ready'));const b=await res.json();
+  assert(res.status===200&&b.ok===true&&b.components.database==='ok','ready ok');
+ });
+ await withFetch(async()=>json({message:'secret internal detail isolated-service-key'},500),async()=>{
+  res=await handleRequest(get('health/ready'));const t=await res.text();
+  assert(res.status===503&&JSON.parse(t).status==='degraded'&&JSON.parse(t).components.database==='down','degraded');
+  assert(!t.includes('secret')&&!t.includes('isolated'),'readiness leaked internals');
+ });
+});
+Deno.test('ORDERS_ENABLED=false blocks quote/create with 503 orders_disabled but keeps tracking, admin, webhook, reconcile',async()=>{
+ Deno.env.set('ORDERS_ENABLED','false');Deno.env.set('RECONCILIATION_SECRET','scheduler-test');
+ try{
+  await withFetch(async input=>{const u=String(input);
+   if(u.includes('order_rate_limit'))return json(true);
+   if(u.includes('order_track'))return json({status:'pending'});
+   if(u.includes('/auth/v1/user'))return json({id:'00000000-0000-0000-0000-000000000001'});
+   if(u.includes('has_role'))return json(true);
+   if(u.includes('order_action'))return json({status:'confirmed'});
+   if(u.includes('/payment_attempts'))return json([]);
+   if(u.includes('/orders')||u.includes('/order_refunds'))return new Response(null,{headers:{'Content-Range':'*/0'}});
+   throw new Error('Unexpected network access '+u);},async()=>{
+   for(const route of ['quote','create']){
+    const res=await handleRequest(req(route,{request}));const b=await res.json();
+    assert(res.status===503&&b.code==='orders_disabled'&&b.error==='orders_disabled'&&/pedidos/.test(b.message),`${route} not disabled`);
+   }
+   assert((await handleRequest(req('track',{token:'a'.repeat(64)}))).status===200,'tracking blocked');
+   assert((await handleRequest(req('action',{id:'00000000-0000-0000-0000-000000000101',version:0,action:'accept',note:''}))).status===200,'admin blocked');
+   const rc=req('reconcile',{});rc.headers.set('Authorization','Bearer scheduler-test');
+   assert((await handleRequest(rc)).status===200,'reconcile blocked');
+   assert((await handleRequest(req('webhook',{environment:'test',data:{transaction:{id:'x'}},signature:{properties:[],checksum:'b'}}))).status===403,'webhook should reach signature check, not kill switch');
+  });
+ }finally{Deno.env.delete('ORDERS_ENABLED');}
+ await withFetch(async input=>{const u=String(input);if(u.includes('order_rate_limit'))return json(true);return json({total:1});},async()=>{
+  assert((await handleRequest(req('quote',{request}))).status===200,'default must be enabled when unset');
+ });
+});
+Deno.test('Online payments disabled by default: online is refused, cash create still works',async()=>{
+ Deno.env.delete('ONLINE_PAYMENTS_ENABLED');
+ await withFetch(async(input)=>{const u=String(input);
+  if(u.includes('order_rate_limit'))return json(true);
+  if(u.includes('siteverify'))return json({success:true,hostname:'shop.example',action:'order'});
+  if(u.includes('order_create'))return json({id:'order'});
+  throw new Error('net');},async()=>{
+  const body={request,idempotency_key:'00000000-0000-0000-0000-000000000002',tracking_token:'f'.repeat(64),quote:'a'.repeat(64),bot_token:'t'};
+  const online=await handleRequest(req('create',{...body,request:{...request,payment_method:'online'}}));
+  assert(online.status===503&&(await online.json()).error==='online_payments_disabled','online not refused');
+  assert((await handleRequest(req('create',body))).status===200,'cash create broken with payments off');
+ });
+});

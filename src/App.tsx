@@ -7,6 +7,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { CartProvider } from "@/context/CartContext";
 import { useCatalogCrossTabSync } from "@/hooks/use-catalog-sync";
 import { lazy, Suspense } from "react";
+import NoIndex from "@/components/NoIndex";
 import Layout from "@/components/layout/Layout";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import HomePage from "./pages/HomePage";
@@ -53,6 +54,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <NoIndex />
             <Routes>
               {/* Admin routes without Layout */}
               <Route path="/admin/login" element={<ErrorBoundary><Suspense fallback={<PageFallback />}><AdminLoginPage /></Suspense></ErrorBoundary>} />

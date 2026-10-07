@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { SITE_NAME, SITE_URL as BASE_URL } from '@/config/site';
 
 interface SEOHeadProps {
   title?: string;
@@ -7,8 +8,6 @@ interface SEOHeadProps {
   type?: string;
 }
 
-const SITE_NAME = 'Ohana Bowls';
-const BASE_URL = 'https://ohanachilli.com';
 const DEFAULT_DESCRIPTION = 'Restaurante en Manizales con bowls frescos personalizables. Pide a domicilio o recoge en sucursal.';
 
 export default function SEOHead({

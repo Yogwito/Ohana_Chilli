@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /admin/login
-Sitemap: https://ohanabowls.com/sitemap.xml

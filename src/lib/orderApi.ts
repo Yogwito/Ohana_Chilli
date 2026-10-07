@@ -14,8 +14,12 @@ const messages: Record<string,string> = {
   tracking_not_found: 'El enlace no existe o venció.',
   online_payments_disabled: 'El pago en línea no está habilitado.',
   refund_requires_review: 'El reembolso necesita revisión. No vuelvas a solicitarlo; consulta su estado.',
+  orders_disabled: 'Estamos en mantenimiento y no estamos recibiendo pedidos en línea por ahora. Tu carrito sigue guardado; intenta de nuevo más tarde o escríbenos por WhatsApp.',
+  service_unavailable: 'El servicio de pedidos no está disponible temporalmente. Tu carrito sigue guardado; intenta de nuevo en unos minutos.',
   payment_reconciliation_required: 'El pago anterior necesita verificación. Contacta al negocio antes de pagar otra vez.',
 };
+export const maintenanceCodes = ['orders_disabled','service_unavailable'];
+export const isMaintenanceError = (error: unknown): error is OrderApiError => error instanceof OrderApiError && maintenanceCodes.includes(error.code);
 export class OrderApiError extends Error {
   constructor(public code: string) { super(messages[code] || 'No pudimos completar la operación. Intenta nuevamente.'); }
 }
@@ -26,8 +30,12 @@ export async function orderApi<T>(route: string, body: unknown): Promise<T> {
       Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
     body: JSON.stringify(body), signal: AbortSignal.timeout(25000),
   });
-  const result = await response.json();
-  if (!response.ok) throw new OrderApiError(result.error || 'unavailable');
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code = result.error || result.code;
+    // 503 with a known code (e.g. rate_limit_unavailable) keeps its own message; bare 503 is maintenance.
+    throw new OrderApiError(code === 'orders_disabled' ? code : code || (response.status === 503 ? 'service_unavailable' : 'unavailable'));
+  }
   return result;
 }
 export function orderItemRequest(item: CartItem) {

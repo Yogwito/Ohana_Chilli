@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.98.0';
 import { z } from 'npm:zod@3.25.76';
+import { errorCategory, log, requestId } from '../_shared/log.ts';
 import { hostedCheckout, minorUnits, sha256, verifyEvent, type WompiEvent, type WompiTransaction } from '../_shared/wompi.ts';
 
 const env = (key: string) => Deno.env.get(key) || '';
@@ -8,6 +9,8 @@ const origin = env('APP_ORIGIN');
 const environment = 'test'; // Production deliberately unavailable until merchant/refund acceptance.
 const providerBase = 'https://sandbox.wompi.co/v1';
 const onlineEnabled = () => env('WOMPI_HOSTED_METHODS_VERIFIED') === 'true' && env('WOMPI_REFERENCE_LOOKUP_VERIFIED') === 'true' && env('ONLINE_PAYMENTS_ENABLED') === 'true' && env('WOMPI_PUBLIC_KEY').startsWith('pub_test_') && env('WOMPI_PRIVATE_KEY').startsWith('prv_test_') && !!env('WOMPI_INTEGRITY_SECRET') && !!env('WOMPI_EVENTS_SECRET') && env('WOMPI_REFUND_METHODS').split(',').includes('CARD');
+// Kill switch for NEW orders only: unset = enabled; the exact string 'false' disables quote/create.
+const ordersEnabled = () => env('ORDERS_ENABLED').trim().toLowerCase() !== 'false';
 const id = z.string().min(1).max(100);
 const extra = z.object({ ingredient_id: id, quantity: z.number().int().min(1).max(10), source: z.enum(['catalog', 'generic', 'upsell', 'suggestion']).optional(), tariff_id: id.optional() }).strict();
 const item = z.object({
@@ -56,9 +59,9 @@ async function boundedBody(req: Request): Promise<string> {
   for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.byteLength; }
   return new TextDecoder().decode(bytes);
 }
-function headers(req: Request) {
+function headers(req: Request, rid = '') {
   const allowed = req.headers.get('origin') === origin;
-  return { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Vary': 'Origin',
+  return { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Vary': 'Origin', ...(rid ? { 'x-request-id': rid, 'Access-Control-Expose-Headers': 'x-request-id' } : {}),
     ...(allowed ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } : {}) };
 }
 async function rpc(name: string, args: Record<string, unknown>, client = db) {
@@ -115,17 +118,41 @@ async function applyTransaction(transaction: WompiTransaction, eventKey: string)
 }
 async function monitor(code: string) {
   // Never log exception bodies, request payloads, addresses, tokens or credentials.
-  console.error(JSON.stringify({ service: 'orders', code }));
+  log('error', 'monitor', { code });
   if (env('MONITORING_URL')) {
     try { await fetch(env('MONITORING_URL'), { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env('MONITORING_TOKEN')}` }, body: JSON.stringify({ service: 'orders', code }), signal: AbortSignal.timeout(5000) }); } catch { /* diagnostic sink cannot break checkout */ }
   }
 }
+async function health(req: Request, rid: string, ready: boolean) {
+  const started = Date.now();
+  let body: Record<string, unknown> = { ok: true };
+  let status = 200;
+  if (ready) {
+    // Coarse result only: never return error text, URLs or keys.
+    let dbOk = false;
+    try {
+      const probe = db.from('settings').select('key').limit(1).then(({ error }) => !error);
+      dbOk = await Promise.race([probe, new Promise<boolean>(r => setTimeout(() => r(false), 3000))]);
+    } catch { dbOk = false; }
+    body = { ok: dbOk, status: dbOk ? 'ok' : 'degraded', components: { database: dbOk ? 'ok' : 'down' } };
+    if (!dbOk) status = 503;
+  }
+  log(status >= 500 ? 'error' : 'info', 'request', { request_id: rid, route: ready ? 'health/ready' : 'health', status, error_category: status >= 500 ? 'server' : 'none', duration_ms: Date.now() - started });
+  return new Response(JSON.stringify(body), { status, headers: { ...headers(req, rid), 'Access-Control-Allow-Origin': '*' } });
+}
 export async function handleRequest(req: Request) {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: headers(req) });
+  const started = Date.now();
+  const rid = requestId(req.headers.get('x-request-id'));
+  const parts = new URL(req.url).pathname.split('/').filter(Boolean);
+  const route = parts[parts.length - 1];
+  if (req.method === 'OPTIONS') return new Response(null, { headers: headers(req, rid) });
+  if (req.method === 'GET' && (route === 'health' || (route === 'ready' && parts[parts.length - 2] === 'health'))) return await health(req, rid, route === 'ready');
+  let code = 'ok';
+  let status = 200;
   try {
     if (req.method !== 'POST') throw new ApiError('method_not_allowed',405);
-    const route = new URL(req.url).pathname.split('/').pop();
     if (route !== 'webhook' && route !== 'reconcile' && req.headers.get('origin') !== origin) throw new ApiError('origin_denied',403);
+    if ((route === 'quote' || route === 'create') && !ordersEnabled()) throw new ApiError('orders_disabled',503);
     const raw = await boundedBody(req);
     const body = JSON.parse(raw);
     let result: unknown;
@@ -249,11 +276,16 @@ export async function handleRequest(req: Request) {
       if (unresolved) await monitor('refund_unresolved');
       result = { reconciled: checked, failed };
     } else throw new ApiError('not_found',404);
-    return new Response(JSON.stringify(result), { headers: headers(req) });
+    log('info', 'request', { request_id: rid, route, status, error_category: 'none', duration_ms: Date.now() - started });
+    return new Response(JSON.stringify(result), { headers: headers(req, rid) });
   } catch (error) {
-    const code = error instanceof ApiError ? error.code : error instanceof z.ZodError || error instanceof SyntaxError ? 'invalid_request' : 'internal_error';
-    const status = error instanceof ApiError ? error.status : code === 'invalid_request' ? 400 : 500;
-    if (status >= 500 || code.includes('mismatch') || code.includes('webhook')) await monitor(code);
-    return new Response(JSON.stringify({ error: code }), { status, headers: headers(req) });
+    code = error instanceof ApiError ? error.code : error instanceof z.ZodError || error instanceof SyntaxError ? 'invalid_request' : 'internal_error';
+    status = error instanceof ApiError ? error.status : code === 'invalid_request' ? 400 : 500;
+    if (errorCategory(status, code) !== 'kill_switch' && (status >= 500 || code.includes('mismatch') || code.includes('webhook'))) await monitor(code);
+    log(status >= 500 && errorCategory(status, code) !== 'kill_switch' ? 'error' : 'warn', 'request', { request_id: rid, route, status, code, error_category: errorCategory(status, code), duration_ms: Date.now() - started });
+    const payload = code === 'orders_disabled'
+      ? { error: code, code, message: 'Por el momento no estamos recibiendo pedidos en línea. Por favor intenta de nuevo más tarde.' }
+      : { error: code };
+    return new Response(JSON.stringify(payload), { status, headers: headers(req, rid) });
   }
 }

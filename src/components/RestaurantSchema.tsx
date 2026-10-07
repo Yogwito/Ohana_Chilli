@@ -1,3 +1,4 @@
+import { SITE_URL } from '@/config/site';
 import { Helmet } from 'react-helmet-async';
 import { getSchemaOpeningHours, parseBusinessAddress } from '@/domain/businessSettings';
 import { useBusinessSettings } from '@/hooks/use-catalog';
@@ -26,7 +27,7 @@ export default function RestaurantSchema() {
     telephone: businessSettings?.whatsappNumber ? `+${businessSettings.whatsappNumber}` : undefined,
     openingHours: openingHours.length > 0 ? openingHours : undefined,
     servesCuisine: ['Bowls', 'Comida saludable'],
-    url: 'https://ohanachilli.com',
+    url: SITE_URL,
   };
 
   return (

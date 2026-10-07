@@ -55,7 +55,7 @@ import BrandIllustration from '@/components/ohana/BrandIllustration';
 import { useIsMobile } from '@/hooks/use-mobile';
 import RecentOrders from '@/components/checkout/RecentOrders';
 import BotProtection from '@/components/checkout/BotProtection';
-import { checkoutAttempt, getPendingCheckout, pendingCheckoutStorageKey, orderApi, orderItemRequest, OrderApiError, type CanonicalQuote, type PendingCheckoutAttempt } from '@/lib/orderApi';
+import { checkoutAttempt, getPendingCheckout, pendingCheckoutStorageKey, orderApi, orderItemRequest, OrderApiError, isMaintenanceError, type CanonicalQuote, type PendingCheckoutAttempt } from '@/lib/orderApi';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -119,6 +119,7 @@ export default function CheckoutPage() {
     deliveryZone: '',
     notes: pendingAttempt?.request?.notes || '',
   });
+  const [maintenance, setMaintenance] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
   // CHANGE 2 — payment method state
@@ -381,6 +382,13 @@ export default function CheckoutPage() {
         toast.success('Pedido creado. Toca "Abrir WhatsApp" para enviar.');
       }
     } catch (err) {
+      if (isMaintenanceError(err)) {
+        // orders_disabled is a definitive rejection: no order exists, so no recovery attempt is kept.
+        if (err.code === 'orders_disabled') { sessionStorage.removeItem(pendingCheckoutStorageKey); setPendingAttempt(null); }
+        else setPendingAttempt(getPendingCheckout());
+        setMaintenance(true);setBotReset(value => value+1);setSubmitError(err.message);setOrderStatus('idle');
+        return;
+      }
       // Keep the original identity after any uncertain submission, including a refresh.
       setPendingAttempt(getPendingCheckout());
       setBotReset(value => value+1);
@@ -429,7 +437,8 @@ export default function CheckoutPage() {
         idempotency_key:attempt.key, tracking_token:attempt.token, bot_token:botToken});
       finishRecovery(attempt);
     } catch(error) {
-      if (error instanceof OrderApiError && error.code === 'quote_changed') {
+      if (isMaintenanceError(error)) { setMaintenance(true); setSubmitError(error.message); }
+      else if (error instanceof OrderApiError && error.code === 'quote_changed') {
         // A quote rejection is pre-commit, but retain the key while requesting explicit review.
         try {
           const quote = await orderApi<CanonicalQuote>('quote',{request:pending.request});
@@ -906,15 +915,16 @@ export default function CheckoutPage() {
                   )}
 
 
+                  {maintenance && <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">Estamos en mantenimiento y no podemos recibir pedidos en línea por ahora. Tu carrito se conserva. <button type="button" className="underline font-medium" onClick={() => setMaintenance(false)}>Intentar de nuevo</button></div>}
                   <BotProtection onToken={setBotToken} resetKey={botReset} />
                   <Button
                     type="submit"
-                    disabled={!!pendingAttempt || cart.items.some(item => item.reviewIssues?.length) || orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || !termsAccepted || !botToken}
+                    disabled={maintenance || !!pendingAttempt || cart.items.some(item => item.reviewIssues?.length) || orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || !termsAccepted || !botToken}
                     className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2 disabled:bg-muted disabled:text-muted-foreground"
                     size="lg"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    {orderStatus === 'submitting' ? 'Creando pedido...' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : paymentMethod === 'online' ? 'Crear pedido y pagar' : 'Crear pedido y abrir WhatsApp'}
+                    {orderStatus === 'submitting' ? 'Creando pedido...' : maintenance ? 'En mantenimiento' : submitBlockedByClosed ? 'Cerrado — fuera de horario' : paymentMethod === 'online' ? 'Crear pedido y pagar' : 'Crear pedido y abrir WhatsApp'}
                   </Button>
 
                   {!termsAccepted && !submitBlockedByClosed && (
