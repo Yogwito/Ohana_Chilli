@@ -1,0 +1,79 @@
+name: Order safeguards
+on:
+  push:
+  pull_request:
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_PUBLISHABLE_KEY: isolated-ci-key
+          VITE_ONLINE_PAYMENTS_ENABLED: 'false'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/order-api/index.ts
+      - run: deno test --allow-env supabase/functions/order-api/handler.test.ts
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: |
+          npm run dev -- --host 127.0.0.1 --port 8089 > /tmp/ohana-vite.log 2>&1 &
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do curl --fail --silent http://127.0.0.1:8089/ && break; sleep 1; done
+          curl --fail --silent http://127.0.0.1:8089/
+          node scripts/test-purchase-browser.cjs
+        env:
+          BROWSER_TEST_ORIGIN: http://127.0.0.1:8089
+          VITE_SUPABASE_URL: https://isolated.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: isolated-ci-key
+          VITE_TURNSTILE_SITE_KEY: isolated-turnstile-site-key
+          VITE_ONLINE_PAYMENTS_ENABLED: 'false'
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated-ci-password
+          POSTGRES_DB: ohana_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: node scripts/test-database.mjs
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated-ci-password@localhost:5432/ohana_ci
+      - run: node scripts/test-migration-scenarios.mjs
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated-ci-password@localhost:5432/ohana_ci
+      - run: node scripts/test-order-concurrency.mjs
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated-ci-password@localhost:5432/ohana_ci
+      - run: node scripts/restore-drill.mjs
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated-ci-password@localhost:5432/ohana_ci
