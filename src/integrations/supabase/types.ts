@@ -603,6 +603,7 @@ Relationships: [{foreignKeyName:"user_roles_user_id_fkey";columns:["user_id"];is
 "order_refund_issue": {Args: {"p_id": string;"p_code": string;}; Returns: undefined};
 "order_refund_request": {Args: {"p_id": string;"p_version": number;"p_reason": string;}; Returns: Json};
 "order_track": {Args: {"p_hash": string;}; Returns: Json};
+"prune_operational_retention": {Args: {}; Returns: Json};
 "track_analytics_event": {Args: {"p_event_type": string;"p_metadata": Json;"p_rate_key": string;}; Returns: boolean};
 }; Enums: {
 "app_role": "admin" | "user";
