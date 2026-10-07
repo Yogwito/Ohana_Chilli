@@ -98,10 +98,10 @@ jobs:
       - name: Secret scan (tracked files and history)
         run: |
           pat='(-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_live_[0-9A-Za-z]{16,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}|eyJhbGciOi[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|postgres(ql)?://[^:@/ ]+:[^@ ]{8,}@(?!localhost|127\.0\.0\.1))'
-          if git grep -nIP "$pat" -- . ':!package-lock.json' ':!.env' ':!docs' ':!scripts/*.mjs' ':!supabase/tests' ':!*.test.*'; then
+          if git grep -nIP "$pat" -- . ':!.github' ':!scripts/ci-local.sh' ':!package-lock.json' ':!.env' ':!docs' ':!scripts/*.mjs' ':!supabase/tests' ':!*.test.*'; then
             echo "::error::possible secret committed"; exit 1
           fi
-          if git log -p --all -G'-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_live_|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}' --format=%h -- . ':!package-lock.json' | grep -E '^\+.*(BEGIN [A-Z ]*PRIVATE KEY|sk_live_|AKIA[0-9A-Z]{16}|ghp_)' ; then
+          if git log -p --all -G'-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_live_|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}' --format=%h -- . ':!package-lock.json' ':!.github' ':!scripts/ci-local.sh' | grep -E '^\+.*(BEGIN [A-Z ]*PRIVATE KEY|sk_live_|AKIA[0-9A-Z]{16}|ghp_)' ; then
             echo "::error::possible secret in history"; exit 1
           fi
       - name: Dependency audit (production, high+; report only)

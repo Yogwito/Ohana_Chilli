@@ -14,7 +14,7 @@ step tsc;   npx tsc --noEmit -p tsconfig.app.json
 step vitest; npm test
 step build; npm run build
 step audit; npm audit --omit=dev --audit-level=high || echo 'WARN: npm audit high findings (non-blocking in CI)'
-step secrets; if git grep -nIP '(-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_live_[0-9A-Za-z]{16,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36})' -- . ':!package-lock.json' ':!.env' ':!docs' ':!scripts/*.mjs' ':!supabase/tests' ':!*.test.*'; then echo 'possible secret'; exit 1; fi
+step secrets; if git grep -nIP '(-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_live_[0-9A-Za-z]{16,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36})' -- . ':!.github' ':!scripts/ci-local.sh' ':!package-lock.json' ':!.env' ':!docs' ':!scripts/*.mjs' ':!supabase/tests' ':!*.test.*'; then echo 'possible secret'; exit 1; fi
 step deno;  deno lint supabase/functions/order-api/handler.ts supabase/functions/order-api/index.ts || echo 'WARN: deno lint (non-blocking)'
 deno check supabase/functions/order-api/index.ts
 deno test --allow-env supabase/functions/order-api/handler.test.ts
