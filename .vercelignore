@@ -1,0 +1,11 @@
+.worktrees/
+.claude/
+.codex/
+.agents/
+.playwright-cli/
+output/
+imagenesOhana/
+docs/
+base.json
+.env*
+!.env.example
