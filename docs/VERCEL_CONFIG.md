@@ -22,8 +22,18 @@ VERIFICADO EN VERCEL READ-ONLY: only 3 variables exist, all Preview-only, create
 Findings:
 - BLOCKER: Production has NO Supabase vars. A Vercel Production build would have no backend (check how `client.ts` behaves without them). Add them to Production before any production deploy.
 - Missing `VITE_TURNSTILE_SITE_KEY` in Preview/Production: checkout captcha cannot work if the Edge function enforces Turnstile.
-- Preview-vs-production Supabase project: NO VERIFICABLE via ls (values encrypted). `vercel.json` CSP hardcodes `naoqsypqqgjhdudenevx.supabase.co`, so a Preview pointing at a different project would be BLOCKED by CSP connect-src. Manual check: Vercel dashboard > Settings > Environment Variables > reveal VITE_SUPABASE_URL for Preview and compare the project-ref (subdomain) with Production/Supabase prod ref. Preview must NOT use the production ref (use staging; see docs/ORDER_BACKEND_ROLLOUT.md) and the CSP must then list the staging host.
+- Preview-vs-production Supabase project: NO VERIFICABLE via ls (values encrypted). (Resolved by §1b: the CSP host now follows each environment's `VITE_SUPABASE_URL`.) Manual check: Vercel dashboard > Settings > Environment Variables > reveal VITE_SUPABASE_URL for Preview and compare the project-ref (subdomain) with Production/Supabase prod ref. Preview must NOT use the production ref (use staging; see docs/ORDER_BACKEND_ROLLOUT.md) and the CSP must then list the staging host.
 - Development target empty: expected if devs use local `.env`.
+
+## 1b. Headers / CSP generation (2026-10-07)
+
+`vercel.json` was replaced by `vercel.ts`, which Vercel evaluates at build time with the deployment's env vars (a prebuild-generated `vercel.json` would be ignored: Vercel reads it before the build command). `vercel.ts` only calls `buildVercelConfig(process.env)` from `config/vercelConfig.mjs`.
+- `connect-src` gets `https://<host>` + `wss://<host>` from `VITE_SUPABASE_URL`. Missing or non-https URL fails the build on purpose (no silent fallback to production).
+- With the production URL the generated config is byte-identical to the former `vercel.json`.
+- Wompi: no CSP entry; checkout is a top-level redirect to a server-built `checkout.wompi.co` URL. `src/test/vercel-config.test.ts` fails if browser code starts referencing a `*.wompi.co` origin not allowed by the CSP.
+- Consequence: `VITE_SUPABASE_URL` must exist for every Vercel environment that builds (Production currently lacks it, see §1).
+- Inspect locally: `node -e "import('./config/vercelConfig.mjs').then(m=>console.log(m.buildCsp(process.env)))"` with the env var set.
+- Not yet verified on a real Vercel deployment: check response headers on the first preview.
 
 ## 2. Domains and headers
 

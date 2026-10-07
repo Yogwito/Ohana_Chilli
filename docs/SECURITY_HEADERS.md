@@ -1,6 +1,6 @@
 # Security headers, XSS and CSRF notes
 
-Headers live in `vercel.json` (applied by Vercel only; `vite preview`/dev do not send them).
+Headers live in `vercel.ts` → `config/vercelConfig.mjs` (applied by Vercel only; `vite preview`/dev do not send them).
 
 ## CSP origins (only those actually used)
 | Directive | Value | Why |
@@ -9,7 +9,7 @@ Headers live in `vercel.json` (applied by Vercel only; `vite preview`/dev do not
 | style-src | `'self' 'unsafe-inline' https://fonts.googleapis.com` | `unsafe-inline` is required: React `style=` attributes, Radix/Sonner/shadcn runtime-injected styles. Inline styles cannot execute script; accepted risk. |
 | font-src | `'self' https://fonts.gstatic.com data:` | Google Fonts in `index.html`. |
 | img-src | `'self' data: blob: https:` | Product `image_url` is admin-entered and may be any https host (Supabase storage, Unsplash, etc.); `data:` for CSS noise SVG / data-image URLs. |
-| connect-src | `'self'`, Supabase project `https://naoqsypqqgjhdudenevx.supabase.co` + `wss://` (realtime), `challenges.cloudflare.com`, `https://api.unsplash.com` (admin image search) | |
+| connect-src | `'self'`, Supabase project from `VITE_SUPABASE_URL` (`https://` + `wss://`) (realtime), `challenges.cloudflare.com`, `https://api.unsplash.com` (admin image search) | |
 | frame-src | `https://challenges.cloudflare.com` | Turnstile widget iframe. |
 | frame-ancestors / object-src / base-uri / form-action | `'none'` / `'none'` / `'self'` / `'self'` | Anti-clickjacking, plugin and base-tag injection. |
 

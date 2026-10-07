@@ -6,6 +6,7 @@ import { buildWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '
 import type { Product } from '@/types';
 import fs from 'node:fs';
 import path from 'node:path';
+import { buildVercelConfig } from '../../config/vercelConfig.mjs';
 
 const XSS = '<img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>';
 vi.mock('@/hooks/use-catalog', () => ({ usePromotions: () => ({ data: [{ id: 'p', title: XSS, description: XSS, type: 'combo', price_cents: 1000, discount_type: 'label' }], isLoading: false }) }));
@@ -56,8 +57,8 @@ describe('source guards', () => {
     const bad = files.filter(f => !f.endsWith('ui/chart.tsx')).filter(f => /dangerouslySetInnerHTML|\.innerHTML\s*=|\beval\(|new Function\(/.test(fs.readFileSync(f, 'utf8')));
     expect(bad).toEqual([]);
   });
-  it('vercel.json CSP forbids unsafe-eval and framing, keeps SPA rewrite', () => {
-    const cfg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../vercel.json'), 'utf8'));
+  it('generated Vercel CSP forbids unsafe-eval and framing, keeps SPA rewrite', () => {
+    const cfg = buildVercelConfig({ VITE_SUPABASE_URL: 'https://example.supabase.co' });
     const h = Object.fromEntries(cfg.headers[0].headers.map((x: { key: string; value: string }) => [x.key, x.value]));
     expect(h['Content-Security-Policy']).not.toMatch(/unsafe-eval/);
     expect(h['Content-Security-Policy']).not.toMatch(/script-src[^;]*unsafe-inline/);
