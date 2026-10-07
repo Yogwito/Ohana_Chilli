@@ -11,6 +11,10 @@ assert(['localhost', '127.0.0.1'].includes(new URL(origin).hostname), 'Local ser
 async function scenario(browser, recovery) {
   const page = await browser.newPage({ viewport: { width: recovery ? 390 : 768, height: 900 } });
   let fail = recovery;
+  const diagnostics = [];
+  page.on('console', m => { if (['error', 'warning'].includes(m.type())) diagnostics.push(`console.${m.type()}: ${m.text()}`); });
+  page.on('pageerror', e => diagnostics.push(`pageerror: ${e.message}`));
+  page.on('requestfailed', r => diagnostics.push(`requestfailed: ${r.url()}`));
   const creates = [];
   const price = recovery ? 18000 : 19000;
   const receipt = { items: [{ name: 'Combo QA', quantity: 1, unit_price_cents: price, details: {} }], total: price, delivery_fee: 0, delivery_zone: null };
@@ -35,6 +39,11 @@ async function scenario(browser, recovery) {
   await page.addInitScript(() => {
     window.turnstile = { render(element, options) { element.textContent = 'Bot fixture'; options.callback('fixture'); return 'qa'; }, remove() {} };
   });
+  const expectCreates = async count => {
+    const deadline = Date.now() + 5000;
+    while (creates.length < count && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(creates.length, count, `create requests; page diagnostics: ${JSON.stringify(diagnostics.slice(0, 10))}`);
+  };
   try {
     await page.goto(origin);
     await page.getByRole('button', { name: 'Agregar', exact: true }).click();
@@ -49,7 +58,7 @@ async function scenario(browser, recovery) {
     await submit.click();
     if (recovery) {
       await page.getByText('Hay un pedido pendiente de confirmar').waitFor();
-      assert.equal(creates.length, 1);
+      await expectCreates(1);
       await page.reload();
       const retry = page.getByRole('button', { name: 'Reenviar solicitud original' });
       await retry.waitFor();
