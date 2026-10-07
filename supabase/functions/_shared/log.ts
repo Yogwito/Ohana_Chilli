@@ -1,7 +1,7 @@
 // Structured logging with central redaction. Logs must never contain secrets or customer PII.
 const SENSITIVE_KEY = /pass(word)?|secret|token|authorization|api[-_]?key|apikey|service[-_]?role|private|integrity|cookie|signature|checksum|bearer|credential|^body$|^raw$|^request$|^payload$/i;
 const PHONE_KEY = /phone|tel|whatsapp|mobile|celular/i;
-const ADDRESS_KEY = /address|direccion|street|notes|note$|customer_name|^name$|email/i;
+const ADDRESS_KEY = /address|direccion|street|notes|note$|customer_name|full_name|first_name|last_name|recipient|contact|ubicacion|^name$|email/i;
 const SECRET_VALUE = /(Bearer\s+[\w.~+/-]+=*|\b(?:prv|pub|prod|test)_(?:test_|prod_)?[A-Za-z0-9]{6,}|\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{5,}|\b[a-f0-9]{64}\b)/g;
 
 export function maskPhone(value: unknown): string {

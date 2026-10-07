@@ -120,6 +120,7 @@ export default function CheckoutPage() {
     notes: pendingAttempt?.request?.notes || '',
   });
   const [maintenance, setMaintenance] = useState(false);
+  const priorAttemptRef = useRef(false);
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
   // CHANGE 2 — payment method state
@@ -337,6 +338,7 @@ export default function CheckoutPage() {
         return;
       }
       if (!botToken) { setSubmitError('Completa la verificación antes de enviar el pedido.'); setOrderStatus('idle'); return; }
+      priorAttemptRef.current = !!getPendingCheckout();
       const attempt = await checkoutAttempt(request, quote.fingerprint);
       setPendingAttempt(attempt);
       const created = await orderApi<{id:string;total:number;receipt:OrderReceipt}>('create', {
@@ -383,8 +385,9 @@ export default function CheckoutPage() {
       }
     } catch (err) {
       if (isMaintenanceError(err)) {
-        // orders_disabled is a definitive rejection: no order exists, so no recovery attempt is kept.
-        if (err.code === 'orders_disabled') { sessionStorage.removeItem(pendingCheckoutStorageKey); setPendingAttempt(null); }
+        // orders_disabled rejects before any order is written, so a FRESH attempt is dropped; an attempt that
+        // already existed (earlier uncertain submit) keeps its idempotency key so re-enabling cannot duplicate it.
+        if (err.code === 'orders_disabled' && !priorAttemptRef.current) { sessionStorage.removeItem(pendingCheckoutStorageKey); setPendingAttempt(null); }
         else setPendingAttempt(getPendingCheckout());
         setMaintenance(true);setBotReset(value => value+1);setSubmitError(err.message);setOrderStatus('idle');
         return;

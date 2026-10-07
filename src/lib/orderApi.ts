@@ -34,7 +34,7 @@ export async function orderApi<T>(route: string, body: unknown): Promise<T> {
   if (!response.ok) {
     const code = result.error || result.code;
     // 503 with a known code (e.g. rate_limit_unavailable) keeps its own message; bare 503 is maintenance.
-    throw new OrderApiError(code === 'orders_disabled' ? code : code || (response.status === 503 ? 'service_unavailable' : 'unavailable'));
+    throw new OrderApiError(code || (response.status === 503 ? 'service_unavailable' : 'unavailable'));
   }
   return result;
 }
