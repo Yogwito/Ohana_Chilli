@@ -1,4 +1,5 @@
-project_id = "naoqsypqqgjhdudenevx"
+# NUNCA poner aquí el project-ref de producción; usar siempre --project-ref explícito
+project_id = "ohana-local"
 
 [functions.order-api]
 verify_jwt = false

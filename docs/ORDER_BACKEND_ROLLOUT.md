@@ -21,6 +21,8 @@ Not verified: live policies/schema/Realtime, staging credentials, actual Turnsti
 
 ## Preserve existing installations
 
+> **Project ref:** `supabase/config.toml` uses the inert local id `ohana-local`. Any command against production requires an explicit `--project-ref`/`--db-url` and must run inside the approved maintenance window. Never re-add the production ref as the default.
+
 Do **not** reset production or replay historical migrations. The history includes a table drop, duplicate delivery-zone creation, catalog foreign-key inconsistencies, and a UUID product-default reference against a text product key. Repository history is not a verified description of the live schema.
 
 1. Connect Supabase or use an authorized read-only database connection. Run `supabase/tests/live-audit.sql`. Securely retain the schema output, table counts, function definitions, grants, migration ledger, and publication membership. Explicitly establish whether any public order-read policy exists. Do not export customer rows into the repository.
