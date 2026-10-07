@@ -35,3 +35,28 @@ Fixed by `npm audit fix` (lockfile only): vite (7.3.7), ws, yaml, postcss, sourc
 - `denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2`
 
 Also set `permissions: contents: read` at workflow level and add `npm audit --omit=dev --audit-level=critical` as an informational job.
+
+## Re-analysis (close-out, 2026-10-07)
+
+Current `npm audit`: 15 advisories (all), 9 (`--omit=dev`; all build tooling or react-router). Installed: react-router-dom 6.30.6, react-router 6.30.6, @remix-run/router 1.23.4.
+
+### react-router-dom 6.x: verdict NOT APPLICABLE (no upgrade)
+
+| Advisory | Needs | Evidence in this repo |
+|---|---|---|
+| GHSA-wrjc-x8rr-h8h6 (open redirect via backslash in `<Link>`/`useNavigate`, CVE-2025-68470 bypass; range >=6.0.0 <7.18.0) | A navigate/Link target built from untrusted input (backslash or `//` host) | App uses `<BrowserRouter>` (src/App.tsx). All `navigate()`/`<Navigate>` targets are literals or built from internal values: `/checkout`, `/`, `/#menu`, `/admin...`, `/pedido/${token}` (64-hex token generated client-side by `randomTrackingToken`, not read from the URL), `/?editar-bowl=${encodeURIComponent(id)}#...`. `useParams` (OrderTrackingPage) only feeds API calls. `useSearchParams` (AdminPage `section`) is checked against an allow-list. The one dynamic `<Link to={link}>` (RecentOrders.tsx) validates same origin and `^/pedido/[a-f0-9]{64}$` first. `CheckoutPage` `continueShoppingPath` comes from `location.state.from` (history state set only by in-app `navigate` from `pathname+search+hash`, so it starts with a single `/`; not settable by a cross-site link), `/checkout` excluded. No server data reaches a redirect target. |
+| GHSA-337j-9hxr-rhxg (constructor injection via `deserializeErrors()` in SSR hydration; range >=6.4.0 <7.18.0) | SSR with data routers / `__staticRouterHydrationData` | No SSR, no `createBrowserRouter`, `RouterProvider`, `createStaticHandler`, loaders or hydration data in src (grep). Pure client-side SPA. |
+
+Action: none; stay on 6.30.6 (the only audit fix is the v7 major). No vitest test added because no untrusted path to a navigate/redirect target exists. Revisit if SSR, data routers, or a user-supplied redirect (`?next=`) is introduced.
+
+### Other remaining advisories
+
+| Package | Advisory | Runtime? | Applies | Notes |
+|---|---|---|---|---|
+| braces <=3.0.3 (via micromatch, fast-glob, chokidar, tailwindcss) | GHSA-vfj7-8cjw-p6xm stack exhaustion, nested patterns | Build only | NO | Patterns are our own tailwind `content` globs. Fix = tailwind 4 (major). |
+| postcss-selector-parser <7.1.6 (via postcss-nested, tailwindcss, @tailwindcss/typography) | GHSA-rj75-hqrm-r3gf quadratic selector parsing | Build only | NO | Parses our own CSS at build time. |
+| vitest 3.2.7 + @vitest/mocker | GHSA-82fw-gwwq-j7x9 path traversal/file read via mock redirect | Dev/CI only | NO | Needs attacker-reachable Vitest server; CI runs `vitest run`. |
+| tinypool <=2.1.1 | GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr prototype pollution to RCE | Dev/CI only | NO | Needs attacker-controlled pool options. Fix = vitest 5 (major). |
+| lovable-tagger (via tailwindcss) | transitive | Dev only | NO | Optional removal. |
+
+Regression test for the orders_disabled-after-uncertain-create scenario: `src/test/checkout-disabled-after-uncertain.test.tsx`.
