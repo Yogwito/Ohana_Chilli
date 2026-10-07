@@ -1,1 +1,4 @@
 project_id = "naoqsypqqgjhdudenevx"
+
+[functions.order-api]
+verify_jwt = false
