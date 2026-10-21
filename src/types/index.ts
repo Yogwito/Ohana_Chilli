@@ -26,6 +26,9 @@ export interface Ingredient {
   calories?: number;
   isVegan?: boolean;
   isGlutenFree?: boolean;
+  /** Solo extras sintéticos del BowlBuilder: ingrediente de catálogo que fija el recargo en el servidor. */
+  sourceId?: string;
+  extraKind?: 'protein' | 'acompanante' | 'sauce' | 'topping';
 }
 
 // Bowl Size Rules

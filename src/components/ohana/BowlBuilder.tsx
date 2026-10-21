@@ -190,8 +190,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   }>>([]);
   const [proteinSelectorOpen, setProteinSelectorOpen] = useState<string | null>(null);
 
-  const makeExtraProteinIngredient = (extra: { uid: string; proteinName: string; charge: number }): Ingredient => ({
+  const makeExtraProteinIngredient = (extra: { uid: string; proteinName: string; charge: number; premiumProteinId: string }): Ingredient => ({
     id: extra.uid,
+    sourceId: extra.premiumProteinId,
+    extraKind: 'protein',
     name: `Proteína extra: ${extra.proteinName} (+${formatPrice(extra.charge)})`,
     type: 'protein' as Ingredient['type'],
     price: extra.charge,
@@ -204,11 +206,14 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     acompName: string;
     charge: number;
     premiumAcompId: string;
+    acompId?: string;
   }>>([]);
   const [acompSelectorOpen, setAcompSelectorOpen] = useState<string | null>(null);
 
-  const makeExtraAcompananteIngredient = (extra: { uid: string; acompName: string; charge: number }): Ingredient => ({
+  const makeExtraAcompananteIngredient = (extra: { uid: string; acompName: string; charge: number; premiumAcompId: string; acompId?: string }): Ingredient => ({
     id: extra.uid,
+    sourceId: extra.premiumAcompId || extra.acompId || '',
+    extraKind: 'acompanante',
     name: `Acompañante extra: ${extra.acompName} (+${formatPrice(extra.charge)})`,
     type: 'acompanante' as Ingredient['type'],
     price: extra.charge,
@@ -225,8 +230,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
   }>>([]);
   const [compSelectorOpen, setCompSelectorOpen] = useState<string | null>(null);
 
-  const makeExtraComplementoIngredient = (extra: { uid: string; compName: string; charge: number }): Ingredient => ({
+  const makeExtraComplementoIngredient = (extra: { uid: string; compName: string; compId: string; charge: number; premiumCompId: string }): Ingredient => ({
     id: extra.uid,
+    sourceId: extra.premiumCompId || extra.compId,
+    extraKind: 'topping',
     name: `Complemento extra: ${extra.compName} (+${formatPrice(extra.charge)})`,
     type: 'topping' as Ingredient['type'],
     price: extra.charge,
@@ -241,8 +248,10 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
     charge: number;
   }>>([]);
 
-  const makeExtraSauceIngredient = (extra: { uid: string; sauceName: string; charge: number }): Ingredient => ({
+  const makeExtraSauceIngredient = (extra: { uid: string; sauceName: string; sauceId: string; charge: number }): Ingredient => ({
     id: extra.uid,
+    sourceId: extra.sauceId,
+    extraKind: 'sauce',
     name: `Salsa extra: ${extra.sauceName} (+${formatPrice(extra.charge)})`,
     type: 'sauce' as Ingredient['type'],
     price: extra.charge,
@@ -1534,6 +1543,7 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                   setExtraAcompananteSelections(prev => [...prev, {
                     uid: `extra-acomp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
                     acompName: ing.name,
+                    acompId: ing.id,
                     charge: charge > 0 ? charge : 2000,
                     premiumAcompId: '',
                   }]);

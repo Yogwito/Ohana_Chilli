@@ -11,14 +11,14 @@ const bowl: CustomBowl = {
   proteins: [
     { id: 'pollo', name: 'Pollo', type: 'protein' },
     { id: 'salmon', name: 'Salmón', type: 'protein', price: 6000 },
-    { id: 'extra-1-a', name: 'Proteína extra: Pollo (+$5.000)', type: 'protein', price: 5000 },
+    { id: 'extra-1-a', name: 'Proteína extra: Pollo (+$5.000)', type: 'protein', price: 5000, sourceId: 'proteina-adicional', extraKind: 'protein' },
   ],
   acompanantes: [
     { id: 'aguacate-adicional', name: 'Aguacate adicional', type: 'acompanante' },
-    { id: 'extra-acomp-1-b', name: 'Acompañante extra: Mango', type: 'acompanante', price: 2000 },
+    { id: 'extra-acomp-1-b', name: 'Acompañante extra: Mango', type: 'acompanante', price: 2000, sourceId: 'mango', extraKind: 'acompanante' },
   ],
-  sauces: [{ id: 'extra-sauce-1-c', name: 'Salsa extra: Teriyaki', type: 'sauce', price: 2000 }],
-  complementos: [{ id: 'extra-comp-1-d', name: 'Complemento extra: Sésamo', type: 'topping', price: 500 }],
+  sauces: [{ id: 'extra-sauce-1-c', name: 'Salsa extra: Teriyaki', type: 'sauce', price: 2000, sourceId: 'teriyaki', extraKind: 'sauce' }],
+  complementos: [{ id: 'extra-comp-1-d', name: 'Complemento extra: Sésamo', type: 'topping', price: 500, sourceId: 'sesamo', extraKind: 'topping' }],
 };
 
 describe('buildBowlValidation', () => {
@@ -27,11 +27,11 @@ describe('buildBowlValidation', () => {
       size: 'medium',
       ingredient_ids: ['arroz', 'pollo', 'salmon', 'aguacate-adicional'],
       extras: [
-        { name: 'Proteína extra: Pollo (+$5.000)', charge: 5000 },
-        { name: 'Aguacate adicional', charge: 3000 },
-        { name: 'Acompañante extra: Mango', charge: 2000 },
-        { name: 'Salsa extra: Teriyaki', charge: 2000 },
-        { name: 'Complemento extra: Sésamo', charge: 500 },
+        { kind: 'protein', source_id: 'proteina-adicional', name: 'Proteína extra: Pollo (+$5.000)', charge: 5000 },
+        { kind: 'named', source_id: 'aguacate-adicional', name: 'Aguacate adicional', charge: 3000 },
+        { kind: 'acompanante', source_id: 'mango', name: 'Acompañante extra: Mango', charge: 2000 },
+        { kind: 'sauce', source_id: 'teriyaki', name: 'Salsa extra: Teriyaki', charge: 2000 },
+        { kind: 'topping', source_id: 'sesamo', name: 'Complemento extra: Sésamo', charge: 500 },
       ],
     });
   });
@@ -44,6 +44,12 @@ describe('buildBowlValidation', () => {
       + v.extras.reduce((s, e) => s + e.charge, 0);
     expect(server).toBe(calculateBowlPrice(bowl));
   });
+});
+
+it('cada extra sintético lleva el ingrediente de catálogo que fija su recargo', () => {
+  const v = buildBowlValidation(bowl);
+  expect(v.extras.every((e) => e.source_id !== '')).toBe(true);
+  expect(v.extras.filter((e) => e.kind !== 'named').map((e) => e.source_id)).not.toContain('extra-1-a');
 });
 
 describe('buildOrderItemsPayload', () => {

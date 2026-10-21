@@ -8,10 +8,23 @@ import type { CartItem, CustomBowl, Ingredient } from '@/types';
  *  - productos/promos: details.product_id (+ customizations.extras con ids de
  *    product_default_ingredients).
  */
+/**
+ * kind/source_id: el servidor (hotfix 2026-10-21b) calcula el recargo desde el
+ * ingrediente `source_id`; `charge` solo lo usa la versión anterior de la RPC.
+ * kind 'named' = recargo de un ingrediente incluido ya listado en ingredient_ids
+ * (el servidor nuevo lo cobra desde ingredient_ids y lo ignora aquí).
+ */
+export interface BowlValidationExtra {
+  kind: 'protein' | 'acompanante' | 'sauce' | 'topping' | 'named';
+  source_id: string;
+  name: string;
+  charge: number;
+}
+
 export interface BowlValidationPayload {
   size: string;
   ingredient_ids: string[];
-  extras: Array<{ name: string; charge: number }>;
+  extras: BowlValidationExtra[];
 }
 
 // Los extras sintéticos del BowlBuilder usan ids "extra-..." (no existen en el catálogo).
@@ -19,7 +32,7 @@ const SYNTHETIC_EXTRA_PREFIX = 'extra-';
 
 export function buildBowlValidation(bowl: CustomBowl): BowlValidationPayload {
   const ingredientIds: string[] = [];
-  const extras: Array<{ name: string; charge: number }> = [];
+  const extras: BowlValidationExtra[] = [];
   const all: Ingredient[] = [
     ...bowl.bases,
     ...bowl.proteins,
@@ -33,14 +46,23 @@ export function buildBowlValidation(bowl: CustomBowl): BowlValidationPayload {
     const catalogPrice = item.price ?? 0;
 
     if (item.id.startsWith(SYNTHETIC_EXTRA_PREFIX)) {
-      if (charge > 0) extras.push({ name: item.name, charge });
+      if (charge > 0) {
+        extras.push({
+          kind: item.extraKind ?? item.type,
+          source_id: item.sourceId ?? '',
+          name: item.name,
+          charge,
+        });
+      }
       return;
     }
 
     // La RPC suma ingredients.price_cents por cada id.
     ingredientIds.push(item.id);
     // Recargo por nombre ("adicional"/"extra") con precio de catálogo 0.
-    if (charge > 0 && catalogPrice === 0) extras.push({ name: item.name, charge });
+    if (charge > 0 && catalogPrice === 0) {
+      extras.push({ kind: 'named', source_id: item.id, name: item.name, charge });
+    }
   });
 
   return { size: bowl.size.size, ingredient_ids: ingredientIds, extras };
