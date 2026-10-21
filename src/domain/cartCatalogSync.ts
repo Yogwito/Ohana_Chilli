@@ -1,11 +1,38 @@
 import { calculateBowlPrice } from '@/domain/bowlPricing';
 import { calculateProductUnitPrice, normalizeProductCustomization } from '@/domain/productCustomizations';
-import type { BowlSizeRule, CartItem, CartState, CustomBowl, Ingredient, Product } from '@/types';
+import type { BowlSizeRule, CartItem, CartState, CustomBowl, Ingredient, Product, Promotion } from '@/types';
 
 export interface CatalogSnapshot {
   bowlRules: BowlSizeRule[];
   ingredients: Ingredient[];
   products: Product[];
+  /** Si no viene (promociones aún sin cargar), los combos del carrito se conservan tal cual. */
+  promotions?: Promotion[];
+}
+
+const PROMO_PREFIX = 'promo-';
+
+// Misma regla que create_order_with_items: combo activo, con precio y dentro de fechas.
+function isOrderablePromotion(promotion: Promotion, now: number) {
+  if (!promotion.is_active || promotion.type !== 'combo' || promotion.price_cents == null) return false;
+  if (promotion.starts_at && new Date(promotion.starts_at).getTime() > now) return false;
+  if (promotion.ends_at && new Date(promotion.ends_at).getTime() < now) return false;
+  return true;
+}
+
+function reconcilePromotionItem(item: CartItem, promotions: Promotion[] | undefined) {
+  if (!promotions) return item;
+  const promotionId = item.product!.id.slice(PROMO_PREFIX.length);
+  const promotion = promotions.find((candidate) => candidate.id === promotionId);
+  if (!promotion || !isOrderablePromotion(promotion, Date.now())) return null;
+
+  const unitPrice = promotion.price_cents!;
+  return {
+    ...item,
+    product: { ...item.product!, name: promotion.title, price: unitPrice },
+    unitPrice,
+    totalPrice: unitPrice * item.quantity,
+  };
 }
 
 function reconcileIngredientSelections(
@@ -66,7 +93,13 @@ function reconcileCartItem(
   productsById: Map<string, Product>,
   bowlRulesBySize: Map<string, BowlSizeRule>,
   ingredientsById: Map<string, Ingredient>,
+  promotions: Promotion[] | undefined,
 ) {
+  if (item.type === 'product' && item.product?.id.startsWith(PROMO_PREFIX)) {
+    // Los combos no existen en products: se validan contra promotions.
+    return reconcilePromotionItem(item, promotions);
+  }
+
   if (item.type === 'product') {
     const currentProduct = item.product?.id ? productsById.get(item.product.id) : null;
     if (!currentProduct) return null;
@@ -105,7 +138,7 @@ export function reconcileCartWithCatalog(state: CartState, snapshot: CatalogSnap
   const ingredientsById = new Map(snapshot.ingredients.map((ingredient) => [ingredient.id, ingredient]));
 
   const nextItems = state.items
-    .map((item) => reconcileCartItem(item, productsById, bowlRulesBySize, ingredientsById))
+    .map((item) => reconcileCartItem(item, productsById, bowlRulesBySize, ingredientsById, snapshot.promotions))
     .filter((item): item is CartItem => Boolean(item));
 
   const nextState: CartState = {

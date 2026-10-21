@@ -8,7 +8,7 @@ import {
   getProductCustomizationKey,
   normalizeProductCustomization,
 } from '@/domain/productCustomizations';
-import { useBowlRules, useIngredients, useProducts } from '@/hooks/use-catalog';
+import { useBowlRules, useIngredients, usePromotions, useProducts } from '@/hooks/use-catalog';
 import { CART_VERSION, parsePersistedCart } from '@/domain/cartPersistence';
 import { toast } from 'sonner';
 
@@ -20,7 +20,7 @@ type CartAction =
   | { type: 'ADD_CUSTOM_BOWL'; payload: { customBowl: CustomBowl; notes?: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
   | { type: 'REMOVE_ITEM'; payload: { itemId: string } }
-  | { type: 'RECONCILE_CATALOG'; payload: { products: Product[]; bowlRules: Parameters<typeof reconcileCartWithCatalog>[1]['bowlRules']; ingredients: Parameters<typeof reconcileCartWithCatalog>[1]['ingredients'] } }
+  | { type: 'RECONCILE_CATALOG'; payload: Parameters<typeof reconcileCartWithCatalog>[1] }
   | { type: 'CLEAR_CART' }
   | { type: 'LOAD_CART'; payload: CartState };
 
@@ -152,6 +152,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { data: products = [], isSuccess: productsReady } = useProducts();
   const { data: bowlRules = [], isSuccess: bowlRulesReady } = useBowlRules();
   const { data: ingredients = [], isSuccess: ingredientsReady } = useIngredients();
+  const { data: promotions, isSuccess: promotionsReady } = usePromotions();
 
   const catalogReady = productsReady && bowlRulesReady && ingredientsReady;
 
@@ -162,9 +163,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     dispatch({
       type: 'RECONCILE_CATALOG',
-      payload: { products, bowlRules, ingredients },
+      payload: { products, bowlRules, ingredients, promotions: promotionsReady ? promotions : undefined },
     });
-  }, [bowlRules, catalogReady, ingredients, products]);
+  }, [bowlRules, catalogReady, ingredients, products, promotions, promotionsReady]);
 
   const addProduct = useCallback((product: Product, quantity = 1, notes?: string, customizations?: ProductCustomization) => {
     dispatch({ type: 'ADD_PRODUCT', payload: { product, quantity, notes, customizations } });
