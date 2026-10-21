@@ -28,8 +28,11 @@ async function verifySuccess(page: Page, testInfo: TestInfo, ctx: Ctx, o: {
     await expect(link).toHaveAttribute('href', /^https:\/\/wa\.me\/\d+\?text=/);
     await link.click();
   } else {
-    // Desktop: openWhatsAppHandoff() ya llamó window.open(web.whatsapp.com); probamos también el botón.
+    // Desktop: la app abre WhatsApp Web UNA vez sola (openWhatsAppHandoff tras crear el pedido).
+    // La segunda captura es el clic del test en "Abrir WhatsApp Web", no la app.
     await expect.poll(async () => (await ctx.waCaptured()).length).toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+    expect((await ctx.waCaptured()).length, 'la app abre WhatsApp Web una sola vez').toBe(1);
     await page.getByRole('button', { name: 'Abrir WhatsApp Web' }).click();
   }
   await expect.poll(async () => (await ctx.waCaptured()).length).toBeGreaterThan(isMobile ? 0 : 1);
