@@ -52,6 +52,11 @@ describe('BowlBuilder', () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
+  it('does not scroll the page to the builder on initial render', () => {
+    render(<BowlBuilder />);
+    expect(window.HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
   it('allows repeated selections, skipping optional steps, and preserves the final bowl payload', async () => {
     render(<BowlBuilder />);
 
