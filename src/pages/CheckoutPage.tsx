@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/CartContext';
 import { useActiveDeliveryZones, useBusinessSettings, useBusinessOpenStatus } from '@/hooks/use-catalog';
@@ -46,6 +46,7 @@ import { formatProductCustomizationLines } from '@/domain/productCustomizations'
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
 import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
 import { buildOrderItemsPayload } from '@/domain/orderPayload';
+import { describeOrderError } from '@/domain/orderErrors';
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
@@ -81,6 +82,14 @@ export default function CheckoutPage() {
   const [whatsappMessage, setWhatsappMessage] = useState<string>('');
   const [whatsappUrl, setWhatsappUrl] = useState<string>('');
   const [submitError, setSubmitError] = useState<string>('');
+  const submitErrorRef = useRef<HTMLDivElement>(null);
+
+  // En móvil el aviso queda arriba del formulario: llevarlo a la vista al aparecer.
+  useEffect(() => {
+    if (!submitError) return;
+    submitErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    submitErrorRef.current?.focus({ preventScroll: true });
+  }, [submitError]);
   const [selectedZoneId, setSelectedZoneId] = useState('');
   const [deliveryZoneSearch, setDeliveryZoneSearch] = useState('');
   const [platform, setPlatform] = useState<'mobile' | 'desktop'>('mobile');
@@ -316,12 +325,9 @@ export default function CheckoutPage() {
 
       if (createOrderError || !createdOrderId) {
         console.error('Error creating order:', createOrderError);
-        setSubmitError(
-          createOrderError?.message
-            ? `Error: ${createOrderError.message}`
-            : 'No pudimos crear el pedido. Intenta nuevamente.'
-        );
-        toast.error('Error al crear el pedido. Intenta de nuevo.');
+        const errorMessage = describeOrderError(createOrderError?.message);
+        setSubmitError(errorMessage);
+        toast.error(errorMessage);
         setOrderStatus('idle');
         return;
       }
@@ -531,7 +537,7 @@ export default function CheckoutPage() {
             <div className="lg:col-span-3 order-2 lg:order-1">
               <form onSubmit={handleSubmit} className="space-y-8">
                 {submitError && (
-                  <Alert variant="destructive">
+                  <Alert ref={submitErrorRef} variant="destructive" role="alert" tabIndex={-1} className="scroll-mt-24">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>No pudimos enviar tu pedido</AlertTitle>
                     <AlertDescription>{submitError}</AlertDescription>
