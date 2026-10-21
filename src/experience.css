@@ -1309,3 +1309,11 @@ body:has(.experience-shell) [role='dialog'] h2 {
 @keyframes exp-line-up { from { transform: translateY(105%); } to { transform: none; } }
 @keyframes exp-fade-up { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: none; } }
 @keyframes exp-photo-in { from { opacity: 0; transform: rotate(-8deg) scale(0.92); } to { opacity: 1; transform: none; } }
+
+/* La barra inferior fija (solo < md) mide 64px + safe area. Sin esto,
+   scrollIntoView/foco dejan "Enviar por WhatsApp" debajo de la barra. */
+@media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
+  }
+}
