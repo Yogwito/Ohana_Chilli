@@ -122,3 +122,44 @@ Orden: primero 2 y después 4. El frontend nuevo con el RPC viejo deja pasar bow
 - [ ] La manipulación de precio desde DevTools se rechaza.
 - [ ] Una hora mirando los logs de Postgres en Supabase por `RAISE` del RPC.
 - [ ] Cuando llegue el cutover, el REVOKE EXECUTE sobre todos los overloads sigue aplicando, porque la firma es la misma.
+
+## 5. Datos reales de prod y decisión sobre variantes
+
+El dueño corrió una consulta de solo lectura. Desde `harden_order_creation` (14-jul) hay 0 items con variante, 0 con extras y 0 bowls validados. Hay 28 variantes activas y 6 addons activos. Solo pasan los productos simples sin variantes y, en teoría, las promos combo.
+
+**Opción elegida para variantes: la (b) acotada, ya incluida en el SQL.** Sin variante enviada, se cobra el precio base solo si existe una variante activa con delta 0.
+- Nunca cobra de menos: si todas las variantes de un producto tienen delta > 0, se sigue rechazando.
+- No toca datos que use el cutover, y se revierte por completo con `*_ROLLBACK.sql`.
+- Comparada con (c), que desactiva las 28: (c) también se puede revertir si se guardan los ids, pero cambia datos que el frontend del cutover necesita activos. Además cobra el precio base incluso cuando el sabor costaba más. Por eso no conviene como primera opción.
+- Si algún producto tiene **todas** sus variantes con delta > 0, ese producto seguirá bloqueado. Para ese producto hay dos salidas: (c1) que el dueño suba `products.price_cents` en el mínimo delta y lo baje en cada variante (cambio de datos reversible), o (c2) desactivar solo esas variantes, aceptando que se cobra el precio base.
+
+Variantes y delta (solo lectura):
+```sql
+select p.name product, v.name variant, v.price_delta_cents
+from product_variants v join products p on p.id=v.product_id
+where v.is_active and p.is_active order by 1,2;
+```
+Productos que el hotfix NO desbloquea (sin variante en $0):
+```sql
+select p.name, min(v.price_delta_cents) min_delta, count(*)
+from product_variants v join products p on p.id=v.product_id
+where v.is_active and p.is_active group by 1 having min(v.price_delta_cents) > 0;
+```
+
+### Conteos de bloqueo actual (solo lectura)
+```sql
+-- productos activos con variantes activas (bloqueados SIEMPRE en 98bd908)
+select count(distinct p.id) from products p join product_variants v on v.product_id=p.id and v.is_active where p.is_active;
+-- productos activos con extras (bloqueados solo si el cliente elige un extra)
+select count(distinct p.id) from products p join product_default_ingredients d on d.product_id=p.id and d.is_extra where p.is_active;
+-- bowls: TODOS los bowls personalizados están bloqueados; tamaños vendibles:
+select size, name, price_cents from bowl_rules order by price_cents;
+-- promos combo agregables (su camino 'promo-<id>' SÍ pasa si están vigentes)
+select id, title, price_cents, starts_at, ends_at from promotions
+where is_active and type='combo' and price_cents is not null
+  and (starts_at is null or starts_at<=now()) and (ends_at is null or ends_at>=now());
+-- combos que se muestran pero fallan ('Promoción no disponible'): activos sin precio o fuera de fecha
+select id, title, type, price_cents, starts_at, ends_at from promotions
+where is_active and type='combo' and (price_cents is null or starts_at>now() or ends_at<now());
+```
+Estimación estática: los bowls están 100% bloqueados. Los productos con variantes también, que con 28 variantes activas probablemente son entre 7 y 14 productos (asumiendo 2 a 4 sabores cada uno). Los extras se bloquean solo cuando el cliente elige uno. Las promos combo vigentes pasan, aunque una promo que vence entre que se muestra y se pide falla con 'Promoción no disponible', y eso es correcto.
