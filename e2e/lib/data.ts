@@ -69,6 +69,8 @@ export interface Discovery {
   hatsu: Pick<ProductPick & { variants: string[] }>;
   bowl: Pick<{
     size: { size: string; name: string; price: number; bases: number; proteins: number; accompaniments: number };
+    /** Todos los tamaños (más barato primero) para los escenarios de bowl complejo. */
+    sizes: { size: string; name: string; price: number; bases: number; proteins: number; accompaniments: number }[];
     bases: string[]; proteins: string[]; acompanantes: string[]; sauces: string[]; complementos: string[];
     premiumProtein: { name: string; charge: number };
     premiumSauce: { name: string; charge: number };
@@ -120,6 +122,7 @@ export function discover(tables: Tables, catalog: any, warnings: string[]): Disc
       bowl = {
         value: {
           size: { size: r.size, name: r.name, price: r.price_cents, bases: r.bases, proteins: r.proteins, accompaniments: r.accompaniments },
+          sizes: rules.map((x) => ({ size: x.size, name: x.name, price: x.price_cents, bases: x.bases, proteins: x.proteins, accompaniments: x.accompaniments })),
           bases: names(free('base')), proteins: names(free('protein')), acompanantes: names(free('acompanante')),
           sauces: names(free('sauce')), complementos: names(free('topping')),
           premiumProtein: { name: pp.name, charge: ingredientCharge(pp) },

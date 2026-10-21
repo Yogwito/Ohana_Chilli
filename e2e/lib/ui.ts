@@ -69,10 +69,27 @@ export async function addCombo(page: Page, title: string) {
   await expect(page.getByText(`${title} agregado al carrito`)).toBeVisible();
 }
 
-export async function buildBowl(page: Page, b: NonNullable<Discovery['bowl']['value']>) {
+export interface BowlOptions {
+  /** Tamaño a usar (por defecto el más barato, b.size). */
+  size?: NonNullable<Discovery['bowl']['value']>['size'];
+  /** Veces que se agregan la proteína y el complemento premium (repetidos). */
+  extras?: number;
+  /** Llenar salsas y complementos incluidos hasta el máximo del tamaño. */
+  fillOptional?: boolean;
+}
+
+/** Precio esperado del bowl armado con buildBowl(b, o) — mismo cálculo que bowlPricing.ts. */
+export function expectedBowlPrice(b: NonNullable<Discovery['bowl']['value']>, o: BowlOptions = {}) {
+  const n = o.extras ?? 1;
+  return (o.size ?? b.size).price + n * b.premiumProtein.charge + b.premiumSauce.charge + n * b.premiumComplemento.charge;
+}
+
+export async function buildBowl(page: Page, b: NonNullable<Discovery['bowl']['value']>, o: BowlOptions = {}) {
+  const size = o.size ?? b.size;
+  const nExtras = o.extras ?? 1;
   const root = page.locator('#arma-tu-bowl');
   await scrollUntil(page, root.getByRole('tablist'));
-  await root.locator('button[aria-pressed]').filter({ hasText: b.size.name }).first().click();
+  await root.locator('button[aria-pressed]').filter({ hasText: size.name }).first().click();
   const currentTab = async () => (await root.locator('[role=tab][aria-selected=true]').textContent())?.trim() ?? '';
   const next = root.getByRole('button', { name: /^(Siguiente|Omitir|Continuar)/ });
 
@@ -86,6 +103,17 @@ export async function buildBowl(page: Page, b: NonNullable<Discovery['bowl']['va
       if (!clicked) throw new Error(`Bowl: no hay ingredientes habilitados para completar el paso (${names.join(', ')})`);
     }
   };
+  // Agrega incluidos (ida y vuelta por la lista) hasta que ninguno quede habilitado = máximo del tamaño.
+  const fillToMax = async (names: string[]) => {
+    for (let guard = 0; guard < 12; guard++) {
+      let clicked = false;
+      for (const n of names) {
+        const btn = root.getByRole('button', { name: `Agregar ${n}`, exact: true });
+        if ((await btn.count()) && (await btn.first().isEnabled())) { await btn.first().click(); clicked = true; break; }
+      }
+      if (!clicked) return;
+    }
+  };
   const pickInSelector = async (heading: string, option: string) => {
     const box = root.getByText(heading, { exact: true }).locator('xpath=ancestor::div[2]');
     await box.getByRole('button', { name: option, exact: true }).click();
@@ -97,18 +125,24 @@ export async function buildBowl(page: Page, b: NonNullable<Discovery['bowl']['va
     if (step === 'Bases') await fillRequired(b.bases);
     if (step === 'Proteínas') {
       await fillRequired(b.proteins);
-      await root.getByRole('button', { name: `Agregar ${b.premiumProtein.name}`, exact: true }).click();
-      await pickInSelector('¿Cuál proteína extra quieres agregar?', b.proteins[0]);
+      for (let i = 0; i < nExtras; i++) {
+        await root.getByRole('button', { name: `Agregar ${b.premiumProtein.name}`, exact: true }).click();
+        await pickInSelector('¿Cuál proteína extra quieres agregar?', b.proteins[i % b.proteins.length]);
+      }
       await expect(root.getByText('Proteínas extra añadidas', { exact: false })).toBeVisible();
     }
     if (step === 'Acompañantes') await fillRequired(b.acompanantes);
     if (step === 'Salsas') {
+      if (o.fillOptional) await fillToMax(b.sauces);
       await root.getByRole('button', { name: new RegExp(`^${esc(b.premiumSauce.name)}`) }).click();
       await expect(root.getByText('Salsas extra añadidas', { exact: false })).toBeVisible();
     }
     if (step === 'Complementos') {
-      await root.getByRole('button', { name: new RegExp(`^${esc(b.premiumComplemento.name)}`) }).click();
-      await pickInSelector('¿Qué complemento extra quieres?', b.complementos[0]);
+      if (o.fillOptional) await fillToMax(b.complementos);
+      for (let i = 0; i < nExtras; i++) {
+        await root.getByRole('button', { name: new RegExp(`^${esc(b.premiumComplemento.name)}`) }).click();
+        await pickInSelector('¿Qué complemento extra quieres?', b.complementos[i % b.complementos.length]);
+      }
       await expect(root.getByText('Complementos extra añadidos', { exact: false })).toBeVisible();
     }
     await next.click();

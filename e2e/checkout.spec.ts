@@ -3,7 +3,7 @@ import type { Page, TestInfo } from '@playwright/test';
 import { test, expect, type Ctx } from './lib/fixtures';
 import { findOrders, MOCK } from './lib/data';
 import {
-  addCombo, addProduct, buildBowl, fillCheckout, goToCheckout, gotoHome, money, readUiTotal,
+  addCombo, addProduct, buildBowl, expectedBowlPrice, fillCheckout, goToCheckout, gotoHome, money, openCart, readUiTotal,
   selectZone, shot, submit, submitButton,
 } from './lib/ui';
 
@@ -151,6 +151,42 @@ test.describe('checkout E2E', () => {
     const ui = await buildBowl(page, b);
     expect(ui, 'precio del bowl en el builder').toBe(b.expectedPrice);
     await runOrder(page, testInfo, ctx, 's04', { lines: [{ label: `Bowl ${b.size.name}`, qty: 1, bowl: true }], expected: b.expectedPrice });
+  });
+
+  // Prod 2026-10-21: bowls con VARIOS adicionales fallaban con la RPC 21b. Todos los tamaños, máximo
+  // de incluidos por regla, proteína y complemento premium repetidos, salsa premium y cantidad 2.
+  for (const sizeKey of ['small', 'medium', 'large']) {
+    test(`04b bowl complejo ${sizeKey}: máximos + extras repetidos x2`, async ({ page, ctx }, testInfo) => {
+      const b = need(ctx.discovery.bowl, 'bowl');
+      const size = need({ value: b.sizes.find((x) => x.size === sizeKey) ?? null, reason: `sin bowl_rules ${sizeKey}` }, `tamaño ${sizeKey}`);
+      const o = { size, extras: 2, fillOptional: true };
+      const ui = await buildBowl(page, b, o);
+      const unit = expectedBowlPrice(b, o);
+      expect(ui, 'precio del bowl en el builder').toBe(unit);
+      const drawer = await openCart(page, testInfo);
+      await page.waitForTimeout(300); // animación del Sheet
+      await drawer.getByRole('button', { name: 'Aumentar cantidad' }).first().click();
+      await expect(drawer.locator('span[aria-live=polite]').first()).toHaveText('2');
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeHidden();
+      await runOrder(page, testInfo, ctx, `s04b-${sizeKey}`, { lines: [{ label: `Bowl ${size.name}`, qty: 2, bowl: true }], expected: unit * 2 });
+    });
+  }
+
+  // Carrito guardado por el frontend legacy (98bd908, misma clave cart:v3): extras sin sourceId/extraKind.
+  test('04c bowl con extras de un carrito legacy (sin sourceId)', async ({ page, ctx }, testInfo) => {
+    const b = need(ctx.discovery.bowl, 'bowl');
+    await buildBowl(page, b);
+    await page.evaluate((key) => {
+      const cart = JSON.parse(localStorage.getItem(key)!);
+      const bowl = cart.items[0].customBowl;
+      for (const k of ['proteins', 'acompanantes', 'sauces', 'complementos']) {
+        for (const ing of bowl[k] ?? []) { delete ing.sourceId; delete ing.extraKind; }
+      }
+      localStorage.setItem(key, JSON.stringify(cart));
+    }, CART_KEY);
+    await page.reload();
+    await runOrder(page, testInfo, ctx, 's04c', { lines: [{ label: `Bowl ${b.size.name}`, qty: 1, bowl: true }], expected: b.expectedPrice });
   });
 
   test('05 promoción combo vigente', async ({ page, ctx }, testInfo) => {

@@ -1,4 +1,4 @@
-// Port JS de supabase/hotfix/2026-10-21b_bowl_surcharge.sql (misma lógica y mensajes),
+// Port JS de supabase/hotfix/2026-10-21c_bowl_legacy_extras.sql (misma lógica y mensajes),
 // usado SOLO en E2E_MOCK=1. Si la SQL cambia, actualiza esto.
 import type { OrderRow, Row, Tables } from '../types';
 import { randomUUID } from 'node:crypto';
@@ -91,16 +91,28 @@ export function createOrderWithItems(t: Tables, args: Row, store: OrderRow[]): s
       if ((counts.base ?? 0) > rule.bases || (counts.protein ?? 0) > rule.proteins
         || (counts.acompanante ?? 0) > rule.accompaniments || (counts.sauce ?? 0) > maxSauces
         || (counts.topping ?? 0) > maxSauces) raise(`Selección excede el tamaño de bowl ${v.size}`);
+      const extraCharge = (i: Row): number | null => {
+        if (i.price_cents > 0) return i.price_cents;
+        if (i.type === 'protein') return named(i.name) ? 5000 : null;
+        if (i.type === 'acompanante' || i.type === 'sauce') return named(i.name) ? 3000 : 2000;
+        if (i.type === 'topping') return named(i.name) ? 3000 : 500;
+        return null;
+      };
       for (const extra of v.extras ?? []) {
         if (extra.kind === 'named') continue;
+        // 21c: extras de carritos legacy sin source_id.
+        if (!extra.source_id) {
+          const charge = /^[0-9]{1,7}$/.test(String(extra.charge)) ? Number(extra.charge) : null;
+          if (charge == null || !['protein', 'acompanante', 'sauce', 'topping'].includes(extra.kind)
+            || !t.ingredients.some((r) => r.is_active && r.type === extra.kind && extraCharge(r) === charge)) {
+            raise(`Recargo de bowl inválido: ${extra.name ?? '?'}`);
+          }
+          unit += charge!;
+          continue;
+        }
         const i = t.ingredients.find((r) => r.id === extra.source_id && r.is_active);
         if (!i || i.type !== extra.kind) raise(`Recargo de bowl inválido: ${extra.name ?? extra.source_id}`);
-        let charge: number | null = null;
-        if (i.price_cents > 0) charge = i.price_cents;
-        else if (i.type === 'protein') charge = named(i.name) ? 5000 : null;
-        else if (i.type === 'acompanante') charge = named(i.name) ? 3000 : 2000;
-        else if (i.type === 'sauce') charge = 2000;
-        else if (i.type === 'topping') charge = named(i.name) ? 3000 : 500;
+        const charge = extraCharge(i!);
         if (charge == null) raise(`Recargo de bowl inválido: ${extra.name ?? extra.source_id}`);
         unit += charge!;
       }

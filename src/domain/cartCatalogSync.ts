@@ -1,4 +1,4 @@
-import { calculateBowlPrice } from '@/domain/bowlPricing';
+import { calculateBowlPrice, getIngredientExtraCharge } from '@/domain/bowlPricing';
 import { calculateProductUnitPrice, normalizeProductCustomization } from '@/domain/productCustomizations';
 import type { BowlSizeRule, CartItem, CartState, CustomBowl, Ingredient, Product, Promotion } from '@/types';
 
@@ -35,6 +35,25 @@ function reconcilePromotionItem(item: CartItem, promotions: Promotion[] | undefi
   };
 }
 
+// Recargo de un extra "desbordado" (ingrediente gratis pedido por encima del límite) en BowlBuilder.
+const OVERFLOW_EXTRA_CHARGE: Partial<Record<Ingredient['type'], number>> = { acompanante: 2000, sauce: 2000, topping: 500 };
+
+/**
+ * Carritos guardados por el frontend legacy (misma clave cart:v3) traen extras sin sourceId/extraKind
+ * y la RPC necesita el ingrediente de origen. Se infiere del catálogo por tipo + recargo; si no hay
+ * uno que cobre exactamente lo mismo, el bowl se descarta como cualquier otro ítem desactualizado.
+ */
+function repairLegacyExtra(selection: Ingredient, ingredients: Ingredient[]): Ingredient | null {
+  if (selection.sourceId) return selection;
+  const sameType = ingredients.filter((ingredient) => ingredient.type === selection.type);
+  const source = sameType.find((ingredient) => getIngredientExtraCharge(ingredient) === selection.price)
+    ?? (OVERFLOW_EXTRA_CHARGE[selection.type] === selection.price
+      ? sameType.find((ingredient) => getIngredientExtraCharge(ingredient) === 0)
+      : undefined);
+  if (!source || !['protein', 'acompanante', 'sauce', 'topping'].includes(source.type)) return null;
+  return { ...selection, sourceId: source.id, extraKind: source.type as Ingredient['extraKind'] };
+}
+
 function reconcileIngredientSelections(
   selections: Ingredient[],
   ingredientsById: Map<string, Ingredient>,
@@ -47,7 +66,9 @@ function reconcileIngredientSelections(
     // catalog by design, so looking them up would wrongly invalidate the
     // whole bowl. They already carry their own price, so pass them through.
     if (selection.id.startsWith('extra-')) {
-      nextSelections.push(selection);
+      const repaired = repairLegacyExtra(selection, Array.from(ingredientsById.values()));
+      if (!repaired) return null;
+      nextSelections.push(repaired);
       continue;
     }
 

@@ -16,7 +16,7 @@ Los pedidos de prueba se llaman `E2E-TEST-<run>-<escenario>-<mobile|desktop>` y 
 
 ## Requisito previo
 
-Staging debe tener aplicado `supabase/hotfix/2026-10-21b_bowl_surcharge.sql`. Con la versión anterior de la RPC, el escenario 07d (recargo de bowl rebajado) falla, porque el servidor acepta el recargo rebajado.
+Staging debe tener aplicado `supabase/hotfix/2026-10-21c_bowl_legacy_extras.sql` (los escenarios 04b/04c fallan con 21b). Con la versión 21 de la RPC, el escenario 07d (recargo de bowl rebajado) falla, porque el servidor acepta el recargo rebajado.
 
 ## Pasos para el dueño (zsh, un comando por línea, pégalos de a uno)
 
@@ -102,7 +102,7 @@ Los datos se descubren en tiempo de ejecución desde staging con la service role
 ## Modo mock (sin red, para desarrollo de la suite)
 
 `E2E_MOCK=1` intercepta `*.supabase.co` con fixtures (`e2e/lib/mock/`) y un port JS de la RPC
-(`supabase/hotfix/2026-10-21b_bowl_surcharge.sql`). No prueba la base real.
+(`supabase/hotfix/2026-10-21c_bowl_legacy_extras.sql`). No prueba la base real.
 
 ```zsh
 E2E_MOCK=1 VITE_SUPABASE_URL=https://mbnedymxjplngwqkaabi.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=dummy npm run e2e

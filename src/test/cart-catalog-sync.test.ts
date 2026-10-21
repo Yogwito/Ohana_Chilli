@@ -175,6 +175,7 @@ describe('cart catalog sync', () => {
       ingredients: [
         { id: 'base-arroz', name: 'Arroz', type: 'base' },
         { id: 'protein-1', name: 'Pollo', type: 'protein' },
+        { id: 'protein-adicional', name: 'Proteína adicional', type: 'protein', price: 5000 },
       ],
     });
 
@@ -182,6 +183,48 @@ describe('cart catalog sync', () => {
     const bowl = nextState.items[0].customBowl!;
     expect(bowl.proteins).toHaveLength(2);
     expect(bowl.proteins[1].id).toBe('extra-1720000000000-abc123');
+    // Carrito legacy sin sourceId: se infiere el ingrediente premium que cobra lo mismo.
+    expect(bowl.proteins[1].sourceId).toBe('protein-adicional');
+    expect(bowl.proteins[1].extraKind).toBe('protein');
     expect(nextState.items[0].unitPrice).toBe(34900);
+  });
+
+  it('repairs legacy overflow extras and drops bowls whose legacy extra has no matching charge', () => {
+    const size = {
+      size: 'small' as const, name: 'Pequeño', price: 23900,
+      maxBases: 1, maxProteins: 1, maxAcompanantes: 4, maxSauces: 1, maxComplementos: 1,
+    };
+    const bowlWith = (extraPrice: number): CartState['items'][number] => ({
+      id: `bowl-${extraPrice}`,
+      brand: 'ohana',
+      type: 'custom-bowl',
+      customBowl: {
+        size,
+        bases: [{ id: 'base-arroz', name: 'Arroz', type: 'base' }],
+        proteins: [{ id: 'protein-1', name: 'Pollo', type: 'protein' }],
+        acompanantes: [],
+        sauces: [{ id: 'extra-sauce-1', name: 'Salsa extra: Ajo', type: 'sauce', price: extraPrice }],
+        complementos: [],
+      },
+      quantity: 1,
+      unitPrice: 23900 + extraPrice,
+      totalPrice: 23900 + extraPrice,
+    });
+
+    const nextState = reconcileCartWithCatalog(
+      { items: [bowlWith(2000), bowlWith(1234)], subtotal: 0, total: 0 },
+      {
+        products: [],
+        bowlRules: [size],
+        ingredients: [
+          { id: 'base-arroz', name: 'Arroz', type: 'base' },
+          { id: 'protein-1', name: 'Pollo', type: 'protein' },
+          { id: 'sauce-ajo', name: 'Salsa de Ajo', type: 'sauce' },
+        ],
+      },
+    );
+
+    expect(nextState.items.map((item) => item.id)).toEqual(['bowl-2000']);
+    expect(nextState.items[0].customBowl!.sauces![0]).toMatchObject({ sourceId: 'sauce-ajo', extraKind: 'sauce' });
   });
 });
