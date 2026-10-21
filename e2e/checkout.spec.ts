@@ -113,7 +113,8 @@ async function expectRejected(page: Page, testInfo: TestInfo, ctx: Ctx, name: st
   await shot(page, testInfo, shotName);
   expect(r.created, 'el pedido manipulado NO debe crearse').toBe(false);
   ctx.report.notes.push(`error mostrado: ${r.error}`);
-  expect(r.error).toMatch(re);
+  expect(r.serverError ?? '', 'causa exacta devuelta por la RPC').toMatch(re);
+  expect(r.error, 'el aviso explica al cliente qué hacer').toMatch(/precios de tu carrito cambiaron|Quita ese producto/);
   expect(await findOrders(name, ctx.mockOrders), 'sin pedido en DB').toHaveLength(0);
 }
 
@@ -229,10 +230,9 @@ test.describe('checkout E2E', () => {
     await expectRejected(page, testInfo, ctx, name, 'manipulacion-total-error', /Total no coincide/);
   });
 
-  test('07d recargo de bowl rebajado a 500 (whitelist) → debería rechazarse', async ({ page, ctx }, testInfo) => {
-    // CONOCIDO: la RPC acepta cualquier recargo en {500,2000,3000,5000} o igual a un precio de
-    // ingrediente; el cliente puede declarar uno más barato. Marcado test.fail() mientras exista.
-    test.fail(true, 'Vulnerabilidad conocida: details.validation.extras[].charge lo declara el cliente');
+  test('07d recargo de bowl rebajado → rechazado', async ({ page, ctx }, testInfo) => {
+    // Requiere supabase/hotfix/2026-10-21b_bowl_surcharge.sql aplicado: el servidor calcula el
+    // recargo desde source_id e ignora el charge declarado, así que el precio rebajado no cuadra.
     const b = need(ctx.discovery.bowl, 'bowl');
     const name = ctx.customerName('s07d');
     await buildBowl(page, b);
@@ -248,6 +248,20 @@ test.describe('checkout E2E', () => {
     await goToCheckout(page, testInfo, 's07d');
     await fillCheckout(page, { name, phone: PHONE, orderType: 'pickup' });
     await expectRejected(page, testInfo, ctx, name, 'manipulacion-bowl', /Recargo de bowl inválido|Precio no coincide|Total no coincide/);
+  });
+
+  test('05b combo sobrevive a una recarga', async ({ page, ctx }, testInfo) => {
+    const c = need(ctx.discovery.combo, 'combo');
+    await addCombo(page, c.title);
+    await page.reload();
+    await expect.poll(async () => page.evaluate((key) => {
+      const cart = JSON.parse(localStorage.getItem(key) ?? '{"items":[]}');
+      return cart.items.filter((i: any) => i.product?.id?.startsWith('promo-')).length;
+    }, CART_KEY), { timeout: 10_000 }).toBe(1);
+    await page.waitForTimeout(1500); // deja correr la reconciliación con el catálogo
+    const left = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{"items":[]}').items.length, CART_KEY);
+    expect(left, 'el combo sigue en el carrito tras recargar').toBe(1);
+    await runOrder(page, testInfo, ctx, 's05b', { lines: [{ label: c.title, qty: 1, productId: `promo-${c.id}` }], expected: c.price });
   });
 
   test('08a recoger en tienda (sin domicilio)', async ({ page, ctx }, testInfo) => {
@@ -343,6 +357,8 @@ test.describe('checkout E2E', () => {
       // Informativo: con el botón pegado al borde inferior (scroll "natural"), ¿lo tapa la barra fija?
       const edge = await hitTest('end');
       ctx.report.notes.push(`block:end → reachable=${edge.reachable} coveredByNav=${edge.coveredByNav} (hit=${edge.hit})`);
+      expect(edge.coveredByNav, 'la barra inferior no tapa el botón con scroll-padding-bottom').toBe(false);
+      expect(edge.reachable, `botón alcanzable pegado al borde (hit=${edge.hit})`).toBe(true);
       const atBottom = await btn.evaluate((el) => {
         window.scrollTo(0, document.documentElement.scrollHeight);
         const nav = document.querySelector('nav[aria-label="Navegación móvil"]')!.getBoundingClientRect();

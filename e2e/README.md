@@ -14,6 +14,10 @@ La suite **aborta antes de arrancar** si:
 Los pedidos de prueba se llaman `E2E-TEST-<run>-<escenario>-<mobile|desktop>` y se borran al final
 (`globalTeardown` ejecuta `e2e/cleanup.mjs`; usa `E2E_KEEP_ORDERS=1` para conservarlos y revisarlos).
 
+## Requisito previo
+
+Staging debe tener aplicado `supabase/hotfix/2026-10-21b_bowl_surcharge.sql`. Con la versión anterior de la RPC, el escenario 07d (recargo de bowl rebajado) falla, porque el servidor acepta el recargo rebajado.
+
 ## Pasos para el dueño (zsh, un comando por línea, pégalos de a uno)
 
 ```zsh
@@ -98,7 +102,7 @@ Los datos se descubren en tiempo de ejecución desde staging con la service role
 ## Modo mock (sin red, para desarrollo de la suite)
 
 `E2E_MOCK=1` intercepta `*.supabase.co` con fixtures (`e2e/lib/mock/`) y un port JS de la RPC
-(`supabase/hotfix/2026-10-21_create_order_with_items.sql`). No prueba la base real.
+(`supabase/hotfix/2026-10-21b_bowl_surcharge.sql`). No prueba la base real.
 
 ```zsh
 E2E_MOCK=1 VITE_SUPABASE_URL=https://mbnedymxjplngwqkaabi.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=dummy npm run e2e

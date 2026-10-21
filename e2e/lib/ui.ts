@@ -182,12 +182,22 @@ export async function assertNotClosed(page: Page) {
 }
 
 /** Envía y devuelve 'created' o el texto del error mostrado. */
-export async function submit(page: Page): Promise<{ created: boolean; error?: string }> {
+export async function submit(page: Page): Promise<{ created: boolean; error?: string; serverError?: string }> {
   await assertNotClosed(page);
+  // El aviso muestra un texto para el cliente (describeOrderError); el mensaje crudo de la RPC
+  // se lee de la respuesta para poder afirmar la causa exacta del rechazo.
+  let serverError: string | undefined;
+  const onResponse = async (res: import('@playwright/test').Response) => {
+    if (!res.url().includes('/rpc/create_order_with_items') || res.ok()) return;
+    try { serverError = (await res.json())?.message; } catch { /* cuerpo no JSON */ }
+  };
+  page.on('response', onResponse);
   await submitButton(page).click();
   const ok = page.getByRole('heading', { name: '¡Pedido creado!' });
   const alert = page.getByRole('alert').filter({ hasText: 'No pudimos enviar tu pedido' });
   await expect(ok.or(alert).first()).toBeVisible({ timeout: 30_000 });
+  page.off('response', onResponse);
   if (await ok.isVisible()) return { created: true };
-  return { created: false, error: (await alert.textContent()) ?? '' };
+  const shown = (await alert.textContent()) ?? '';
+  return { created: false, error: [serverError, shown].filter(Boolean).join(' | '), serverError };
 }

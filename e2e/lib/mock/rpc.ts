@@ -1,11 +1,9 @@
-// Port JS de supabase/hotfix/2026-10-21_create_order_with_items.sql (misma lógica y mensajes),
+// Port JS de supabase/hotfix/2026-10-21b_bowl_surcharge.sql (misma lógica y mensajes),
 // usado SOLO en E2E_MOCK=1. Si la SQL cambia, actualiza esto.
 import type { OrderRow, Row, Tables } from '../types';
 import { randomUUID } from 'node:crypto';
 
 export class RpcError extends Error {}
-
-const BOWL_WHITELIST = [500, 2000, 3000, 5000];
 
 export function createOrderWithItems(t: Tables, args: Row, store: OrderRow[]): string {
   const raise = (m: string) => { throw new RpcError(m); };
@@ -77,18 +75,34 @@ export function createOrderWithItems(t: Tables, args: Row, store: OrderRow[]): s
       const v = d.validation;
       const rule = t.bowl_rules.find((r) => r.size === v.size);
       if (!rule) raise('Tamaño de bowl inválido');
+      // Hotfix 2026-10-21b: el recargo sale del catálogo; el charge declarado se ignora.
+      const named = (n: string) => /(adicional|extra)/.test(n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
+      const maxSauces = v.size === 'large' ? 3 : v.size === 'medium' ? 2 : 1;
+      const counts: Record<string, number> = {};
       unit = rule.price_cents;
       for (const id of v.ingredient_ids ?? []) {
         const i = t.ingredients.find((r) => r.id === id && r.is_active);
         if (!i) raise(`Ingrediente no disponible: ${id}`);
-        unit += i.price_cents;
-      }
-      for (const extra of v.extras ?? []) {
-        const charge = Number(extra.charge ?? -1);
-        if (!BOWL_WHITELIST.includes(charge) && !t.ingredients.some((i) => i.is_active && i.price_cents > 0 && i.price_cents === charge)) {
-          raise(`Recargo de bowl inválido: ${extra.name} (${charge})`);
-        }
+        let charge = i.price_cents > 0 ? i.price_cents : 0;
+        if (charge === 0 && named(i.name)) charge = i.type === 'protein' ? 5000 : 3000;
         unit += charge;
+        counts[i.type] = (counts[i.type] ?? 0) + 1;
+      }
+      if ((counts.base ?? 0) > rule.bases || (counts.protein ?? 0) > rule.proteins
+        || (counts.acompanante ?? 0) > rule.accompaniments || (counts.sauce ?? 0) > maxSauces
+        || (counts.topping ?? 0) > maxSauces) raise(`Selección excede el tamaño de bowl ${v.size}`);
+      for (const extra of v.extras ?? []) {
+        if (extra.kind === 'named') continue;
+        const i = t.ingredients.find((r) => r.id === extra.source_id && r.is_active);
+        if (!i || i.type !== extra.kind) raise(`Recargo de bowl inválido: ${extra.name ?? extra.source_id}`);
+        let charge: number | null = null;
+        if (i.price_cents > 0) charge = i.price_cents;
+        else if (i.type === 'protein') charge = named(i.name) ? 5000 : null;
+        else if (i.type === 'acompanante') charge = named(i.name) ? 3000 : 2000;
+        else if (i.type === 'sauce') charge = 2000;
+        else if (i.type === 'topping') charge = named(i.name) ? 3000 : 500;
+        if (charge == null) raise(`Recargo de bowl inválido: ${extra.name ?? extra.source_id}`);
+        unit += charge!;
       }
     } else {
       raise(`Item sin datos de validación: ${item.name}`);
