@@ -3,7 +3,7 @@
 CREATE OR REPLACE FUNCTION public.order_action(p_id uuid,p_version integer,p_action text,p_note text DEFAULT '') RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 DECLARE o orders%ROWTYPE; next_status text; BEGIN
-  IF NOT has_role(auth.uid(),'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
+  IF NOT has_role(_user_id => auth.uid(), _role => 'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
   SELECT * INTO o FROM orders WHERE id=p_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'not_found'; END IF;
   IF o.version<>p_version THEN RAISE EXCEPTION 'version_conflict'; END IF;

@@ -1,23 +1,53 @@
 -- Additive cutover. Run only after live audit, backup/restore drill and Edge deployment.
 -- Existing snapshots and payment knowledge are preserved.
+-- Applies on top of 20261005000000_prod_baseline.sql (= production schema), where
+-- orders.payment_method already exists (nullable, CHECK cash/transfer/wompi) together
+-- with the legacy Wompi columns (payment_status, payment_provider, ...). Those legacy
+-- columns are intentionally kept; see supabase/migrations_pending/.
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0;
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS acknowledged_at timestamptz,
-  ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT 'legacy',
-  ADD COLUMN IF NOT EXISTS payment_state text NOT NULL DEFAULT 'unknown',
+  ADD COLUMN IF NOT EXISTS payment_method text,
+  ADD COLUMN IF NOT EXISTS payment_state text,
   ADD COLUMN IF NOT EXISTS actionable_at timestamptz,
   ADD COLUMN IF NOT EXISTS tracking_hash text,
   ADD COLUMN IF NOT EXISTS tracking_expires_at timestamptz,
   ADD COLUMN IF NOT EXISTS request_key uuid,
   ADD COLUMN IF NOT EXISTS request_hash text;
+
+-- payment_method / payment_state: normalise historical rows explicitly instead of
+-- relying on ADD COLUMN ... DEFAULT (which is skipped when the column already exists).
+-- Historical orders never carried verified payment knowledge: they become
+-- payment_method='legacy', payment_state='unknown'. The backfill must not touch
+-- updated_at (audit timestamp), so the prod updated_at trigger is paused.
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_payment_state_check;
+DO $$
+DECLARE has_trigger boolean := EXISTS (
+  SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.orders'::regclass AND tgname = 'orders_set_updated_at' AND NOT tgisinternal);
+BEGIN
+  IF has_trigger THEN EXECUTE 'ALTER TABLE public.orders DISABLE TRIGGER orders_set_updated_at'; END IF;
+  UPDATE public.orders SET payment_method = 'online' WHERE payment_method = 'wompi';
+  UPDATE public.orders SET payment_method = 'legacy' WHERE payment_method IS NULL;
+  UPDATE public.orders SET payment_state = 'unknown' WHERE payment_state IS NULL;
+  IF has_trigger THEN EXECUTE 'ALTER TABLE public.orders ENABLE TRIGGER orders_set_updated_at'; END IF;
+END $$;
+ALTER TABLE public.orders
+  ALTER COLUMN payment_method SET DEFAULT 'legacy',
+  ALTER COLUMN payment_method SET NOT NULL,
+  ALTER COLUMN payment_state SET DEFAULT 'unknown',
+  ALTER COLUMN payment_state SET NOT NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_payment_method_check CHECK (payment_method IN ('legacy','cash','transfer','online'));
+ALTER TABLE public.orders ADD CONSTRAINT orders_payment_state_check CHECK (payment_state IN ('unknown','unpaid','unverified','pending','paid','rejected','refunded'));
+
 CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key ON public.orders(request_key);
 CREATE UNIQUE INDEX IF NOT EXISTS orders_tracking_hash ON public.orders(tracking_hash);
 CREATE INDEX IF NOT EXISTS orders_attention ON public.orders(actionable_at) WHERE acknowledged_at IS NULL AND status = 'pending';
-ALTER TABLE public.orders ADD CONSTRAINT orders_payment_method_check CHECK (payment_method IN ('legacy','cash','transfer','online')) NOT VALID;
-ALTER TABLE public.orders ADD CONSTRAINT orders_payment_state_check CHECK (payment_state IN ('unknown','unpaid','unverified','pending','paid','rejected','refunded')) NOT VALID;
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_amount_check;
 ALTER TABLE public.orders ADD CONSTRAINT orders_amount_check CHECK (total_cents >= 0 AND delivery_fee_cents >= 0 AND delivery_fee_cents <= total_cents) NOT VALID;
+ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS order_items_amount_quantity_check;
 ALTER TABLE public.order_items ADD CONSTRAINT order_items_amount_quantity_check CHECK (quantity BETWEEN 1 AND 20 AND unit_price_cents >= 0) NOT VALID;
 -- NOT VALID avoids rewriting or rejecting historical data; enforced for every new write.
 ALTER TABLE public.product_default_ingredients ADD COLUMN IF NOT EXISTS is_extra boolean NOT NULL DEFAULT false;
@@ -58,11 +88,18 @@ DO $$ DECLARE p record; t text; BEGIN
     EXECUTE format('GRANT ALL ON public.%I TO service_role', t);
     IF t NOT IN ('order_rate_limits','order_provider_events') THEN
       EXECUTE format('GRANT SELECT ON public.%I TO authenticated', t);
-      EXECUTE format('CREATE POLICY admin_read ON public.%I FOR SELECT TO authenticated USING (public.has_role(auth.uid(), ''admin''))', t);
+      EXECUTE format('CREATE POLICY admin_read ON public.%I FOR SELECT TO authenticated USING (public.has_role(_user_id => auth.uid(), _role => ''admin''))', t);
     END IF;
   END LOOP;
 END $$;
-REVOKE ALL ON FUNCTION public.create_order_with_items(text,text,text,text,text,integer,text,integer,jsonb) FROM PUBLIC, anon, authenticated;
+-- The legacy browser RPC exists with different arities depending on the installation
+-- (9 args in old repo migrations, 10 args with p_payment_method in production).
+DO $$ DECLARE f record; BEGIN
+  FOR f IN SELECT p.oid::regprocedure AS signature FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+           WHERE n.nspname='public' AND p.proname='create_order_with_items' LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.signature);
+  END LOOP;
+END $$;
 -- Metadata must also be readable under RLS.
 ALTER TABLE public.product_default_ingredients ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS order_catalog_metadata ON public.product_default_ingredients;
@@ -226,7 +263,7 @@ END $$;
 CREATE FUNCTION public.order_action(p_id uuid,p_version integer,p_action text,p_note text DEFAULT '') RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE o orders%ROWTYPE; next_status text; BEGIN
-  IF NOT has_role(auth.uid(),'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
+  IF NOT has_role(_user_id => auth.uid(), _role => 'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
   SELECT * INTO o FROM orders WHERE id=p_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'not_found'; END IF;
   IF o.version<>p_version THEN RAISE EXCEPTION 'version_conflict'; END IF;

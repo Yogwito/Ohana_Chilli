@@ -44,7 +44,7 @@ END $$;
 CREATE FUNCTION public.order_refund_request(p_id uuid,p_version integer,p_reason text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE o orders%ROWTYPE; a payment_attempts%ROWTYPE; r order_refunds%ROWTYPE; BEGIN
-  IF NOT has_role(auth.uid(),'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
+  IF NOT has_role(_user_id => auth.uid(), _role => 'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
   SELECT * INTO o FROM orders WHERE id=p_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'not_found'; END IF;
   SELECT * INTO r FROM order_refunds WHERE order_id=p_id;
