@@ -172,11 +172,11 @@ export default function PromotionsSection() {
   if (!isLoading && promotions.length === 0) return null;
 
   return (
-    <div className="container max-w-4xl py-4">
+    <div className="experience-promotions">
       <AnimatedElement animation="fade-up">
         <div className="mb-4">
           <h2 className="font-display font-bold text-2xl text-foreground dark:text-white">
-            🔥 Promociones
+            Más para disfrutar.
           </h2>
           <div className="mt-1.5 h-[3px] w-9 rounded-full bg-brand" />
         </div>

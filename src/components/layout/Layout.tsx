@@ -1,4 +1,4 @@
-import { ReactNode, useState, lazy, Suspense } from 'react';
+import { ReactNode, useState, useEffect, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { House, UtensilsCrossed, ShoppingCart, Info } from 'lucide-react';
 import Navbar from './Navbar';
@@ -16,7 +16,7 @@ interface LayoutProps {
 
 const bottomNavItems = [
   { href: '/', icon: House, label: 'Inicio', exact: true },
-  { href: '/#arma-tu-bowl', icon: UtensilsCrossed, label: 'Menú', exact: false },
+  { href: '/#menu', icon: UtensilsCrossed, label: 'Menú', exact: false },
 ] as const;
 
 export default function Layout({ children }: LayoutProps) {
@@ -24,6 +24,10 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { getItemCount } = useCart();
   const itemCount = getItemCount();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [location.pathname]);
 
   const isActive = (path: string, exact = false) => {
     if (path.includes('#')) return location.pathname === '/' && location.hash === path.slice(path.indexOf('#'));
@@ -33,15 +37,16 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="experience-shell flex flex-col min-h-screen">
+      <a className="experience-skip-link" href="#main-content">Saltar al contenido</a>
       <RestaurantSchema />
       <ClosedBanner />
       <Navbar />
-      <main className="flex-1 pb-16 md:pb-0">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex-1">{children}</main>
       <Footer />
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 min-h-16 bg-background/95 backdrop-blur-xl border-t border-border/40 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="Navegación móvil" className="experience-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 min-h-16 bg-background/95 backdrop-blur-xl border-t border-border/40 flex items-stretch pb-[env(safe-area-inset-bottom)]">
         {bottomNavItems.map(({ href, icon: Icon, label, exact }) => (
           <Link
             key={label}

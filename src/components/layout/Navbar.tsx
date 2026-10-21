@@ -1,183 +1,102 @@
-import { useState, lazy, Suspense, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, ShoppingCart, Sun, Moon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useCart } from '@/context/CartContext';
-import { useTheme } from '@/hooks/use-theme';
-import { cn } from '@/lib/utils';
-
-const CartDrawer = lazy(() => import('@/components/cart/CartDrawer'));
-
-const STATIC_LINKS = [
-  { href: '/nosotros', label: 'Nosotros' },
-  { href: '/contacto', label: 'Contacto' },
+import { lazy, Suspense, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Moon, ShoppingBag, Sun, Menu } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { useCart } from "@/context/CartContext";
+import { useTheme } from "@/hooks/use-theme";
+const CartDrawer = lazy(() => import("@/components/cart/CartDrawer"));
+const links = [
+  { href: "/#menu", label: "El menú" },
+  { href: "/#arma-tu-bowl", label: "Crea tu bowl" },
+  { href: "/nosotros", label: "Somos Ohana" },
+  { href: "/contacto", label: "Encuéntranos" },
 ];
 
 export default function Navbar() {
-  const location = useLocation();
   const { getItemCount } = useCart();
-
   const { theme, setTheme } = useTheme();
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
   const [cartOpen, setCartOpen] = useState(false);
-  const [badgeAnimating, setBadgeAnimating] = useState(false);
-  const prevCountRef = useRef(0);
-
-  // Cart badge animation
-  const itemCount = getItemCount();
-  useEffect(() => {
-    if (itemCount !== prevCountRef.current && prevCountRef.current !== 0) {
-      setBadgeAnimating(true);
-      const timer = setTimeout(() => setBadgeAnimating(false), 400);
-      prevCountRef.current = itemCount;
-      return () => clearTimeout(timer);
-    }
-    prevCountRef.current = itemCount;
-  }, [itemCount]);
-
-  // Crystallize navbar on scroll
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const isOnHome = location.pathname === '/';
-
+  const [menuOpen, setMenuOpen] = useState(false);
+  const count = getItemCount();
   return (
     <>
-      <header className={cn(
-        'sticky top-0 z-50 w-full transition-all duration-300',
-        scrolled
-          ? 'bg-background/90 backdrop-blur-xl border-b border-border/40 shadow-sm'
-          : 'bg-background/0 border-b border-transparent shadow-none',
-      )}>
-        <nav className="container flex h-14 items-center gap-4">
-
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-1 shrink-0">
-            <span className="font-display font-black text-xl tracking-tight text-brand">Ohana</span>
-            <span className="font-display font-light text-xl tracking-tight text-brand-light">Bowls</span>
+      <header className="experience-nav">
+        <nav className="experience-nav-inner" aria-label="Navegación principal">
+          <Link
+            to="/"
+            className="experience-logo"
+            aria-label="Ohana Bowls, inicio"
+          >
+            ohana<span>bowls & good vibes</span>
           </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-1 flex-1 min-w-0">
-            <Link
-              to="/"
-              className={cn(
-                'text-sm font-medium px-3 py-1.5 rounded-lg transition-colors shrink-0',
-                isOnHome
-                  ? 'text-brand font-semibold'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-              )}
-            >
-              Inicio
-            </Link>
-          </div>
-
-          {/* Right-side actions */}
-          <div className="flex items-center gap-1 shrink-0 ml-auto md:ml-0">
-            {/* Static links — desktop only */}
-            {STATIC_LINKS.map((link) => (
+          <div className="experience-nav-links">
+            {links.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
-                className={cn(
-                  'hidden lg:block text-sm font-medium px-3 py-1.5 rounded-lg transition-colors shrink-0',
-                  location.pathname.startsWith(link.href)
-                    ? 'text-brand'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                )}
+                aria-current={
+                  `${location.pathname}${location.hash}` === link.href
+                    ? "page"
+                    : undefined
+                }
               >
                 {link.label}
               </Link>
             ))}
-
-            {/* Theme toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          </div>
+          <div className="experience-nav-actions">
+            <button
+              className="experience-icon-button"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               aria-label="Cambiar tema"
             >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
-
-            {/* Cart button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
+              {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+            </button>
+            <button
+              className="experience-cart-button"
               onClick={() => setCartOpen(true)}
-              aria-label="Abrir carrito"
+              aria-label={`Abrir pedido, ${count} productos`}
             >
-              <ShoppingCart className="h-5 w-5" />
-              {itemCount > 0 && (
-                <span
-                  className={cn(
-                    'absolute -top-1 -right-1 h-5 w-5 rounded-full bg-brand text-[10px] font-bold text-white flex items-center justify-center shadow-sm transition-transform duration-200',
-                    badgeAnimating && 'scale-125',
-                  )}
+              <ShoppingBag size={18} />
+              <span>Mi pedido</span>
+              <b key={count}>{count}</b>
+            </button>
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger asChild>
+                <button
+                  className="experience-icon-button mobile-menu-trigger"
+                  aria-label="Abrir navegación"
                 >
-                  {itemCount > 99 ? '99+' : itemCount}
-                </span>
-              )}
-            </Button>
-
-            {/* Mobile hamburger */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild className="hidden">
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Abrir menú</span>
-                </Button>
+                  <Menu size={22} />
+                </button>
               </SheetTrigger>
-
-              <SheetContent side="right" className="w-[280px] sm:w-[320px] overflow-y-auto">
-                {/* Logo */}
-                <div className="flex items-center gap-1 mb-6 mt-2">
-                  <span className="font-display font-black text-lg text-brand">Ohana</span>
-                  <span className="font-display font-light text-lg text-brand-light">Bowls</span>
-                </div>
-
-                {/* Inicio */}
-                <Link
-                  to="/"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    'flex items-center text-base font-medium px-4 py-2.5 rounded-lg transition-colors',
-                    isOnHome ? 'text-brand bg-brand/5' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                  )}
-                >
-                  Inicio
-                </Link>
-
-                {/* Divider + static links */}
-                <div className="border-t border-border/60 mt-4 pt-4 flex flex-col gap-0.5">
-                  {STATIC_LINKS.map((link) => (
+              <SheetContent>
+                <SheetTitle>Explora Ohana</SheetTitle>
+                <SheetDescription>Encuentra tu próximo favorito.</SheetDescription>
+                <nav className="experience-mobile-links">
+                  {links.map((link) => (
                     <Link
                       key={link.href}
                       to={link.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={cn(
-                        'text-base font-medium px-4 py-2.5 rounded-lg transition-colors',
-                        location.pathname.startsWith(link.href)
-                          ? 'text-brand bg-brand/5'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                      )}
+                      onClick={() => setMenuOpen(false)}
                     >
                       {link.label}
+                      <span aria-hidden="true">↗</span>
                     </Link>
                   ))}
-                </div>
+                </nav>
               </SheetContent>
             </Sheet>
           </div>
         </nav>
       </header>
-
       <Suspense fallback={null}>
         <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
       </Suspense>
