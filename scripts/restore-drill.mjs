@@ -29,7 +29,7 @@ try{
  const afterSnapshots=run('psql',['-X','-A','-t','-c',snapshotSql],target).trim();
  const sentinel=run('psql',['-X','-A','-t','-c',`SELECT count(*) FROM public.orders WHERE id='${sentinelId}' AND total_cents=12345 AND payment_state='unknown'`],target).trim();
  if(before!==after||beforeSnapshots!==afterSnapshots||sentinel!=='1')throw new Error('Restore data verification failed');
- const tests=['order-workflow.sql',...readdirSync('supabase/tests').filter(file=>file.endsWith('.sql')&&!['local-bootstrap.sql','legacy-sentinel.sql','verify-legacy.sql','order-workflow.sql','live-audit.sql'].includes(file)).sort()];
+ const tests=['order-workflow.sql',...readdirSync('supabase/tests').filter(file=>file.endsWith('.sql')&&!['local-bootstrap.sql','legacy-sentinel.sql','verify-legacy.sql','order-workflow.sql','live-audit.sql','prod-sentinel.sql','verify-prod-sentinel.sql'].includes(file)).sort()];
  for(const file of tests)run('psql',['-X','-v','ON_ERROR_STOP=1','-f',`supabase/tests/${file}`],target);
  if(createHash('sha256').update(readFileSync(archive)).digest('hex')!==checksum)throw new Error('Archive changed during drill');
  console.log(JSON.stringify({restore_seconds:Number(seconds.toFixed(3)),row_counts_match:true,order_item_snapshots_match:true,historical_payment_preserved:true,permission_tests_pass:true,regression_files:tests.length,archive_readable:true,archive_sha256_verified:true,scope:'isolated-local-fixture-only'}));

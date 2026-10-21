@@ -8,12 +8,13 @@ const concurrent=text=>new Promise(resolve=>{
  child.stdout.on('data',chunk=>output+=chunk);child.stderr.on('data',chunk=>error+=chunk);child.on('close',code=>resolve({code,output:output.trim(),error}));
 });
 const actor='00000000-0000-0000-0000-000000000091';
+const product='00000000-0000-0000-0000-000000000093';
 let oid;
 try{
  sql(`INSERT INTO auth.users(id) VALUES('${actor}'); INSERT INTO public.user_roles(user_id,role) VALUES('${actor}','admin');
  INSERT INTO public.brands(id,name) VALUES('concurrency','Test'); INSERT INTO public.categories(id,brand_id,name) VALUES('concurrency','concurrency','Test');
- INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('concurrency','concurrency','concurrency','Test',10000);`);
- const request=JSON.stringify({customer_name:'Concurrency test',phone:'3001234567',order_type:'pickup',payment_method:'cash',items:[{type:'product',product_id:'concurrency',quantity:1}]});
+ INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('${product}','concurrency','concurrency','Test',10000);`);
+ const request=JSON.stringify({customer_name:'Concurrency test',phone:'3001234567',order_type:'pickup',payment_method:'cash',items:[{type:'product',product_id:product,quantity:1}]});
  const quote=JSON.parse(sql(`SELECT public.order_quote('${request}')`));
  const create=`SELECT public.order_create('${request}','00000000-0000-0000-0000-000000000092','${quote.fingerprint}','${'d'.repeat(64)}')`;
  const creates=await Promise.all([concurrent(`BEGIN; ${create}; SELECT pg_sleep(0.2); COMMIT;`),concurrent(create)]);
@@ -26,5 +27,5 @@ try{
  console.log('Concurrent creation returns one order; concurrent status edits produce one success and one conflict.');
 }finally{
  if(oid)sql(`DELETE FROM public.order_events WHERE order_id='${oid}'; DELETE FROM public.order_items WHERE order_id='${oid}'; DELETE FROM public.orders WHERE id='${oid}';`);
- sql(`DELETE FROM public.products WHERE id='concurrency'; DELETE FROM public.categories WHERE id='concurrency'; DELETE FROM public.brands WHERE id='concurrency'; DELETE FROM public.user_roles WHERE user_id='${actor}'; DELETE FROM auth.users WHERE id='${actor}';`);
+ sql(`DELETE FROM public.products WHERE id='${product}'; DELETE FROM public.categories WHERE id='concurrency'; DELETE FROM public.brands WHERE id='concurrency'; DELETE FROM public.user_roles WHERE user_id='${actor}'; DELETE FROM auth.users WHERE id='${actor}';`);
 }

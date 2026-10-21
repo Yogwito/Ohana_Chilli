@@ -4,7 +4,7 @@
 Una migración de `supabase/migrations/2026100612*` falla a la mitad o la app falla tras aplicarla; tests SQL rojos.
 
 ## DETECCIÓN
-Salida de la migración; `node scripts/test-database.mjs`; `scripts/test-migration-scenarios.mjs`; `supabase/tests/verify-legacy.sql`, `legacy-sentinel.sql`.
+Salida de la migración; `node scripts/test-database.mjs`; `scripts/test-migration-scenarios.mjs`; `supabase/tests/verify-legacy.sql`, `legacy-sentinel.sql`, `prod-sentinel.sql`/`verify-prod-sentinel.sql` (escenario D: snapshot de producción).
 
 ## IMPACTO
 Esquema parcial; funciones RPC ausentes; pedidos fallan.

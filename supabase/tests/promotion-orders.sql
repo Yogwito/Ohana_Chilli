@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 BEGIN;
 INSERT INTO public.brands(id,name) VALUES('ohana','Ohana') ON CONFLICT DO NOTHING;
-INSERT INTO public.promotions(id,title,type,price_cents,is_active) VALUES('00000000-0000-0000-0000-000000001234','Combo canonical','combo',18000,true);
+INSERT INTO public.promotions(id,title,type,discount_type,price_cents,is_active) VALUES('00000000-0000-0000-0000-000000001234','Combo canonical','combo','fixed',18000,true);
 DO $$ DECLARE req jsonb; q jsonb; created jsonb; BEGIN
 req:='{"customer_name":"Test","phone":"3001234567","order_type":"pickup","payment_method":"cash","items":[{"type":"promotion","promotion_id":"00000000-0000-0000-0000-000000001234","quantity":2,"price":1}]}';
 q:=order_quote(req);

@@ -129,6 +129,10 @@ jobs:
         with:
           node-version: 22
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # Schema = supabase/migrations/20261005000000_prod_baseline.sql (prod snapshot, idempotent)
+      # + 20261006*. Scenario D in test-migration-scenarios restores the raw prod snapshot
+      # (supabase/baseline/prod_schema_*.sql, PG 17.6) and upgrades it. Server stays on 16 so
+      # the runner's pg_dump (restore-drill) is not older than the server.
       - run: node scripts/test-database.mjs
         env:
           TEST_DATABASE_URL: postgresql://postgres:isolated-ci-password@localhost:5432/ohana_ci

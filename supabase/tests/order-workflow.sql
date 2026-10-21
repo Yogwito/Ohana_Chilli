@@ -2,9 +2,9 @@
 BEGIN;
 INSERT INTO auth.users(id) VALUES ('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');
 INSERT INTO public.user_roles(user_id,role) VALUES('00000000-0000-0000-0000-000000000001','admin');
-INSERT INTO public.brands(id,name) VALUES('ohana','Ohana');
+INSERT INTO public.brands(id,name) VALUES('ohana','Ohana') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.categories(id,brand_id,name) VALUES('test-menu','ohana','Test');
-INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('test-product','ohana','test-menu','Producto de prueba',10000);
+INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('00000000-0000-0000-0000-0000000000a1','ohana','test-menu','Producto de prueba',10000);
 INSERT INTO public.ingredients(id,type,name,price_cents) VALUES('test-base','base','Arroz',0),('test-protein','protein','Pollo',0),('test-acc','acompanante','Maíz',0),('test-premium','protein','Premium',7000),('protein-proteina-adicional','protein','Proteína adicional',5000);
 INSERT INTO public.bowl_rules(size,name,price_cents,bases,proteins,accompaniments) VALUES('small','Pequeño',23900,1,1,4);
 INSERT INTO public.delivery_zones(id,name,fee_cents) VALUES('00000000-0000-0000-0000-000000000003','Test zone',3000);
@@ -12,9 +12,9 @@ INSERT INTO public.settings(key,value) VALUES('business_hours_enforce','false');
 
 DO $$ DECLARE req jsonb; q jsonb; result jsonb; oid uuid; online_id uuid; attempt jsonb; refund jsonb; count_before bigint; tracking jsonb; BEGIN
   IF has_table_privilege('anon','public.orders','SELECT') OR has_table_privilege('anon','public.orders','INSERT') OR has_table_privilege('authenticated','public.orders','UPDATE') THEN RAISE EXCEPTION 'direct access not revoked'; END IF;
-  IF has_function_privilege('anon','public.create_order_with_items(text,text,text,text,text,integer,text,integer,jsonb)','EXECUTE') OR has_function_privilege('authenticated','public.order_create(jsonb,uuid,text,text)','EXECUTE') THEN RAISE EXCEPTION 'public RPC bypass'; END IF;
+  IF EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='create_order_with_items' AND (has_function_privilege('anon',p.oid,'EXECUTE') OR has_function_privilege('authenticated',p.oid,'EXECUTE'))) OR has_function_privilege('authenticated','public.order_create(jsonb,uuid,text,text)','EXECUTE') THEN RAISE EXCEPTION 'public RPC bypass'; END IF;
   IF has_table_privilege('anon','public.order_refunds','SELECT') OR has_table_privilege('anon','public.payment_attempts','SELECT') OR has_table_privilege('anon','public.order_events','SELECT') THEN RAISE EXCEPTION 'financial data exposed'; END IF;
-  req := '{"customer_name":"Test Customer","phone":"3001234567","order_type":"delivery","payment_method":"cash","delivery_zone_id":"00000000-0000-0000-0000-000000000003","address":"Test address","items":[{"type":"product","product_id":"test-product","quantity":2,"unit_price_cents":1}]}'::jsonb;
+  req := '{"customer_name":"Test Customer","phone":"3001234567","order_type":"delivery","payment_method":"cash","delivery_zone_id":"00000000-0000-0000-0000-000000000003","address":"Test address","items":[{"type":"product","product_id":"00000000-0000-0000-0000-0000000000a1","quantity":2,"unit_price_cents":1}]}'::jsonb;
   q := public.order_quote(req);
   IF (q->>'total')::integer<>23000 THEN RAISE EXCEPTION 'forged price accepted'; END IF;
   BEGIN PERFORM public.order_create(req,gen_random_uuid(),'forged',repeat('a',64)); RAISE EXCEPTION 'bad quote accepted'; EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'quote_changed' THEN RAISE; END IF; END;
@@ -28,7 +28,7 @@ DO $$ DECLARE req jsonb; q jsonb; result jsonb; oid uuid; online_id uuid; attemp
   BEGIN PERFORM public.order_track(repeat('a',64)); RAISE EXCEPTION 'expired token accepted'; EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'tracking_not_found' THEN RAISE; END IF; END;
   UPDATE orders SET tracking_expires_at=now()+interval '30 days' WHERE id=oid;
   SELECT count(*) INTO count_before FROM orders;
-  BEGIN PERFORM public.order_create(jsonb_set(req,'{items}','[{"type":"product","product_id":"test-product","quantity":0}]'),gen_random_uuid(),q->>'fingerprint',repeat('b',64)); RAISE EXCEPTION 'invalid quantity accepted'; EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'invalid_quantity_or_notes' THEN RAISE; END IF; END;
+  BEGIN PERFORM public.order_create(jsonb_set(req,'{items}','[{"type":"product","product_id":"00000000-0000-0000-0000-0000000000a1","quantity":0}]'),gen_random_uuid(),q->>'fingerprint',repeat('b',64)); RAISE EXCEPTION 'invalid quantity accepted'; EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'invalid_quantity_or_notes' THEN RAISE; END IF; END;
   IF (SELECT count(*) FROM orders)<>count_before THEN RAISE EXCEPTION 'failed order did not roll back'; END IF;
   req:=jsonb_set(req,'{items}','[{"type":"custom-bowl","size":"small","quantity":1,"bases":["test-base"],"proteins":["test-protein"],"acompanantes":["test-acc","test-acc"],"extras":[{"ingredient_id":"test-protein","quantity":2,"source":"generic","tariff_id":"protein-proteina-adicional"}]}]');
   q:=public.order_quote(req);
@@ -91,11 +91,11 @@ ROLLBACK;
 BEGIN;
 INSERT INTO public.brands(id,name) VALUES('rollback','Test');
 INSERT INTO public.categories(id,brand_id,name) VALUES('rollback','rollback','Test');
-INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('rollback','rollback','rollback','Test',1000);
+INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('00000000-0000-0000-0000-0000000000a2','rollback','rollback','Test',1000);
 CREATE FUNCTION public.test_fail_order_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'forced_history_failure'; END $$;
 CREATE TRIGGER test_fail_order_event BEFORE INSERT ON public.order_events FOR EACH ROW EXECUTE FUNCTION public.test_fail_order_event();
 DO $$ DECLARE request jsonb; quote jsonb; before_count bigint; BEGIN
- request:='{"customer_name":"Rollback test","phone":"3001234567","order_type":"pickup","payment_method":"cash","items":[{"type":"product","product_id":"rollback","quantity":1}]}';
+ request:='{"customer_name":"Rollback test","phone":"3001234567","order_type":"pickup","payment_method":"cash","items":[{"type":"product","product_id":"00000000-0000-0000-0000-0000000000a2","quantity":1}]}';
  quote:=public.order_quote(request); SELECT count(*) INTO before_count FROM public.orders;
  BEGIN PERFORM public.order_create(request,gen_random_uuid(),quote->>'fingerprint',repeat('f',64)); RAISE EXCEPTION 'forced rollback not raised'; EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'forced_history_failure' THEN RAISE; END IF; END;
  IF (SELECT count(*) FROM public.orders)<>before_count OR EXISTS(SELECT 1 FROM public.order_items WHERE name='Test') THEN RAISE EXCEPTION 'partial order persisted'; END IF;
@@ -105,11 +105,11 @@ ROLLBACK;
 BEGIN;
 INSERT INTO public.brands(id,name) VALUES('payment-failure','Test');
 INSERT INTO public.categories(id,brand_id,name) VALUES('payment-failure','payment-failure','Test');
-INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('payment-failure','payment-failure','payment-failure','Test',1000);
+INSERT INTO public.products(id,brand_id,category_id,name,price_cents) VALUES('00000000-0000-0000-0000-0000000000a3','payment-failure','payment-failure','Test',1000);
 INSERT INTO auth.users(id) VALUES('00000000-0000-0000-0000-000000000088');
 INSERT INTO public.user_roles(user_id,role) VALUES('00000000-0000-0000-0000-000000000088','admin');
 DO $$ DECLARE request jsonb; quote jsonb; oid uuid; attempt jsonb; second jsonb; refund jsonb; BEGIN
- request:='{"customer_name":"Payment failure","phone":"3001234567","order_type":"pickup","payment_method":"online","items":[{"type":"product","product_id":"payment-failure","quantity":1}]}';
+ request:='{"customer_name":"Payment failure","phone":"3001234567","order_type":"pickup","payment_method":"online","items":[{"type":"product","product_id":"00000000-0000-0000-0000-0000000000a3","quantity":1}]}';
  quote:=public.order_quote(request);oid:=(public.order_create(request,gen_random_uuid(),quote->>'fingerprint',repeat('e',64))->>'id')::uuid;
  attempt:=public.order_payment_start(repeat('e',64),'test');
  PERFORM public.order_payment_apply(attempt->>'reference','rejected-id',100000,'COP','test','DECLINED','rejected-fixture');

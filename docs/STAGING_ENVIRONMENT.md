@@ -5,7 +5,7 @@ This file prepares a separate Supabase staging project. It never authorizes a pr
 ## Bootstrap order
 
 1. Create a separate project and a separate frontend deployment origin.
-2. Load the canonical baseline plus only additive migrations `20261006120000` through `20261006127000`; seed a sanitized catalog and synthetic staff/customer data.
+2. Load the prod baseline (`supabase/migrations/20261005000000_prod_baseline.sql`) plus only additive migrations `20261006120000` through `20261006127000`; seed a sanitized catalog and synthetic staff/customer data.
 3. Configure the Storage buckets and policies recorded in the configuration inventory. Upload only staging assets.
 4. Create the minimum staging admin account and assign `user_roles.role = 'admin'` by an approved administrative procedure.
 5. Deploy `order-api`, set only staging secrets, deploy the frontend, and keep both online-payment flags `false`.

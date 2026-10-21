@@ -5,7 +5,7 @@ This runbook is a plan, not evidence that an environment has been configured. It
 ## Preconditions
 
 1. Record the production project ref, database major version, active migration versions, RLS/grants/functions snapshot, `public` schema CREATE/USAGE privileges, Realtime publication membership, Storage buckets/object count, Edge function deployment revision and environment-secret inventory. Use `supabase/tests/live-audit.sql` through an administrative **read-only** connection; save schema metadata only, never customer rows or secrets. Any `anon` or `authenticated` CREATE privilege on `public` is a blocker until deliberately revoked and re-audited.
-2. Compare that snapshot to `supabase/baseline/catalog.sql` plus migrations. Resolve every drift item in an additive migration or a documented exception. Do not run historical migrations on a populated project: historical files include destructive catalog/order rebuilds and are not a production rollout mechanism.
+2. Compare that snapshot to `supabase/baseline/prod_schema_2026-10-20.sql` / `supabase/migrations/20261005000000_prod_baseline.sql` plus migrations. Resolve every drift item in an additive migration or a documented exception. Do not run historical migrations on a populated project: historical files include destructive catalog/order rebuilds and are not a production rollout mechanism.
    Record the live counts for invalid historical order amounts, states and item quantities from the audit output. The additive `NOT VALID` constraints protect new writes; they do not clean or validate pre-existing anomalies.
 3. Complete the backup and isolated restore gate in `BACKUP_RESTORE.md`. A database dump alone is insufficient because Storage object bytes and project/function configuration are outside it.
 4. Create an independent staging Supabase project. Use its own URL, publishable key, Auth users, Storage bucket, Edge secrets, Turnstile test credentials, monitoring endpoint, scheduler secret and backup destination. Payments remain disabled.
@@ -13,7 +13,7 @@ This runbook is a plan, not evidence that an environment has been configured. It
 ## Staging build order
 
 1. Load a sanitized catalog and synthetic users/orders into staging. Do not clone customer data unless an approved retention and masking procedure is used.
-2. Apply only the additive migrations from `20261006120000_authoritative_orders.sql` through `20261006127000_operational_retention.sql`, in timestamp order. Capture `supabase_migrations.schema_migrations` before and after.
+2. Apply `20261005000000_prod_baseline.sql` on an empty staging project (or restore the prod schema snapshot), then only the additive migrations from `20261006120000_authoritative_orders.sql` through `20261006127000_operational_retention.sql`, in timestamp order. Capture `supabase_migrations.schema_migrations` before and after.
 3. Regenerate `src/integrations/supabase/types.ts` from the migrated staging schema and compare it to the committed generated file. A mismatch is a release blocker.
 4. Deploy `order-api` with production payments disabled. Configure `APP_ORIGIN` to the staging application origin, a trusted ingress-only rate header, a random rate-limit secret, staging Turnstile secret, reconciliation secret, and monitoring. Verify the function’s secret inventory without printing values.
 5. Apply the reconciliation schedule only after the Edge function and secrets are verified. Confirm one scheduled invocation manually and inspect its status without logging body data.
