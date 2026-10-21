@@ -45,6 +45,7 @@ import { formatBowlSummary } from '@/domain/bowlSummary';
 import { formatProductCustomizationLines } from '@/domain/productCustomizations';
 import { findDeliveryZoneByIdOrName } from '@/domain/deliveryZones';
 import { buildPlatformWhatsAppUrl, generateWhatsAppMessage, openWhatsAppHandoff } from '@/domain/whatsapp';
+import { buildOrderItemsPayload } from '@/domain/orderPayload';
 import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { AnimatedElement } from '@/components/ui/AnimatedElement';
@@ -294,32 +295,10 @@ export default function CheckoutPage() {
       }
 
       const finalOrderTotal = orderSubtotal + resolvedDeliveryFeeCents;
-      const orderItems = cart.items.map((item) => ({
-        brand_id: item.brand,
-        name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
-        quantity: item.quantity,
-        unit_price_cents: item.unitPrice,
-        details:
-          item.type === 'custom-bowl' && item.customBowl
-            ? {
-                size: item.customBowl.size.name,
-                bases: item.customBowl.bases.map((b) => b.name),
-                proteins: item.customBowl.proteins.map((p) => p.name),
-                acompanantes: item.customBowl.acompanantes.map((a) => a.name),
-                sauces: item.customBowl.sauces?.map((s) => s.name),
-                complementos: item.customBowl.complementos?.map((c) => c.name),
-                notes: item.notes,
-              }
-            : {
-                product_id: item.product?.id,
-                notes: item.notes,
-                customizations: item.customizations ?? null,
-              },
-      }));
+      const orderItems = buildOrderItemsPayload(cart.items);
 
       // create_order_with_items keeps order + order_items inserts atomic.
-      // It's SECURITY INVOKER — anon inserts are already allowed by RLS
-      // (orders/order_items have public FOR INSERT WITH CHECK (true) policies).
+      // SECURITY DEFINER en prod: recalcula precios en el servidor y rechaza discrepancias.
       const { data: createdOrderId, error: createOrderError } = await supabase.rpc(
         'create_order_with_items',
         {
