@@ -21,11 +21,18 @@ END $$;
 REVOKE ALL ON FUNCTION public.order_financial_attention() FROM PUBLIC,anon,authenticated;
 CREATE TRIGGER orders_financial_attention BEFORE UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.order_financial_attention();
 -- Existing cancelled/paid snapshots retain their states and gain a durable review incident.
-UPDATE public.orders SET financial_attention_at=NULL WHERE status='cancelled' AND payment_state='paid' AND financial_attention_at IS NULL;
+-- Explicit now() (not via the trigger) and an explicit, attributable incident event.
+WITH flagged AS (
+  UPDATE public.orders SET financial_attention_at=now(), financial_acknowledged_at=NULL, financial_resolved_at=NULL
+  WHERE status='cancelled' AND payment_state='paid' AND financial_attention_at IS NULL
+  RETURNING id
+)
+INSERT INTO public.order_events(order_id,kind,data)
+SELECT id,'financial_attention_required',jsonb_build_object('reason','cancelled_paid','source','migration_backfill') FROM flagged;
 CREATE OR REPLACE FUNCTION public.order_action(p_id uuid,p_version integer,p_action text,p_note text DEFAULT '') RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE o orders%ROWTYPE; next_status text; BEGIN
-  IF NOT has_role(auth.uid(),'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
+  IF NOT has_role(_user_id => auth.uid(), _role => 'admin') THEN RAISE EXCEPTION 'forbidden'; END IF;
   SELECT * INTO o FROM orders WHERE id=p_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'not_found'; END IF;
   IF o.version<>p_version THEN RAISE EXCEPTION 'version_conflict'; END IF;
