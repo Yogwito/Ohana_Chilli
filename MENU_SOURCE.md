@@ -45,3 +45,9 @@ Todas las vistas deben formatear precios con:
 - `src/domain/formatPrice.ts`
 
 Nunca se debe multiplicar por 100 ni dividir por 100 en frontend para productos, bowls, ordenes o domicilios.
+
+## Imagenes de productos
+
+La URL principal viene de `products.image_url`. Las fotos locales que sustituyen imagenes genericas o incorrectas se asignan por ID en `src/domain/productImages.ts` y viven en `public/images/`. Las tarjetas y el detalle muestran la imagen completa con `object-contain` para no cortar botellas ni platos.
+
+Auditoria de staging del 21 de octubre de 2026: 39 productos activos, 12 con imagen local y 27 con archivo publico de Supabase Storage. Los 27 objetos remotos existen y tienen contenido; no hay productos activos sin imagen resuelta.

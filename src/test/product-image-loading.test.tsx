@@ -52,6 +52,9 @@ describe('ProductImage loading', () => {
       );
     });
 
-    expect(screen.getByRole('img', { name: product.name })).toHaveAttribute('src', product.imageUrl);
+    const image = screen.getByRole('img', { name: product.name });
+    expect(image).toHaveAttribute('src', product.imageUrl);
+    expect(image).toHaveClass('object-contain');
+    expect(image).not.toHaveClass('group-hover:scale-105');
   });
 });

@@ -71,7 +71,6 @@ export default function ProductCard({ product, variant = 'default', categoryName
             product={product}
             ratio={1}
             className="rounded-lg"
-            imageClassName="group-hover:scale-105"
             fallbackClassName="rounded-lg"
           />
         </div>
@@ -100,7 +99,6 @@ export default function ProductCard({ product, variant = 'default', categoryName
         <ProductImage
           product={product}
           ratio={4 / 3}
-          imageClassName="group-hover:scale-105"
         />
 
         <div className="flex flex-col flex-1 p-4 gap-2">

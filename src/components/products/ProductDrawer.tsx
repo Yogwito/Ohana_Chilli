@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { formatPrice } from '@/domain/formatPrice';
-import { resolveProductImageUrl, shouldContainProductImage } from '@/domain/productImages';
+import { resolveProductImageUrl } from '@/domain/productImages';
 import { cn } from '@/lib/utils';
 import type { Product, ProductCustomization } from '@/types';
 
@@ -102,7 +102,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
             <img
               src={resolveProductImageUrl(product)}
               alt={product.name}
-              className={cn('w-full h-40 object-cover rounded-t-2xl sm:rounded-none', shouldContainProductImage(product) && 'object-contain')}
+              className="w-full h-40 object-contain bg-white p-2 rounded-t-2xl sm:rounded-none"
             />
           )}
 

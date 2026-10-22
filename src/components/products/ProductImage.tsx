@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PRODUCT_IMAGE_PLACEHOLDER_SRC, getProductImageFallbackInitial, resolveProductImageUrl, shouldContainProductImage } from '@/domain/productImages';
+import { PRODUCT_IMAGE_PLACEHOLDER_SRC, getProductImageFallbackInitial, resolveProductImageUrl } from '@/domain/productImages';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/types';
 
@@ -9,14 +9,12 @@ interface ProductImageProps {
   product: Product;
   ratio?: number;
   className?: string;
-  imageClassName?: string;
   fallbackClassName?: string;
 }
 
 function ProductImageContent({
   product,
   className,
-  imageClassName,
   fallbackClassName,
 }: Omit<ProductImageProps, 'ratio'>) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,7 +55,7 @@ function ProductImageContent({
   }, [resolvedImageUrl]);
 
   return (
-    <div ref={containerRef} className={cn('relative h-full w-full overflow-hidden bg-brand-muted', className)}>
+    <div ref={containerRef} className={cn('relative h-full w-full overflow-hidden bg-white', className)}>
       {showImage ? (
         <>
           {!isLoaded ? <Skeleton className="absolute inset-0 rounded-none" /> : null}
@@ -73,10 +71,8 @@ function ProductImageContent({
                 setIsLoaded(false);
               }}
               className={cn(
-                'h-full w-full object-cover transition-all duration-300',
-                shouldContainProductImage(product) && 'object-contain',
-                isLoaded ? 'opacity-100 group-hover:scale-105' : 'opacity-0',
-                imageClassName,
+                'h-full w-full object-contain p-2 transition-opacity duration-300',
+                isLoaded ? 'opacity-100' : 'opacity-0',
               )}
             />
           ) : null}
@@ -102,7 +98,6 @@ export default function ProductImage({
   product,
   ratio = 4 / 3,
   className,
-  imageClassName,
   fallbackClassName,
 }: ProductImageProps) {
   return (
@@ -110,7 +105,6 @@ export default function ProductImage({
       <ProductImageContent
         product={product}
         className={className}
-        imageClassName={imageClassName}
         fallbackClassName={fallbackClassName}
       />
     </AspectRatio>
