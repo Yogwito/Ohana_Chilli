@@ -18,7 +18,7 @@ import {
 } from '@/domain/bowlPricing';
 import { formatGroupedIngredients } from '@/domain/bowlSummary';
 import { formatPrice } from '@/domain/formatPrice';
-import { getAdditionalIngredientImageUrl } from '@/domain/productImages';
+import { getAdditionalIngredientImageUrl, resolveProductImageUrl, shouldContainProductImage } from '@/domain/productImages';
 import { cn } from '@/lib/utils';
 import type { BowlBuilderStep, BowlSizeRule, CustomBowl, Ingredient, Product } from '@/types';
 
@@ -1584,8 +1584,8 @@ export default function BowlBuilder({ onComplete }: BowlBuilderProps) {
                         const inCart = cart.items.some(item => item.type === 'product' && item.product?.id === drink.id);
                         return (
                           <div key={drink.id} className="snap-start shrink-0 w-32 md:w-auto">
-                            {drink.imageUrl ? (
-                              <img src={drink.imageUrl} alt={drink.name} className="w-full h-20 object-cover rounded-lg" />
+                            {resolveProductImageUrl(drink) ? (
+                              <img src={resolveProductImageUrl(drink)} alt={drink.name} className={cn('w-full h-20 object-cover rounded-lg', shouldContainProductImage(drink) && 'object-contain')} />
                             ) : (
                               <div className="w-full h-20 bg-brand/20 rounded-lg" />
                             )}

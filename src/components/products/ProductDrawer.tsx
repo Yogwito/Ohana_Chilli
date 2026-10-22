@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProductDefaultIngredients } from '@/hooks/use-catalog';
 import { formatPrice } from '@/domain/formatPrice';
+import { resolveProductImageUrl, shouldContainProductImage } from '@/domain/productImages';
 import { cn } from '@/lib/utils';
 import type { Product, ProductCustomization } from '@/types';
 
@@ -97,11 +98,11 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           {/* Product image */}
-          {product.imageUrl && (
+          {resolveProductImageUrl(product) && (
             <img
-              src={product.imageUrl}
+              src={resolveProductImageUrl(product)}
               alt={product.name}
-              className="w-full h-40 object-cover rounded-t-2xl sm:rounded-none"
+              className={cn('w-full h-40 object-cover rounded-t-2xl sm:rounded-none', shouldContainProductImage(product) && 'object-contain')}
             />
           )}
 

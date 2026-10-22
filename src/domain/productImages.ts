@@ -18,6 +18,7 @@ const KNOWN_BAD_PRODUCT_IMAGE_IDS = new Set<string>([
 // ID-based overrides: local images take priority over any Supabase image_url.
 // Used for products whose catalog image_url points to a generic/incorrect stock photo.
 const PRODUCT_IMAGE_OVERRIDES: Record<string, string> = {
+  'd631af2e-93d7-44a9-0789-7cf0c824e773': '/images/products/bretana.webp',            // Bretaña 300 ml
   '23e44c1b-fe27-251a-0759-74f798d65e53': '/images/adicionales/03_guacamole.webp',     // Guacamole
   '3d9f5e71-d95c-7b13-5898-33a0c9e8e04e': '/images/adicionales/04_papas_francesa.webp', // Papa Francesa
   '978c1802-ff11-1e54-8ea9-7995664d91a9': '/images/adicionales/05_pepinillos.webp',      // Pepinillos
@@ -26,9 +27,17 @@ const PRODUCT_IMAGE_OVERRIDES: Record<string, string> = {
   '7e9a2544-4712-8633-f844-0766c82a2a01': '/images/adicionales/06_tocineta.webp',        // Tocineta
 };
 
+const PORTRAIT_PRODUCT_IMAGE_IDS = new Set<string>([
+  'd631af2e-93d7-44a9-0789-7cf0c824e773',
+]);
+
 type ProductImageSource = Pick<Product, 'id' | 'imageUrl'>;
 
 export const PRODUCT_IMAGE_PLACEHOLDER_SRC = '/placeholder.svg';
+
+export function shouldContainProductImage(product: Pick<Product, 'id'>): boolean {
+  return PORTRAIT_PRODUCT_IMAGE_IDS.has(product.id);
+}
 
 export function resolveProductImageUrl(product: ProductImageSource): string | undefined {
   if (PRODUCT_IMAGE_OVERRIDES[product.id]) {

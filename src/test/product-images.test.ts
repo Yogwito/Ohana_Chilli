@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveProductImageUrl } from '@/domain/productImages';
+import { resolveProductImageUrl, shouldContainProductImage } from '@/domain/productImages';
 
 describe('product image resolution', () => {
   it('rejects legacy bare filenames that do not exist in the public app', () => {
@@ -50,5 +50,15 @@ describe('product image resolution', () => {
       id: '12135ae7-32db-9903-7179-f48581e8b8cc',
       imageUrl: 'https://images.unsplash.com/placeholder?w=400&q=80',
     })).toBe('/images/adicionales/02_queso_frito.webp');
+  });
+
+  it('uses the local Bretaña photo and keeps the full bottle visible', () => {
+    const bretana = {
+      id: 'd631af2e-93d7-44a9-0789-7cf0c824e773',
+      imageUrl: 'https://example.com/old-bretana.webp',
+    };
+
+    expect(resolveProductImageUrl(bretana)).toBe('/images/products/bretana.webp');
+    expect(shouldContainProductImage(bretana)).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PRODUCT_IMAGE_PLACEHOLDER_SRC, getProductImageFallbackInitial, resolveProductImageUrl } from '@/domain/productImages';
+import { PRODUCT_IMAGE_PLACEHOLDER_SRC, getProductImageFallbackInitial, resolveProductImageUrl, shouldContainProductImage } from '@/domain/productImages';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/types';
 
@@ -74,6 +74,7 @@ function ProductImageContent({
               }}
               className={cn(
                 'h-full w-full object-cover transition-all duration-300',
+                shouldContainProductImage(product) && 'object-contain',
                 isLoaded ? 'opacity-100 group-hover:scale-105' : 'opacity-0',
                 imageClassName,
               )}
