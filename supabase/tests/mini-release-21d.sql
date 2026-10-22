@@ -37,6 +37,8 @@ BEGIN
     flavored.price_cents+flavor.price_delta_cents,jsonb_build_array(item));
   PERFORM public.create_order_with_items('Prueba 21d','3001234567','pickup',NULL,NULL,0,NULL,
     simple.price_cents,jsonb_build_array(item_other));
+  PERFORM public.create_order_with_items('Prueba 21d','3001234567','pickup',NULL,NULL,0,NULL,
+    10*simple.price_cents,jsonb_build_array(jsonb_set(item_other,'{quantity}','10'::jsonb)));
 
   BEGIN
     PERFORM public.create_order_with_items('Prueba 21d','3001234567','pickup',NULL,NULL,0,NULL,
@@ -82,6 +84,10 @@ BEGIN
   open_hours := (SELECT jsonb_agg(jsonb_build_object('open','00:00','close','23:59')) FROM generate_series(0,6));
   INSERT INTO public.settings(key,value) VALUES ('business_hours_weekly','[null,null,null,null,null,null,null]')
   ON CONFLICT(key) DO UPDATE SET value=excluded.value;
+  UPDATE public.settings SET value='false' WHERE key='business_hours_enforce';
+  -- Closed schedule is allowed while server enforcement is disabled.
+  PERFORM public.create_order_with_items('Prueba 21d','3001234567','pickup',NULL,NULL,0,NULL,
+    simple.price_cents,jsonb_build_array(item_other));
   UPDATE public.settings SET value='true' WHERE key='business_hours_enforce';
   BEGIN
     PERFORM public.create_order_with_items('Prueba 21d','3001234567','pickup',NULL,NULL,0,NULL,
@@ -94,6 +100,6 @@ BEGIN
   UPDATE public.settings SET value=open_hours::text WHERE key='business_hours_weekly';
   PERFORM public.create_order_with_items('Prueba 21d','3001234567','pickup',NULL,NULL,0,NULL,
     simple.price_cents,jsonb_build_array(item_other));
-  RAISE NOTICE '21d: sabor, variante ajena, horario cerrado/abierto y límite 10 verificados';
+  RAISE NOTICE '21d: sabor, variante ajena, horario cerrado con flag on/off, abierto y límite 10 verificados';
 END $test$;
 ROLLBACK;

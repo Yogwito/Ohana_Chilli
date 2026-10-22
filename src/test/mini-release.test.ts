@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateProductUnitPrice, getProductCustomizationKey, normalizeProductCustomization } from '@/domain/productCustomizations';
-import { getBusinessOpenStatus } from '@/domain/businessHours';
+import { getBusinessOpenStatus, shouldBlockOrderSend } from '@/domain/businessHours';
 import { mapPublicCatalogResponse } from '@/domain/publicCatalog';
 import { reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
 import { applyQuantityReviewIssues, CART_QUANTITY_LIMIT_MESSAGE } from '@/domain/cartCatalogSync';
@@ -20,6 +20,13 @@ describe('mini release', () => {
     expect(getBusinessOpenStatus(schedule, new Date('2026-10-20T14:00:00Z')).message).toBe('Estamos cerrados. Abrimos hoy a las 11:00');
     expect(getBusinessOpenStatus(schedule, new Date('2026-10-20T17:00:00Z')).isOpen).toBe(true);
     expect(getBusinessOpenStatus(schedule, new Date('2026-10-20T03:00:00Z')).message).toBe('Estamos cerrados. Abrimos mañana a las 11:00');
+  });
+
+  it('blocks the customer UI from configured hours even when server enforcement is off', () => {
+    const schedule = [null, { open: '11:00', close: '21:00' }, null, null, null, null, null];
+    const isOpen = getBusinessOpenStatus(schedule, new Date('2026-10-20T14:00:00Z')).isOpen;
+    expect(shouldBlockOrderSend(isOpen, true, false)).toBe(true);
+    expect(shouldBlockOrderSend(isOpen, false, false)).toBe(false);
   });
 
   it('maps active flavors and keeps a saved flavorless cart line for repair', () => {

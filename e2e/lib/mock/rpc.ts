@@ -1,4 +1,4 @@
-// Port JS de supabase/hotfix/2026-10-22d_checkout_rules.sql (misma lógica y mensajes),
+// Port JS de supabase/hotfix/2026-10-21d.sql (misma lógica y mensajes),
 // usado SOLO en E2E_MOCK=1. Si la SQL cambia, actualiza esto.
 import type { OrderRow, Row, Tables } from '../types';
 import { randomUUID } from 'node:crypto';

@@ -50,4 +50,4 @@ Nunca se debe multiplicar por 100 ni dividir por 100 en frontend para productos,
 
 La URL principal viene de `products.image_url`. Las fotos locales que sustituyen imagenes genericas o incorrectas se asignan por ID en `src/domain/productImages.ts` y viven en `public/images/`. Las tarjetas y el detalle muestran la imagen completa con `object-contain` para no cortar botellas ni platos.
 
-Auditoria de staging del 21 de octubre de 2026: 39 productos activos, 12 con imagen local y 27 con archivo publico de Supabase Storage. Los 27 objetos remotos existen y tienen contenido; no hay productos activos sin imagen resuelta.
+Auditoria de staging del 21 de octubre de 2026: 39 productos activos, 11 con imagen local y 27 con archivo publico de Supabase Storage. TERIYAKI queda pendiente de foto real; no incluir una imagen generada en producción. Hasta cargar la foto aprobada, muestra el fallback del producto.

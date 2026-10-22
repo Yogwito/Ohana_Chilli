@@ -16,7 +16,7 @@ Los pedidos de prueba se llaman `E2E-TEST-<run>-<escenario>-<mobile|desktop>` y 
 
 ## Requisito previo
 
-Staging debe tener aplicada la migración `20261022100000_public_catalog_variants.sql` y la RPC `2026-10-22d_checkout_rules.sql`. La suite comprueba sabores, horario y límite, además de los casos de 21c. El escenario de horario cerrado cambia dos settings de staging y los restaura al terminar; ejecútala sin otros cambios de horario simultáneos.
+Staging debe tener aplicada la migración `20261022100000_public_catalog_variants.sql` y la RPC `2026-10-21d.sql`. La suite comprueba sabores, horario y límite, además de los casos de 21c. El escenario de horario cerrado cambia dos settings de staging y los restaura al terminar; ejecútala sin otros cambios de horario simultáneos.
 
 ## Pasos para el dueño (zsh, un comando por línea, pégalos de a uno)
 

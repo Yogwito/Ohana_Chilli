@@ -18,6 +18,7 @@ interface OrderRow {
   total_cents: number;
   status: string;
   created_at: string;
+  items?: { name: string; quantity: number; unit_price_cents: number }[];
 }
 
 const statusConfig: Record<string, { label: string; icon: ReactNode; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -56,7 +57,27 @@ export default function OrdersPage() {
         return;
       }
 
-      setOrders((data ?? []) as OrderRow[]);
+      const orderRows = (data ?? []) as OrderRow[];
+      const ids = orderRows.map((order) => order.id);
+      if (ids.length) {
+        const { data: itemRows, error: itemsError } = await supabase
+          .from('order_items')
+          .select('order_id, name, quantity, unit_price_cents')
+          .in('order_id', ids);
+        if (itemsError) {
+          console.error('Error fetching order items:', itemsError);
+          setLoading(false);
+          return;
+        }
+        const itemsByOrder = new Map<string, NonNullable<OrderRow['items']>>();
+        for (const item of itemRows ?? []) {
+          const items = itemsByOrder.get(item.order_id) ?? [];
+          items.push({ name: item.name, quantity: item.quantity, unit_price_cents: item.unit_price_cents });
+          itemsByOrder.set(item.order_id, items);
+        }
+        for (const order of orderRows) order.items = itemsByOrder.get(order.id) ?? [];
+      }
+      setOrders(orderRows);
       setLoading(false);
     };
 
@@ -129,6 +150,16 @@ export default function OrdersPage() {
 
                   {order.address && <p className="text-xs text-muted-foreground">{order.address}</p>}
                   {order.notes && <p className="text-xs text-muted-foreground">{order.notes}</p>}
+                  {order.items && order.items.length > 0 && (
+                    <ul className="space-y-1 border-t pt-3 text-sm">
+                      {order.items.map((item, index) => (
+                        <li key={`${order.id}-${index}`} className="flex justify-between gap-4">
+                          <span>{item.quantity}× {item.name}</span>
+                          <span className="shrink-0 text-muted-foreground">{formatPrice(item.unit_price_cents * item.quantity)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               );
             })}

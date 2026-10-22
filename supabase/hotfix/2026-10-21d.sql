@@ -3,7 +3,7 @@
 -- y (2) salsa "adicional/extra" con precio 0 cobrada 3000 como en bowlPricing.ts (21b cobraba 2000).
 -- CREATE OR REPLACE, misma firma de 10 args y mismos grants. Sigue sin confiar en precios del cliente
 -- salvo el caso legacy, donde el recargo declarado debe ser EXACTAMENTE el de un ingrediente activo del mismo tipo.
--- Rollback: 2026-10-21c_bowl_legacy_extras_ROLLBACK.sql (vuelve a 21b, lo que hay hoy en prod).
+-- Rollback: 2026-10-21d_ROLLBACK.sql (restaura 21c y deja el flag horario apagado).
 -- Guardia: aborta si la función vigente no es 21b ni 21c, o si hay sobrecargas.
 BEGIN;
 DO $$

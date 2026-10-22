@@ -1,4 +1,4 @@
--- Restores 21c RPC; keeps configured schedule and flag. Disable flag before rollback if needed.
+-- Restores 21c RPC and disables enforcement; the weekly schedule is preserved.
 -- HOTFIX 2026-10-21c: 21b + (1) extras de carritos guardados antes de 527c185 (sin source_id)
 -- y (2) salsa "adicional/extra" con precio 0 cobrada 3000 como en bowlPricing.ts (21b cobraba 2000).
 -- CREATE OR REPLACE, misma firma de 10 args y mismos grants. Sigue sin confiar en precios del cliente

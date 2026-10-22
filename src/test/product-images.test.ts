@@ -30,7 +30,6 @@ describe('product image resolution', () => {
 
   it('replaces hidden catalog photos with product-specific local images', () => {
     const replacements = {
-      'be1fa199-5029-433f-7ccf-8fce38116665': '/images/products/bowl-teriyaki.webp',
       '1232c37b-9b66-78d2-43af-285c23ddcd7b': '/images/products/salchipapa.webp',
       '446beb63-71b7-7242-3797-db75472451d9': '/images/products/hamburguesa-veggie.webp',
       'edfc2bdb-d986-d364-5080-a7868f942bf4': '/images/products/bowl-veggie.webp',
@@ -43,6 +42,13 @@ describe('product image resolution', () => {
         imageUrl: 'https://images.unsplash.com/placeholder?w=400&q=80',
       })).toBe(expectedUrl);
     }
+  });
+
+  it('keeps TERIYAKI without an image until its real photo is available', () => {
+    expect(resolveProductImageUrl({
+      id: 'be1fa199-5029-433f-7ccf-8fce38116665',
+      imageUrl: 'https://images.unsplash.com/generated-teriyaki.webp',
+    })).toBeUndefined();
   });
 
   it('uses optimized local WebP overrides instead of external placeholders', () => {

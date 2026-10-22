@@ -17,7 +17,7 @@ safe_staging_psql -f supabase/hotfix/2026-10-21b_bowl_surcharge.sql
 safe_staging_psql -f supabase/hotfix/verify_rpc_version.sql
 safe_staging_psql -f supabase/hotfix/2026-10-21c_bowl_legacy_extras.sql
 safe_staging_psql -f supabase/hotfix/verify_rpc_version.sql
-safe_staging_psql -f supabase/hotfix/2026-10-22d_checkout_rules.sql
+safe_staging_psql -f supabase/hotfix/2026-10-21d.sql
 safe_staging_psql -f supabase/hotfix/verify_rpc_version.sql
 safe_staging_psql -f supabase/tests/mini-release-21d.sql
 safe_staging_psql -f supabase/tests/bowl-complex.sql
@@ -42,7 +42,7 @@ La E2E tiene una guardia que aborta si `.env.local`, `.env.development*` o varia
 Rollback de staging, en orden inverso, si hace falta:
 
 ```zsh
-safe_staging_psql -f supabase/hotfix/2026-10-22d_checkout_rules_ROLLBACK.sql
+safe_staging_psql -f supabase/hotfix/2026-10-21d_ROLLBACK.sql
 safe_staging_psql -f supabase/hotfix/2026-10-21c_bowl_legacy_extras_ROLLBACK.sql
 safe_staging_psql -f supabase/hotfix/2026-10-21b_bowl_surcharge_ROLLBACK.sql
 safe_staging_psql -f supabase/hotfix/2026-10-22_public_catalog_variants_ROLLBACK.sql
@@ -88,7 +88,7 @@ npx wrangler pages deploy dist --project-name ohana-bowls --branch main
 Entonces:
 
 ```zsh
-safe_prod_psql -f supabase/hotfix/2026-10-22d_checkout_rules.sql
+safe_prod_psql -f supabase/hotfix/2026-10-21d.sql
 safe_prod_psql -f supabase/hotfix/verify_rpc_version.sql
 safe_prod_psql -Atc "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='create_order_with_items'"
 ```
@@ -96,7 +96,7 @@ safe_prod_psql -Atc "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid
 Rollback de cada paso: 21d vuelve a 21c y apaga el flag; 21c vuelve a 21b; 21b vuelve a 21. Revierte el frontend a `527c185` **antes** de retirar la clave de variantes del catálogo. Verifica `count=1` después de cada SQL y comprueba un pedido de prueba/WhatsApp.
 
 ```zsh
-safe_prod_psql -f supabase/hotfix/2026-10-22d_checkout_rules_ROLLBACK.sql
+safe_prod_psql -f supabase/hotfix/2026-10-21d_ROLLBACK.sql
 safe_prod_psql -f supabase/hotfix/verify_rpc_version.sql
 safe_prod_psql -f supabase/hotfix/2026-10-21c_bowl_legacy_extras_ROLLBACK.sql
 safe_prod_psql -f supabase/hotfix/verify_rpc_version.sql

@@ -8,13 +8,13 @@ const BARE_FILENAME_RE = /^[^/]+\.(png|jpe?g|webp|avif|gif|svg)$/i;
 // Product-specific overrides live here until catalog images are fully managed in admin.
 const KNOWN_BAD_PRODUCT_IMAGE_IDS = new Set<string>([
   'chilli-burger-veggie',
+  'be1fa199-5029-433f-7ccf-8fce38116665', // TERIYAKI: foto real pendiente; no publicar imagen generada.
 ]);
 
 // ID-based overrides: local images take priority over any Supabase image_url.
 // Used for products whose catalog image_url points to a generic/incorrect stock photo.
 const PRODUCT_IMAGE_OVERRIDES: Record<string, string> = {
   'd631af2e-93d7-44a9-0789-7cf0c824e773': '/images/products/bretana.webp',            // Bretaña 300 ml
-  'be1fa199-5029-433f-7ccf-8fce38116665': '/images/products/bowl-teriyaki.webp',       // TERIYAKI bowl
   '1232c37b-9b66-78d2-43af-285c23ddcd7b': '/images/products/salchipapa.webp',         // Salchipapa
   '446beb63-71b7-7242-3797-db75472451d9': '/images/products/hamburguesa-veggie.webp', // VEGGIE burger
   'edfc2bdb-d986-d364-5080-a7868f942bf4': '/images/products/bowl-veggie.webp',         // VEGGIE bowl

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { getBusinessOpenStatus, parseWeeklyHours } from '@/domain/businessHours';
+import { getBusinessOpenStatus, parseWeeklyHours, shouldBlockOrderSend } from '@/domain/businessHours';
 import { supabase } from '@/integrations/supabase/client';
 import {
   EMPTY_BUSINESS_SETTINGS,
@@ -210,7 +210,7 @@ export function useBusinessOpenStatus() {
   return {
     isOpen,
     isEnforced,
-    isClosed: isEnforced && isOpen === false,
+    isClosed: shouldBlockOrderSend(isOpen, schedule !== null, isEnforced),
     hoursConfigured: isOpen !== null,
     weeklyConfigured: schedule !== null,
     message: status.message ?? (isEnforced && !schedule ? 'Estamos cerrados. Horario de atención sin configurar' : null),

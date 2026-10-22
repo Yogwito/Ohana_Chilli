@@ -1,6 +1,10 @@
 export interface DailyHours { open: string; close: string }
 export type WeeklyHours = (DailyHours | null)[];
 
+export function shouldBlockOrderSend(isOpen: boolean | null, weeklyScheduleConfigured: boolean, enforcementEnabled: boolean): boolean {
+  return isOpen === false && (weeklyScheduleConfigured || enforcementEnabled);
+}
+
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export function parseWeeklyHours(value: string | null | undefined): WeeklyHours | null {
