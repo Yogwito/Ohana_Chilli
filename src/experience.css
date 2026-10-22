@@ -236,7 +236,11 @@
 .hero-line-mask {
   display: block;
   overflow: hidden;
+  padding-top: 0.16em;
+  padding-right: 0.05em;
   padding-bottom: 0.085em;
+  margin-top: -0.16em;
+  margin-right: -0.05em;
   margin-bottom: -0.01em;
 }
 .hero-line-mask > span {
