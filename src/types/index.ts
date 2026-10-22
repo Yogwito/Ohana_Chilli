@@ -58,7 +58,10 @@ export interface Product {
   isGlutenFree?: boolean;
   isPopular?: boolean;
   isNew?: boolean;
+  variants?: ProductVariant[];
 }
+
+export interface ProductVariant { id: string; name: string; priceDelta: number; }
 
 // Product Modifier
 export interface Modifier {
@@ -80,6 +83,7 @@ export interface ProductCustomization {
   extras: ProductCustomizationExtra[];
   note: string;
   extraTotal: number;
+  variant?: ProductVariant;
 }
 
 // Custom Bowl Type
@@ -106,6 +110,7 @@ export interface CartItem {
   notes?: string;
   unitPrice: number;
   totalPrice: number;
+  reviewIssues?: string[];
 }
 
 // Cart State

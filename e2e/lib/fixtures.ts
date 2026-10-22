@@ -5,7 +5,7 @@ import { PROD_REF } from './guard.mjs';
 import { ARTIFACTS, MOCK, readDiscovery, type Discovery } from './data';
 import { mockTables } from './mock/fixtures';
 import { installSupabaseMock } from './mock/router';
-import type { OrderRow, Row } from './types';
+import type { OrderRow, Row, Tables } from './types';
 
 export interface WaCapture { url: string; text: string | null; via: string }
 
@@ -24,6 +24,7 @@ export interface Ctx {
   /** create_order_with_items vistos desde el navegador (staging y mock). */
   rpcCalls: Row[];
   mockOrders: OrderRow[];
+  mockTables: Tables | null;
   waFromRoutes: WaCapture[];
   customerName: (scenario: string) => string;
   waCaptured: () => Promise<WaCapture[]>;
@@ -86,7 +87,8 @@ export const test = base.extend<{ ctx: Ctx }>({
     context.on('page', (p) => { if (p !== page && WA_RE.test(p.url())) void p.close(); });
 
     const unmocked: string[] = [];
-    if (MOCK) await installSupabaseMock(page, { tables: mockTables(), orders: mockOrders, unmocked });
+    const tables = MOCK ? mockTables() : null;
+    if (tables) await installSupabaseMock(page, { tables, orders: mockOrders, unmocked });
 
     page.on('request', (req) => {
       if (req.url().includes('/rest/v1/rpc/create_order_with_items')) {
@@ -105,7 +107,7 @@ export const test = base.extend<{ ctx: Ctx }>({
     });
 
     const ctx: Ctx = {
-      discovery, report, rpcCalls, mockOrders, waFromRoutes,
+      discovery, report, rpcCalls, mockOrders, mockTables: tables, waFromRoutes,
       customerName: (scenario) => `E2E-TEST-${process.env.E2E_RUN_ID}-${scenario}-${testInfo.project.name}`,
       waCaptured: async () => [
         ...(await page.evaluate(() => (window as unknown as { __waCaptured?: WaCapture[] }).__waCaptured ?? []).catch(() => [])),

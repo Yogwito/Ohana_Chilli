@@ -113,11 +113,12 @@ export function normalizeProductCustomization(
   const note = normalizeText(customizations.note);
   const extraTotal = extras.reduce((sum, extra) => sum + extra.price, 0);
 
-  if (removedIngredients.length === 0 && extras.length === 0 && !note) {
+  const variant = customizations.variant;
+  if (removedIngredients.length === 0 && extras.length === 0 && !note && !variant) {
     return undefined;
   }
 
-  return { removedIngredients, extras, note, extraTotal };
+  return { removedIngredients, extras, note, extraTotal, ...(variant ? { variant } : {}) };
 }
 
 export function getProductCustomizationKey(customizations?: ProductCustomization | null) {
@@ -135,6 +136,7 @@ export function getProductCustomizationKey(customizations?: ProductCustomization
     removedIngredients: sortedRemoved,
     extras: sortedExtras,
     note: normalized.note,
+    variantId: normalized.variant?.id ?? null,
   });
 }
 
@@ -143,7 +145,7 @@ export function calculateProductUnitPrice(
   customizations?: ProductCustomization | null,
 ) {
   const normalized = normalizeProductCustomization(customizations);
-  return basePrice + (normalized?.extraTotal ?? 0);
+  return basePrice + (normalized?.extraTotal ?? 0) + (normalized?.variant?.priceDelta ?? 0);
 }
 
 export function formatProductCustomizationLines(customizations?: ProductCustomization | null) {
@@ -151,6 +153,8 @@ export function formatProductCustomizationLines(customizations?: ProductCustomiz
   if (!normalized) return [];
 
   const lines: string[] = [];
+
+  if (normalized.variant) lines.push(`Sabor: ${normalized.variant.name}`);
 
   if (normalized.removedIngredients.length > 0) {
     lines.push(`Sin: ${normalized.removedIngredients.join(', ')}`);

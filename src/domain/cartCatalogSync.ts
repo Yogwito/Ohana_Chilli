@@ -11,6 +11,17 @@ export interface CatalogSnapshot {
 }
 
 const PROMO_PREFIX = 'promo-';
+export const CART_QUANTITY_LIMIT_MESSAGE = 'Para pedidos de más de 10 unidades escríbenos por WhatsApp';
+
+export function applyQuantityReviewIssues(items: CartItem[]): CartItem[] {
+  const byProduct = new Map<string, number>();
+  items.forEach(item => { if (item.type === 'product' && item.product) byProduct.set(item.product.id, (byProduct.get(item.product.id) ?? 0) + item.quantity); });
+  return items.map(item => {
+    const issues = (item.reviewIssues ?? []).filter(issue => issue !== CART_QUANTITY_LIMIT_MESSAGE);
+    if (item.quantity > 10 || (item.type === 'product' && item.product && (byProduct.get(item.product.id) ?? 0) > 10)) issues.push(CART_QUANTITY_LIMIT_MESSAGE);
+    return { ...item, reviewIssues: issues.length ? issues : undefined };
+  });
+}
 
 // Misma regla que create_order_with_items: combo activo, con precio y dentro de fechas.
 function isOrderablePromotion(promotion: Promotion, now: number) {
@@ -126,13 +137,17 @@ function reconcileCartItem(
     if (!currentProduct) return null;
 
     const customizations = normalizeProductCustomization(item.customizations);
-    const unitPrice = calculateProductUnitPrice(currentProduct.price, customizations);
+    const currentVariant = currentProduct.variants?.find((variant) => variant.id === customizations?.variant?.id);
+    const needsVariant = Boolean(currentProduct.variants?.length && !currentVariant);
+    const nextCustomizations = currentVariant && customizations ? { ...customizations, variant: currentVariant } : customizations;
+    const unitPrice = calculateProductUnitPrice(currentProduct.price, nextCustomizations);
 
     return {
       ...item,
       brand: currentProduct.brand,
       product: currentProduct,
-      customizations,
+      customizations: nextCustomizations,
+      reviewIssues: needsVariant ? ['Selecciona un sabor antes de enviar el pedido.'] : undefined,
       unitPrice,
       totalPrice: unitPrice * item.quantity,
     };
@@ -158,9 +173,9 @@ export function reconcileCartWithCatalog(state: CartState, snapshot: CatalogSnap
   const bowlRulesBySize = new Map(snapshot.bowlRules.map((rule) => [rule.size, rule]));
   const ingredientsById = new Map(snapshot.ingredients.map((ingredient) => [ingredient.id, ingredient]));
 
-  const nextItems = state.items
+  const nextItems = applyQuantityReviewIssues(state.items
     .map((item) => reconcileCartItem(item, productsById, bowlRulesBySize, ingredientsById, snapshot.promotions))
-    .filter((item): item is CartItem => Boolean(item));
+    .filter((item): item is CartItem => Boolean(item)));
 
   const nextState: CartState = {
     items: nextItems,

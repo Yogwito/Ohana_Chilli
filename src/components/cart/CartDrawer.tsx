@@ -15,7 +15,7 @@ interface CartDrawerProps {
 }
 
 export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
-  const { cart, updateQuantity, removeItem } = useCart();
+  const { cart, updateQuantity, setItemVariant, removeItem } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -75,7 +75,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
               <div className="space-y-4 py-4">
                 {cart.items.map((item, index) => {
                   const customizationLines = item.type === 'product'
-                    ? formatProductCustomizationLines(item.customizations)
+                    ? formatProductCustomizationLines(item.customizations).filter(line => !line.startsWith('Sabor:'))
                     : [];
 
                   return (
@@ -96,7 +96,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                               Ohana
                             </span>
                             <h4 className="mt-1 text-sm font-medium">
-                              {item.type === 'product' ? item.product?.name : 'Bowl Personalizado'}
+                              {item.type === 'product' ? `${item.product?.name}${item.customizations?.variant ? ` · ${item.customizations.variant.name}` : ''}` : 'Bowl Personalizado'}
                             </h4>
                             {item.type === 'custom-bowl' && item.customBowl && (
                               <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
@@ -110,6 +110,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                                 ))}
                               </div>
                             )}
+                            {item.reviewIssues?.length ? <div className="mt-2"><p className="text-xs text-destructive">{item.reviewIssues.join(' ')}</p><div className="flex flex-wrap gap-1 mt-1">{item.product?.variants?.map(variant => <button key={variant.id} type="button" className="rounded-full border px-2 py-1 text-xs" onClick={() => setItemVariant(item.id, variant)}>{variant.name}</button>)}</div></div> : null}
                             {item.notes && customizationLines.length === 0 && (
                               <p className="mt-0.5 text-xs italic text-muted-foreground">Nota: {item.notes}</p>
                             )}
@@ -160,7 +161,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                 <span className="font-semibold">Total</span>
                 <span className="font-bold text-ohana">{formatPrice(cart.total)}</span>
               </div>
-              <Button onClick={handleCheckout} className="w-full btn-ohana" size="lg">
+              <Button onClick={handleCheckout} disabled={cart.items.some(item => item.reviewIssues?.length)} className="w-full btn-ohana" size="lg">
                 Continuar pedido
               </Button>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

@@ -66,7 +66,7 @@ export interface Discovery {
   hoursEnforced: boolean;
   simple: Pick<ProductPick>;
   extras: Pick<ProductPick & { extras: { id: string; name: string; price: number }[] }>;
-  hatsu: Pick<ProductPick & { variants: string[] }>;
+  hatsu: Pick<ProductPick & { variants: { id: string; name: string; delta: number }[] }>;
   bowl: Pick<{
     size: { size: string; name: string; price: number; bases: number; proteins: number; accompaniments: number };
     /** Todos los tamaños (más barato primero) para los escenarios de bowl complejo. */
@@ -158,7 +158,7 @@ export function discover(tables: Tables, catalog: any, warnings: string[]): Disc
       ? { value: null, reason: "no hay producto público con nombre ilike '%hatsu%400%'" }
       : !hatsuVariants.some((v) => v.price_delta_cents === 0)
         ? { value: null, reason: `${hatsuRow.name} no tiene variantes activas con delta 0 (el servidor exigirá sabor)` }
-        : { value: { ...pp(hatsuRow)!, variants: hatsuVariants.map((v) => `${v.name}(${v.price_delta_cents})`) } },
+        : { value: { ...pp(hatsuRow)!, variants: hatsuVariants.map((v) => ({ id: v.id, name: v.name, delta: v.price_delta_cents })) } },
     bowl,
     combo: comboRow ? { value: { id: comboRow.id, title: comboRow.title, price: comboRow.price_cents } }
       : { value: null, reason: 'no hay promoción combo vigente hoy con price_cents' },

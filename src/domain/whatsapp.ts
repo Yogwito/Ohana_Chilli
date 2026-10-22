@@ -45,8 +45,8 @@ export function generateWhatsAppMessage(items: CartItem[], total: number, info: 
   items.forEach((item) => {
     const brand = '[Ohana]';
     if (item.type === 'product' && item.product) {
-      lines.push(`• ${brand} ${item.quantity}x ${item.product.name} — ${formatPrice(item.totalPrice)}`);
-      formatProductCustomizationLines(item.customizations).forEach((line) => {
+      lines.push(`• ${brand} ${item.quantity}x ${item.product.name}${item.customizations?.variant ? ` · ${item.customizations.variant.name}` : ''} — ${formatPrice(item.totalPrice)}`);
+      formatProductCustomizationLines(item.customizations).filter(line => !line.startsWith('Sabor:')).forEach((line) => {
         lines.push(`   ${line}`);
       });
     } else if (item.type === 'custom-bowl' && item.customBowl) {

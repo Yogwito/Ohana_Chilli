@@ -72,7 +72,9 @@ SELECT pg_temp.expect('bowl compl. extra con precio -> 1500', pg_temp.bowl('medi
 SELECT pg_temp.expect('producto simple', pg_temp.product('11111111-1111-1111-1111-111111111111', 8000), 8000, true);
 SELECT pg_temp.expect('producto + 2 extras', pg_temp.product('22222222-2222-2222-2222-222222222222', 28000,
   '{"extras":[{"id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},{"id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}]}'), 28000, true);
-SELECT pg_temp.expect('producto con variante delta 0', pg_temp.product('33333333-3333-3333-3333-333333333333', 9000), 9000, true);
+SELECT pg_temp.expect('producto con variante delta 0', pg_temp.product('33333333-3333-3333-3333-333333333333', 9000,
+  jsonb_build_object('variant', (SELECT jsonb_build_object('id', id, 'name', name) FROM public.product_variants
+    WHERE product_id = '33333333-3333-3333-3333-333333333333' AND is_active AND price_delta_cents = 0 LIMIT 1))), 9000, true);
 SELECT pg_temp.expect('promo combo', pg_temp.product('promo-55555555-5555-5555-5555-555555555555', 40000), 40000, true);
 SELECT pg_temp.expect('precio manipulado', pg_temp.product('11111111-1111-1111-1111-111111111111', 7000), 7000, false);
 ROLLBACK;

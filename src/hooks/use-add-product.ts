@@ -29,7 +29,7 @@ export function useAddProduct(product: Product, productForCustomization: Product
   };
 
   const handleAddClick = () => {
-    if (isProductCustomizable(productForCustomization)) {
+    if (product.variants?.length || isProductCustomizable(productForCustomization)) {
       setDrawerOpen(true);
       return;
     }

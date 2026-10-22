@@ -1,5 +1,5 @@
 import { resolveProductImageUrl } from '@/domain/productImages';
-import type { BowlSizeRule, Brand, Category, Ingredient, Product, Promotion } from '@/types';
+import type { BowlSizeRule, Brand, Category, Ingredient, Product, Promotion, ProductVariant } from '@/types';
 
 export interface ProductQueryRow {
   id: string;
@@ -60,6 +60,8 @@ export interface PublicCatalog {
   promotions: Promotion[];
   settings: SettingQueryRow[];
 }
+
+interface VariantQueryRow { id: string; product_id: string; name: string; price_delta_cents: number; }
 
 function toArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
@@ -141,9 +143,15 @@ export function mapBowlRule(row: BowlRuleQueryRow): BowlSizeRule {
 
 export function mapPublicCatalogResponse(value: unknown): PublicCatalog {
   const payload = toRecord(value);
+  const variants = toArray<VariantQueryRow>(payload.product_variants);
+  const variantsByProduct = new Map<string, ProductVariant[]>();
+  variants.forEach((row) => variantsByProduct.set(row.product_id, [
+    ...(variantsByProduct.get(row.product_id) ?? []),
+    { id: row.id, name: row.name, priceDelta: row.price_delta_cents },
+  ]));
 
   return {
-    products: toArray<ProductQueryRow>(payload.products).map(mapProduct),
+    products: toArray<ProductQueryRow>(payload.products).map((row) => ({ ...mapProduct(row), variants: variantsByProduct.get(row.id) ?? [] })),
     categories: toArray<CategoryQueryRow>(payload.categories).map(mapCategory),
     ingredients: toArray<IngredientQueryRow>(payload.ingredients).map(mapIngredient),
     bowlRules: toArray<BowlRuleQueryRow>(payload.bowl_rules).map(mapBowlRule),

@@ -9,8 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Save, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { BUSINESS_SETTING_DEFINITIONS, type BusinessSettingKey, isBusinessOpenNow } from '@/domain/businessSettings';
-import { useBusinessSettings } from '@/hooks/use-catalog';
+import { BUSINESS_SETTING_DEFINITIONS, type BusinessSettingKey } from '@/domain/businessSettings';
+import { useBusinessOpenStatus } from '@/hooks/use-catalog';
+import { parseWeeklyHours, type WeeklyHours } from '@/domain/businessHours';
+
+const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
 type BannerColor = 'warning' | 'danger' | 'info';
 
@@ -22,11 +25,14 @@ const COLOR_CLASSES: Record<BannerColor, string> = {
 
 export default function SettingsAdmin() {
   const queryClient = useQueryClient();
-  const { data: businessSettings } = useBusinessSettings();
+  const { isOpen, weeklyConfigured } = useBusinessOpenStatus();
 
   const [hoursEnforce, setHoursEnforce] = useState(false);
   const [hoursEnforceLoading, setHoursEnforceLoading] = useState(true);
   const [hoursEnforceSaving, setHoursEnforceSaving] = useState(false);
+  const [weeklyHours, setWeeklyHours] = useState<WeeklyHours>(Array(7).fill(null));
+  const [weeklyLoading, setWeeklyLoading] = useState(true);
+  const [weeklySaving, setWeeklySaving] = useState(false);
 
   const [bannerEnabled, setBannerEnabled] = useState(false);
   const [bannerMessage, setBannerMessage] = useState('Estamos cerrados por ahora. ¡Volvemos pronto!');
@@ -43,6 +49,10 @@ export default function SettingsAdmin() {
   const [bizSaving, setBizSaving] = useState(false);
 
   useEffect(() => {
+    supabase.from('settings').select('value').eq('key', 'business_hours_weekly').maybeSingle().then(({ data }) => {
+      setWeeklyHours(parseWeeklyHours(data?.value) ?? Array(7).fill(null));
+      setWeeklyLoading(false);
+    });
     supabase
       .from('settings')
       .select('key, value')
@@ -55,14 +65,30 @@ export default function SettingsAdmin() {
   }, []);
 
   const saveHoursEnforce = async (value: boolean) => {
+    if (value && weeklyHours.every(day => !day)) { toast.error('Configura al menos un día antes de activar el bloqueo'); return; }
+    if (value && !parseWeeklyHours(JSON.stringify(weeklyHours))) { toast.error('Revisa el horario semanal'); return; }
     setHoursEnforceSaving(true);
     const { error } = await supabase
       .from('settings')
-      .upsert({ key: 'business_hours_enforce', value: String(value) }, { onConflict: 'key' });
+      .upsert(value ? [
+        { key: 'business_hours_weekly', value: JSON.stringify(weeklyHours) },
+        { key: 'business_hours_enforce', value: 'true' },
+      ] : [{ key: 'business_hours_enforce', value: 'false' }], { onConflict: 'key' });
     setHoursEnforceSaving(false);
     if (error) { toast.error('Error al guardar'); return; }
+    setHoursEnforce(value);
     await queryClient.invalidateQueries({ queryKey: ['public-catalog'] });
     toast.success(value ? 'Bloqueo activado' : 'Bloqueo desactivado');
+  };
+
+  const saveWeeklyHours = async () => {
+    if (!parseWeeklyHours(JSON.stringify(weeklyHours))) { toast.error('Revisa que cada cierre sea posterior a la apertura'); return; }
+    setWeeklySaving(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'business_hours_weekly', value: JSON.stringify(weeklyHours) }, { onConflict: 'key' });
+    setWeeklySaving(false);
+    if (error) { toast.error('Error al guardar horario'); return; }
+    await queryClient.invalidateQueries({ queryKey: ['public-catalog'] });
+    toast.success('Horario actualizado');
   };
 
   useEffect(() => {
@@ -143,9 +169,8 @@ export default function SettingsAdmin() {
               <Switch
                 id="hours_enforce"
                 checked={hoursEnforce}
-                disabled={hoursEnforceSaving}
+                disabled={hoursEnforceSaving || weeklyLoading}
                 onCheckedChange={async (v) => {
-                  setHoursEnforce(v);
                   await saveHoursEnforce(v);
                 }}
               />
@@ -156,17 +181,26 @@ export default function SettingsAdmin() {
                 </p>
               </div>
             </div>
-            {businessSettings && (
+            {!weeklyLoading && (
               <div className="rounded-lg bg-muted/50 border px-4 py-3 text-sm flex items-center gap-2">
                 {(() => {
-                  const open = isBusinessOpenNow(businessSettings);
-                  if (open === null) return <span className="text-muted-foreground">Sin horarios configurados — define <strong>Horario Lun-Vie</strong> y <strong>Sáb-Dom</strong> en Información del negocio.</span>;
+                  const open = weeklyConfigured ? isOpen : null;
+                  if (open === null) return <span className="text-muted-foreground">Sin horario semanal configurado.</span>;
                   return open
                     ? <><span className="w-2 h-2 rounded-full bg-green-500 shrink-0" /> <span>Ahora: <strong className="text-green-700 dark:text-green-400">Abierto</strong></span></>
                     : <><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> <span>Ahora: <strong className="text-red-600 dark:text-red-400">Cerrado</strong></span></>;
                 })()}
               </div>
             )}
+            <div className="space-y-3 border-t pt-4">
+              <p className="text-sm text-muted-foreground">Hora de Bogotá. Activa cada día y define apertura y cierre.</p>
+              {DAY_NAMES.map((name, day) => <div key={name} className="flex flex-wrap items-center gap-3">
+                <Switch aria-label={`Abrir ${name}`} checked={Boolean(weeklyHours[day])} onCheckedChange={(enabled) => setWeeklyHours(previous => previous.map((value, index) => index === day ? (enabled ? { open: '11:00', close: '21:00' } : null) : value))} />
+                <span className="w-24 text-sm">{name}</span>
+                {weeklyHours[day] ? <><Input aria-label={`Apertura ${name}`} type="time" className="w-32" value={weeklyHours[day]!.open} onChange={event => setWeeklyHours(previous => previous.map((value, index) => index === day ? { ...value!, open: event.target.value } : value))} /><Input aria-label={`Cierre ${name}`} type="time" className="w-32" value={weeklyHours[day]!.close} onChange={event => setWeeklyHours(previous => previous.map((value, index) => index === day ? { ...value!, close: event.target.value } : value))} /></> : <span className="text-sm text-muted-foreground">Cerrado</span>}
+              </div>)}
+              <Button type="button" onClick={saveWeeklyHours} disabled={weeklySaving || weeklyLoading}>Guardar horario semanal</Button>
+            </div>
           </>
         )}
       </div>

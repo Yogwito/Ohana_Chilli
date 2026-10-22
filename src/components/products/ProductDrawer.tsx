@@ -22,12 +22,14 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
   const [removed, setRemoved] = useState<string[]>([]);
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
   const [note, setNote] = useState('');
+  const [variantId, setVariantId] = useState('');
 
   // Reset state when product changes
   useEffect(() => {
     setRemoved([]);
     setExtraQty({});
     setNote('');
+    setVariantId('');
   }, [product?.id]);
 
   if (!product) return null;
@@ -63,20 +65,25 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
   });
 
   const extraTotal = extrasSelected.reduce((s, e) => s + e.price, 0);
-  const totalPrice = product.price + extraTotal;
+  const selectedVariant = product.variants?.find((variant) => variant.id === variantId);
+  const totalPrice = product.price + extraTotal + (selectedVariant?.priceDelta ?? 0);
+  const requiresVariant = Boolean(product.variants?.length);
 
   const handleConfirm = () => {
-    onConfirm({ removedIngredients: removed, extras: extrasSelected, note, extraTotal });
+    if (requiresVariant && !selectedVariant) return;
+    onConfirm({ removedIngredients: removed, extras: extrasSelected, note, extraTotal, variant: selectedVariant });
     onClose();
   };
 
   const handleAddWithoutChanges = () => {
-    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0 });
+    if (requiresVariant && !selectedVariant) return;
+    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0, variant: selectedVariant });
     onClose();
   };
 
   const handleAddWithoutConfiguredIngredients = () => {
-    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0 });
+    if (requiresVariant && !selectedVariant) return;
+    onConfirm({ removedIngredients: [], extras: [], note, extraTotal: 0, variant: selectedVariant });
     onClose();
   };
 
@@ -107,6 +114,8 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
               </SheetDescription>
               <p className="text-brand font-bold mt-1">{formatPrice(product.price)}</p>
             </div>
+
+            {requiresVariant && <div><p className="text-sm font-semibold mb-2">Elige un sabor *</p><div className="flex flex-wrap gap-2">{product.variants!.map((variant) => <button key={variant.id} type="button" aria-pressed={variant.id === variantId} onClick={() => setVariantId(variant.id)} className={cn('rounded-full border px-3 py-2 text-sm', variant.id === variantId ? 'bg-brand text-white border-brand' : 'border-border')}>{variant.name}{variant.priceDelta > 0 ? ` · +${formatPrice(variant.priceDelta)}` : ''}</button>)}</div></div>}
 
             {isLoading ? (
               <div className="space-y-4">
@@ -228,6 +237,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
               <button
                 type="button"
                 onClick={handleConfirm}
+                disabled={requiresVariant && !selectedVariant}
                 className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
               >
                 Agregar al carrito · {formatPrice(totalPrice)}
@@ -235,6 +245,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
               <button
                 type="button"
                 onClick={handleAddWithoutChanges}
+                disabled={requiresVariant && !selectedVariant}
                 className="w-full border border-border text-foreground py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors"
               >
                 Agregar sin cambios
@@ -244,6 +255,7 @@ export default function ProductDrawer({ product, open, onClose, onConfirm }: Pro
             <button
               type="button"
               onClick={handleAddWithoutConfiguredIngredients}
+              disabled={requiresVariant && !selectedVariant}
               className="w-full bg-brand text-white py-3 rounded-xl font-semibold text-sm hover:bg-brand/90 transition-colors"
             >
               Agregar sin cambios →

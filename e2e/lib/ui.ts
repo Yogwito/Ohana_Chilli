@@ -36,7 +36,7 @@ export async function gotoHome(page: Page) {
   await expect(page.getByText(/opciones para disfrutar/)).toBeVisible();
 }
 
-export async function addProduct(page: Page, name: string, extras: string[] = []) {
+export async function addProduct(page: Page, name: string, extras: string[] = [], flavor?: string) {
   const search = page.getByRole('searchbox', { name: 'Buscar en el menú' });
   await search.scrollIntoViewIfNeeded();
   await search.fill(name);
@@ -49,6 +49,10 @@ export async function addProduct(page: Page, name: string, extras: string[] = []
   await expect(sheet.or(toast).first()).toBeVisible();
   if (await sheet.isVisible()) {
     await expect(sheet.getByText('Cargando opciones...')).toHaveCount(0);
+    if (flavor) {
+      await expect(sheet.getByRole('button', { name: /^Agregar sin cambios/ }).first()).toBeDisabled();
+      await sheet.getByRole('button', { name: new RegExp(`^${esc(flavor)}(?: ·|$)`) }).click();
+    }
     for (const extra of extras) {
       const row = sheet.getByText(extra, { exact: true }).locator('xpath=ancestor::div[.//button[@aria-label="Agregar"]][1]');
       await row.getByRole('button', { name: 'Agregar', exact: true }).click();

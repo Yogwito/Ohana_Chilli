@@ -1,4 +1,4 @@
-// Port JS de supabase/hotfix/2026-10-21c_bowl_legacy_extras.sql (misma lógica y mensajes),
+// Port JS de supabase/hotfix/2026-10-22d_checkout_rules.sql (misma lógica y mensajes),
 // usado SOLO en E2E_MOCK=1. Si la SQL cambia, actualiza esto.
 import type { OrderRow, Row, Tables } from '../types';
 import { randomUUID } from 'node:crypto';
@@ -13,6 +13,19 @@ export function createOrderWithItems(t: Tables, args: Row, store: OrderRow[]): s
   if (!['pickup', 'delivery'].includes(args.p_order_type)) raise('Tipo de orden inválido');
   const items: Row[] = args.p_items;
   if (!Array.isArray(items) || items.length === 0) raise('La orden no tiene items');
+
+  if (t.settings.find(s => s.key === 'business_hours_enforce')?.value === 'true') {
+    const schedule = JSON.parse(t.settings.find(s => s.key === 'business_hours_weekly')?.value ?? 'null');
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Bogota', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+    const get = (type: string) => parts.find(part => part.type === type)?.value ?? '';
+    const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
+    const hours = schedule?.[day];
+    const time = `${get('hour')}:${get('minute')}`;
+    if (!hours || time < hours.open || time >= hours.close) raise('Estamos cerrados. Vuelve en nuestro horario de atención');
+  }
+  const perProduct = new Map<string, number>();
+  for (const item of items) if (item.details?.product_id) perProduct.set(item.details.product_id, (perProduct.get(item.details.product_id) ?? 0) + Number(item.quantity ?? 0));
+  if ([...perProduct.values()].some(qty => qty > 10)) raise('Para pedidos de más de 10 unidades escríbenos por WhatsApp');
 
   let fee = 0;
   if (args.p_order_type === 'delivery') {
@@ -30,7 +43,8 @@ export function createOrderWithItems(t: Tables, args: Row, store: OrderRow[]): s
   const nowMs = Date.now();
   for (const item of items) {
     const qty = Number(item.quantity ?? 0);
-    if (qty < 1 || qty > 50) raise(`Cantidad inválida para ${item.name}`);
+    if (qty < 1) raise(`Cantidad inválida para ${item.name}`);
+    if (qty > 10) raise('Para pedidos de más de 10 unidades escríbenos por WhatsApp');
     const claimed = item.unit_price_cents ?? -1;
     const d = item.details ?? {};
     let unit = 0;
@@ -53,8 +67,9 @@ export function createOrderWithItems(t: Tables, args: Row, store: OrderRow[]): s
         if (variantId != null) {
           const v = active.find((x) => x.id === variantId);
           if (!v) raise(`Sabor/variante no disponible para ${item.name}`);
+          if (d.customizations?.variant?.name !== v.name) raise(`Sabor/variante no disponible para ${item.name}`);
           unit += v.price_delta_cents;
-        } else if (active.length > 0 && !active.some((v) => v.price_delta_cents === 0)) {
+        } else if (active.length > 0) {
           raise(`Falta seleccionar sabor para ${item.name}`);
         }
       }
@@ -143,6 +158,7 @@ export function publicCatalog(t: Tables) {
   const pick = (r: Row, keys: string[]) => Object.fromEntries(keys.map((k) => [k, r[k] ?? null]));
   return {
     products: t.products.filter((p) => p.is_active),
+    product_variants: t.product_variants.filter((v) => v.is_active),
     categories: t.categories,
     ingredients: t.ingredients.filter((i) => i.is_active),
     bowl_rules: t.bowl_rules,

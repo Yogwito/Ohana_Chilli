@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Page, TestInfo } from '@playwright/test';
 import { test, expect, type Ctx } from './lib/fixtures';
-import { findOrders, MOCK } from './lib/data';
+import { adminClient, findOrders, MOCK } from './lib/data';
 import {
   addCombo, addProduct, buildBowl, expectedBowlPrice, fillCheckout, goToCheckout, gotoHome, money, openCart, readUiTotal,
   selectZone, shot, submit, submitButton,
@@ -10,7 +10,7 @@ import {
 const PHONE = '+57 300 000 0000';
 const CART_KEY = 'ohana-bowls-cart'; // clave real en src/context/CartContext.tsx
 
-interface Line { label: string; qty: number; productId?: string; extraIds?: string[]; bowl?: boolean }
+interface Line { label: string; qty: number; productId?: string; variantId?: string; extraIds?: string[]; bowl?: boolean }
 
 function need<T>(pick: { value: T | null; reason?: string }, what: string): T {
   test.skip(!pick.value, `Sin datos en ${MOCK ? 'mock' : 'staging'} para ${what}: ${pick.reason}`);
@@ -70,6 +70,7 @@ async function verifySuccess(page: Page, testInfo: TestInfo, ctx: Ctx, o: {
     const item = order.order_items.find((it: any) => (l.bowl ? !!it.details?.validation : it.details?.product_id === l.productId));
     expect(item, `order_item para ${l.label}`).toBeTruthy();
     expect(item!.quantity).toBe(l.qty);
+    if (l.variantId) expect(item!.details?.customizations?.variant?.id).toBe(l.variantId);
     if (l.extraIds) {
       const ids = (item!.details?.customizations?.extras ?? []).map((e: any) => e.id).sort();
       expect(ids).toEqual([...l.extraIds].sort());
@@ -141,9 +142,94 @@ test.describe('checkout E2E', () => {
 
   test('03 Hatsu 400 ml con variantes delta 0', async ({ page, ctx }, testInfo) => {
     const p = need(ctx.discovery.hatsu, 'Hatsu 400 ml');
-    ctx.report.notes.push(`variantes: ${p.variants.join(', ')}`);
+    const flavor = p.variants.find(v => v.delta === 0)!;
+    ctx.report.notes.push(`sabor: ${flavor.name}`);
+    await addProduct(page, p.name, [], flavor.name);
+    await runOrder(page, testInfo, ctx, 's03', { lines: [{ label: `${p.name} · ${flavor.name}`, qty: 1, productId: p.id, variantId: flavor.id }], expected: p.price });
+  });
+
+  test('03b carrito legacy conserva Hatsu y pide sabor', async ({ page, ctx }, testInfo) => {
+    const p = need(ctx.discovery.hatsu, 'Hatsu 400 ml');
+    await addProduct(page, p.name, [], p.variants[0].name);
+    await page.evaluate((key) => {
+      const cart = JSON.parse(localStorage.getItem(key)!);
+      delete cart.items[0].customizations.variant;
+      localStorage.setItem(key, JSON.stringify(cart));
+    }, CART_KEY);
+    await page.reload();
+    const drawer = await openCart(page, testInfo);
+    await expect(drawer.getByText('Selecciona un sabor antes de enviar el pedido.')).toBeVisible();
+    await expect(drawer.getByRole('button', { name: 'Continuar pedido' })).toBeDisabled();
+    await drawer.getByRole('button', { name: p.variants[0].name, exact: true }).click();
+    await expect(drawer.getByRole('button', { name: 'Continuar pedido' })).toBeEnabled();
+  });
+
+  test('03e dos sabores del mismo Hatsu quedan en dos líneas', async ({ page, ctx }, testInfo) => {
+    const p = need(ctx.discovery.hatsu, 'Hatsu 400 ml');
+    test.skip(p.variants.length < 2, 'se requieren dos sabores activos');
+    await addProduct(page, p.name, [], p.variants[0].name);
+    await addProduct(page, p.name, [], p.variants[1].name);
+    const drawer = await openCart(page, testInfo);
+    await expect(drawer.getByRole('heading', { name: `${p.name} · ${p.variants[0].name}` })).toBeVisible();
+    await expect(drawer.getByRole('heading', { name: `${p.name} · ${p.variants[1].name}` })).toBeVisible();
+    await expect(drawer.getByRole('heading', { name: new RegExp(`^${p.name} ·`) })).toHaveCount(2);
+  });
+
+  test('03c máximo 10 unidades del mismo producto', async ({ page, ctx }, testInfo) => {
+    const p = need(ctx.discovery.simple, 'producto simple');
     await addProduct(page, p.name);
-    await runOrder(page, testInfo, ctx, 's03', { lines: [{ label: p.name, qty: 1, productId: p.id }], expected: p.price });
+    const drawer = await openCart(page, testInfo);
+    const plus = drawer.getByRole('button', { name: 'Aumentar cantidad' }).first();
+    for (let n = 1; n < 10; n++) await plus.click();
+    await expect(drawer.locator('span[aria-live=polite]').first()).toHaveText('10');
+    await plus.click();
+    await expect(drawer.locator('span[aria-live=polite]').first()).toHaveText('10');
+    await expect(page.getByText('Para pedidos de más de 10 unidades escríbenos por WhatsApp')).toBeVisible();
+    const name = ctx.customerName('s03c');
+    await drawer.getByRole('button', { name: 'Continuar pedido' }).click();
+    await fillCheckout(page, { name, phone: PHONE, orderType: 'pickup' });
+    await tamperRpc(page, args => { args.p_items[0].quantity = 11; args.p_total_cents = p.price * 11; });
+    const rejected = await submit(page);
+    expect(rejected.created).toBe(false);
+    expect(rejected.serverError).toMatch(/más de 10 unidades/);
+    expect(await findOrders(name, ctx.mockOrders)).toHaveLength(0);
+  });
+
+  test('03d horario cerrado muestra banner y RPC rechaza', async ({ page, ctx }) => {
+    const schedule = JSON.stringify(Array(7).fill(null));
+    const keys = ['business_hours_weekly', 'business_hours_enforce'];
+    const db = MOCK ? null : adminClient();
+    const old = db ? (await db.from('settings').select('key,value').in('key', keys)).data ?? [] : [];
+    try {
+      if (ctx.mockTables) {
+        ctx.mockTables.settings.push({ key: 'business_hours_weekly', value: schedule });
+        ctx.mockTables.settings.find(row => row.key === 'business_hours_enforce')!.value = 'true';
+      } else {
+        const { error } = await db!.from('settings').upsert([{ key: 'business_hours_weekly', value: schedule }, { key: 'business_hours_enforce', value: 'true' }], { onConflict: 'key' });
+        expect(error).toBeNull();
+      }
+      await page.reload();
+      await expect(page.getByRole('status').filter({ hasText: 'Estamos cerrados' })).toBeVisible();
+      const p = need(ctx.discovery.simple, 'producto simple');
+      await addProduct(page, p.name);
+      const drawer = await openCart(page, test.info());
+      await drawer.getByRole('button', { name: 'Continuar pedido' }).click();
+      await expect(page.getByRole('button', { name: /Cerrado — fuera de horario/ })).toBeDisabled();
+      const payload = { p_customer_name: 'E2E horario', p_phone: '3001234567', p_order_type: 'pickup', p_address: null, p_delivery_zone: null, p_delivery_fee_cents: 0, p_notes: null, p_total_cents: p.price, p_items: [{ brand_id: 'ohana', name: p.name, quantity: 1, unit_price_cents: p.price, details: { product_id: p.id } }] };
+      if (ctx.mockTables) {
+        const { createOrderWithItems } = await import('./lib/mock/rpc');
+        expect(() => createOrderWithItems(ctx.mockTables!, payload, ctx.mockOrders)).toThrow(/Estamos cerrados/);
+      } else {
+        const { error } = await db!.rpc('create_order_with_items', payload);
+        expect(error?.message).toMatch(/Estamos cerrados/);
+      }
+    } finally {
+      if (ctx.mockTables) ctx.mockTables.settings.find(row => row.key === 'business_hours_enforce')!.value = 'false';
+      else {
+        await db!.from('settings').upsert(old, { onConflict: 'key' });
+        for (const key of keys.filter(key => !old.some(row => row.key === key))) await db!.from('settings').delete().eq('key', key);
+      }
+    }
   });
 
   test('04 bowl con proteína extra, salsa y complemento pago', async ({ page, ctx }, testInfo) => {
@@ -206,7 +292,7 @@ test.describe('checkout E2E', () => {
       lines.push({ label: p.name, qty: 1, productId: p.id, extraIds: p.extras.map((e) => e.id) });
       expected += p.price + p.extras.reduce((s, e) => s + e.price, 0);
     }
-    if (d.hatsu.value) { await addProduct(page, d.hatsu.value.name); lines.push({ label: d.hatsu.value.name, qty: 1, productId: d.hatsu.value.id }); expected += d.hatsu.value.price; }
+    if (d.hatsu.value) { const flavor = d.hatsu.value.variants.find(v => v.delta === 0)!; await addProduct(page, d.hatsu.value.name, [], flavor.name); lines.push({ label: `${d.hatsu.value.name} · ${flavor.name}`, qty: 1, productId: d.hatsu.value.id, variantId: flavor.id }); expected += d.hatsu.value.price; }
     if (d.combo.value) { await addCombo(page, d.combo.value.title); lines.push({ label: d.combo.value.title, qty: 1, productId: `promo-${d.combo.value.id}` }); expected += d.combo.value.price; }
     if (d.bowl.value) { await buildBowl(page, d.bowl.value); lines.push({ label: `Bowl ${d.bowl.value.size.name}`, qty: 1, bowl: true }); expected += d.bowl.value.expectedPrice; }
     test.skip(lines.length < 2, 'menos de 2 tipos de ítem disponibles');

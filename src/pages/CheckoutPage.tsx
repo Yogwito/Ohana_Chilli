@@ -70,7 +70,7 @@ export default function CheckoutPage() {
   const location = useLocation();
   const { cart, updateQuantity, removeItem, clearCart } = useCart();
   const { data: businessSettings } = useBusinessSettings();
-  const { isClosed: isBusinessClosed, isOpen: isBusinessOpen, isEnforced: isHoursEnforced } = useBusinessOpenStatus();
+  const { isClosed: isBusinessClosed, isOpen: isBusinessOpen, isEnforced: isHoursEnforced, message: closedMessage } = useBusinessOpenStatus();
   const {
     data: deliveryZones = [],
     isLoading: loadingDeliveryZones,
@@ -222,6 +222,9 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitError('');
+
+    if (isBusinessClosed) { setSubmitError(closedMessage ?? 'Estamos cerrados.'); return; }
+    if (cart.items.some(item => item.reviewIssues?.length)) { setSubmitError('Revisa los productos del carrito antes de continuar.'); return; }
 
     const result = checkoutSchema.safeParse(form);
     if (!result.success) {
@@ -831,9 +834,7 @@ export default function CheckoutPage() {
                       <div>
                         <p className="font-semibold text-red-800 dark:text-red-300">Estamos cerrados</p>
                         <p className="text-red-700 dark:text-red-400 text-xs mt-0.5">
-                          {businessSettings?.hoursWeekday
-                            ? `Horario: Lun–Vie ${businessSettings.hoursWeekday}${businessSettings.hoursWeekend ? ` · Sáb–Dom ${businessSettings.hoursWeekend}` : ''}`
-                            : 'Vuelve en nuestro próximo horario de atención.'}
+                          {closedMessage ?? 'Vuelve en nuestro próximo horario de atención.'}
                         </p>
                       </div>
                     </div>
@@ -841,7 +842,7 @@ export default function CheckoutPage() {
 
                   <Button
                     type="submit"
-                    disabled={orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || !termsAccepted}
+                    disabled={orderStatus === 'submitting' || submitBlockedByZone || submitBlockedByClosed || cart.items.some(item => item.reviewIssues?.length) || !termsAccepted}
                     className="w-full rounded-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white font-semibold transition-colors gap-2 disabled:bg-muted disabled:text-muted-foreground"
                     size="lg"
                   >

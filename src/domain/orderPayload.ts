@@ -71,7 +71,7 @@ export function buildBowlValidation(bowl: CustomBowl): BowlValidationPayload {
 export function buildOrderItemsPayload(items: CartItem[]) {
   return items.map((item) => ({
     brand_id: item.brand,
-    name: item.type === 'product' ? (item.product?.name ?? 'Producto') : 'Bowl Personalizado',
+    name: item.type === 'product' ? `${item.product?.name ?? 'Producto'}${item.customizations?.variant ? ` · ${item.customizations.variant.name}` : ''}` : 'Bowl Personalizado',
     quantity: item.quantity,
     unit_price_cents: item.unitPrice,
     details:
@@ -89,7 +89,12 @@ export function buildOrderItemsPayload(items: CartItem[]) {
         : {
             product_id: item.product?.id,
             notes: item.notes,
-            customizations: item.customizations ?? null,
+            customizations: item.customizations ? {
+              ...item.customizations,
+              variant: item.customizations.variant
+                ? { id: item.customizations.variant.id, name: item.customizations.variant.name }
+                : undefined,
+            } : null,
           },
   }));
 }

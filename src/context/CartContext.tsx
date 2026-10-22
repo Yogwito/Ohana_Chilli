@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { CartItem, CartState, Product, CustomBowl, Brand, ProductCustomization } from '@/types';
-import { reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
+import { CartItem, CartState, Product, CustomBowl, Brand, ProductCustomization, ProductVariant } from '@/types';
+import { applyQuantityReviewIssues, CART_QUANTITY_LIMIT_MESSAGE, reconcileCartWithCatalog } from '@/domain/cartCatalogSync';
 import { calculateBowlPrice } from '@/domain/bowlPricing';
 import {
   calculateProductUnitPrice,
@@ -19,6 +19,7 @@ type CartAction =
   | { type: 'ADD_PRODUCT'; payload: { product: Product; quantity: number; notes?: string; customizations?: ProductCustomization } }
   | { type: 'ADD_CUSTOM_BOWL'; payload: { customBowl: CustomBowl; notes?: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
+  | { type: 'SET_ITEM_VARIANT'; payload: { itemId: string; variant: ProductVariant } }
   | { type: 'REMOVE_ITEM'; payload: { itemId: string } }
   | { type: 'RECONCILE_CATALOG'; payload: Parameters<typeof reconcileCartWithCatalog>[1] }
   | { type: 'CLEAR_CART' }
@@ -45,6 +46,8 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       const customizationKey = getProductCustomizationKey(customizations);
       const normalizedNotes = getProductNotesKey(customizations, notes);
       const unitPrice = calculateProductUnitPrice(product.price, customizations);
+      const currentQuantity = state.items.filter(item => item.type === 'product' && item.product?.id === product.id).reduce((sum, item) => sum + item.quantity, 0);
+      if (currentQuantity + quantity > 10) return state;
       const existingIndex = state.items.findIndex(
         item => {
           if (item.type !== 'product' || item.product?.id !== product.id) return false;
@@ -83,17 +86,30 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     }
     case 'UPDATE_QUANTITY': {
       const { itemId, quantity } = action.payload;
+      const target = state.items.find(item => item.id === itemId);
+      if (target && quantity >= target.quantity && quantity > 10) return state;
+      if (target?.type === 'product' && target.product && quantity >= target.quantity && state.items.filter(item => item.type === 'product' && item.product?.id === target.product?.id && item.id !== itemId).reduce((sum, item) => sum + item.quantity, quantity) > 10) return state;
       if (quantity <= 0) {
-        const newItems = state.items.filter(item => item.id !== itemId);
+        const newItems = applyQuantityReviewIssues(state.items.filter(item => item.id !== itemId));
         return { items: newItems, ...calculateTotals(newItems) };
       }
-      const newItems = state.items.map(item =>
+      const newItems = applyQuantityReviewIssues(state.items.map(item =>
         item.id === itemId ? { ...item, quantity, totalPrice: item.unitPrice * quantity } : item
-      );
+      ));
       return { items: newItems, ...calculateTotals(newItems) };
     }
+    case 'SET_ITEM_VARIANT': {
+      const items = state.items.map(item => {
+        if (item.id !== action.payload.itemId || item.type !== 'product' || !item.product?.variants?.some(variant => variant.id === action.payload.variant.id)) return item;
+        const customizations = normalizeProductCustomization({ removedIngredients: item.customizations?.removedIngredients ?? [], extras: item.customizations?.extras ?? [], note: item.customizations?.note ?? '', extraTotal: 0, variant: action.payload.variant });
+        const unitPrice = calculateProductUnitPrice(item.product.price, customizations);
+        return { ...item, customizations, reviewIssues: undefined, unitPrice, totalPrice: unitPrice * item.quantity };
+      });
+      const reviewedItems = applyQuantityReviewIssues(items);
+      return { items: reviewedItems, ...calculateTotals(reviewedItems) };
+    }
     case 'REMOVE_ITEM': {
-      const newItems = state.items.filter(item => item.id !== action.payload.itemId);
+      const newItems = applyQuantityReviewIssues(state.items.filter(item => item.id !== action.payload.itemId));
       return { items: newItems, ...calculateTotals(newItems) };
     }
     case 'RECONCILE_CATALOG':
@@ -116,6 +132,7 @@ interface CartActionsContextType {
   addProduct: (product: Product, quantity?: number, notes?: string, customizations?: ProductCustomization) => void;
   addCustomBowl: (customBowl: CustomBowl, notes?: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
+  setItemVariant: (itemId: string, variant: ProductVariant) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
   getItemCount: () => number;
@@ -168,16 +185,22 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [bowlRules, catalogReady, ingredients, products, promotions, promotionsReady]);
 
   const addProduct = useCallback((product: Product, quantity = 1, notes?: string, customizations?: ProductCustomization) => {
+    if (cart.items.filter(item => item.type === 'product' && item.product?.id === product.id).reduce((sum, item) => sum + item.quantity, 0) + quantity > 10) { toast.error(CART_QUANTITY_LIMIT_MESSAGE); return; }
     dispatch({ type: 'ADD_PRODUCT', payload: { product, quantity, notes, customizations } });
-  }, []);
+  }, [cart.items]);
 
   const addCustomBowl = useCallback((customBowl: CustomBowl, notes?: string) => {
     dispatch({ type: 'ADD_CUSTOM_BOWL', payload: { customBowl, notes } });
   }, []);
 
   const updateQuantity = useCallback((itemId: string, quantity: number) => {
+    const target = cart.items.find(item => item.id === itemId);
+    if (target && quantity >= target.quantity && quantity > 10) { toast.error(CART_QUANTITY_LIMIT_MESSAGE); return; }
+    if (target?.type === 'product' && target.product && quantity >= target.quantity && cart.items.filter(item => item.type === 'product' && item.product?.id === target.product?.id && item.id !== itemId).reduce((sum, item) => sum + item.quantity, quantity) > 10) { toast.error(CART_QUANTITY_LIMIT_MESSAGE); return; }
     dispatch({ type: 'UPDATE_QUANTITY', payload: { itemId, quantity } });
-  }, []);
+  }, [cart.items]);
+
+  const setItemVariant = useCallback((itemId: string, variant: ProductVariant) => dispatch({ type: 'SET_ITEM_VARIANT', payload: { itemId, variant } }), []);
 
   const removeItem = useCallback((itemId: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: { itemId } });
@@ -191,8 +214,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const stateValue = useMemo(() => ({ cart }), [cart]);
   const actionsValue = useMemo(() => ({
-    addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand,
-  }), [addProduct, addCustomBowl, updateQuantity, removeItem, clearCart, getItemCount, getItemsByBrand]);
+    addProduct, addCustomBowl, updateQuantity, setItemVariant, removeItem, clearCart, getItemCount, getItemsByBrand,
+  }), [addProduct, addCustomBowl, updateQuantity, setItemVariant, removeItem, clearCart, getItemCount, getItemsByBrand]);
 
   return (
     <CartStateContext.Provider value={stateValue}>

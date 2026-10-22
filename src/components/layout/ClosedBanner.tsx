@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { useBannerSettings } from '@/hooks/use-catalog';
+import { useBannerSettings, useBusinessOpenStatus } from '@/hooks/use-catalog';
 import { cn } from '@/lib/utils';
 
 const COLOR_CLASSES = {
@@ -12,7 +12,9 @@ const COLOR_CLASSES = {
 export default function ClosedBanner() {
   const [dismissed, setDismissed] = useState(false);
   const { data } = useBannerSettings();
+  const business = useBusinessOpenStatus();
 
+  if (business.isClosed) return <div role="status" className="w-full bg-amber-500 text-white text-center px-4 py-2 text-sm font-semibold">{business.message ?? 'Estamos cerrados.'}</div>;
   if (!data?.enabled || dismissed) return null;
 
   const colorClass = COLOR_CLASSES[data.color as keyof typeof COLOR_CLASSES] ?? COLOR_CLASSES.warning;

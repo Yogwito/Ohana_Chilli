@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { getBusinessOpenStatus, parseWeeklyHours } from '@/domain/businessHours';
 import { supabase } from '@/integrations/supabase/client';
 import {
   EMPTY_BUSINESS_SETTINGS,
@@ -194,16 +196,23 @@ export function useProductDefaultIngredients(productId: string | null) {
 }
 
 export function useBusinessOpenStatus() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 30_000); return () => window.clearInterval(timer); }, []);
   const { data: settings } = useBusinessSettings();
+  const { data: scheduleRaw } = useSettingValue('business_hours_weekly');
   const { data: enforceRaw } = useSettingValue('business_hours_enforce');
 
   const isEnforced = enforceRaw === 'true';
-  const isOpen = settings ? isBusinessOpenNow(settings) : null;
+  const schedule = parseWeeklyHours(scheduleRaw);
+  const status = getBusinessOpenStatus(schedule, now);
+  const isOpen = schedule ? status.isOpen : isEnforced ? false : settings ? isBusinessOpenNow(settings, now) : null;
 
   return {
     isOpen,
     isEnforced,
     isClosed: isEnforced && isOpen === false,
     hoursConfigured: isOpen !== null,
+    weeklyConfigured: schedule !== null,
+    message: status.message ?? (isEnforced && !schedule ? 'Estamos cerrados. Horario de atención sin configurar' : null),
   };
 }

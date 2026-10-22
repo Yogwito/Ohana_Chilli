@@ -16,7 +16,7 @@ Los pedidos de prueba se llaman `E2E-TEST-<run>-<escenario>-<mobile|desktop>` y 
 
 ## Requisito previo
 
-Staging debe tener aplicado `supabase/hotfix/2026-10-21c_bowl_legacy_extras.sql` (los escenarios 04b/04c fallan con 21b). Con la versión 21 de la RPC, el escenario 07d (recargo de bowl rebajado) falla, porque el servidor acepta el recargo rebajado.
+Staging debe tener aplicada la migración `20261022100000_public_catalog_variants.sql` y la RPC `2026-10-22d_checkout_rules.sql`. La suite comprueba sabores, horario y límite, además de los casos de 21c. El escenario de horario cerrado cambia dos settings de staging y los restaura al terminar; ejecútala sin otros cambios de horario simultáneos.
 
 ## Pasos para el dueño (zsh, un comando por línea, pégalos de a uno)
 
@@ -70,7 +70,11 @@ Si el negocio tiene `business_hours_enforce=true` y está cerrado, los escenario
 |---|---|---|
 | 01 | Producto simple (sin extras ni variantes) | total UI = WhatsApp = `orders.total_cents`; 1 `order_item` |
 | 02 | Producto con 2 extras (`product_default_ingredients.is_extra`) | precio base + extras; ids de extras en `details.customizations.extras` |
-| 03 | Hatsu 400 ml (variantes activas delta 0) | pasa al precio base sin selector de sabor |
+| 03 | Hatsu 400 ml (variantes activas delta 0) | sabor obligatorio y persistido en `order_items.details` |
+| 03b | Carrito legacy de Hatsu sin sabor | conserva el ítem y exige elegir sabor |
+| 03e | Dos sabores de Hatsu | dos líneas separadas en el carrito |
+| 03c | Límite 10 | la UI rechaza la unidad 11 |
+| 03d | Horario cerrado | banner, botón inactivo y rechazo por RPC |
 | 04 | Bowl con proteína extra, salsa premium y complemento pago | precio del builder = servidor; `details.validation` |
 | 05 | Promoción combo vigente | `product_id = promo-<id>` al precio de la promo |
 | 06 | Carrito mixto con los cinco | suma correcta, todos los ítems en WhatsApp y DB |
